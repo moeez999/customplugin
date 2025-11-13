@@ -964,10 +964,12 @@ echo $studentsItemsHtml;
                     <div class="monthly_cal_modal">
                         <div class="monthly_cal_header">
                             <button id="weeklyLessonCalendarPrevManage"
-                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;">&#8592;</button>
+                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#232323;"
+                                aria-label="Previous month">&#8592;</button>
                             <span class="monthly_cal_month_label" id="weeklyLessonCalendarMonthManage"></span>
                             <button id="weeklyLessonCalendarNextManage"
-                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;">&#8594;</button>
+                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#232323;"
+                                aria-label="Next month">&#8594;</button>
                         </div>
                         <div class="monthly_cal_grid" id="weeklyLessonCalendarDaysManage"></div>
                         <div class="monthly_cal_grid" id="weeklyLessonCalendarDatesManage"></div>
@@ -1043,9 +1045,9 @@ echo $studentsItemsHtml;
 <div class="calendar-modal-backdrop" id="calendarModalBackdropManage">
     <div class="calendar-modal" id="calendarModal">
         <div class="calendar-modal-header">
-            <div class="calendar-modal-arrow" id="calendarPrevMonth">&#8592;</div>
-            <span id="calendarMonthYear">January 2025</span>
-            <div class="calendar-modal-arrow" id="calendarNextMonth">&#8594;</div>
+            <div class="calendar-modal-arrow" id="calendarPrevMonthManage">&#8592;</div>
+            <span id="calendarMonthYearManage">January 2025</span>
+            <div class="calendar-modal-arrow" id="calendarNextMonthManage">&#8594;</div>
         </div>
         <div class="calendar-modal-grid">
             <div class="calendar-modal-weekdays">
@@ -1600,6 +1602,10 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
     if (startDateEl && startDateStr) {
         const startDate = parseUnixTimestamp(startDateStr);
         startDateEl.textContent = formatDate(startDate);
+        // store deterministic ISO date for later parsing
+        try {
+            startDateEl.dataset.fullDate = startDate.toISOString().split('T')[0];
+        } catch (e) {}
         window.weeklyLessonStartDate = startDate;
     }
 
@@ -1698,6 +1704,10 @@ function updateDateTimeFields(date, startTime, endTime, duration) {
             day: 'numeric'
         });
         dateElement.textContent = formattedDate;
+        // store deterministic ISO date for later parsing/opening
+        try {
+            dateElement.dataset.fullDate = (new Date(date)).toISOString().split('T')[0];
+        } catch (e) {}
     }
 
     // Update time input with the selected lesson's start time
@@ -2101,10 +2111,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (startDateText) {
             startDateText.textContent = formatDate(weeklyLessonStartDate);
+            try {
+                startDateText.dataset.fullDate = weeklyLessonStartDate.toISOString().split('T')[0];
+            } catch (e) {}
         }
         if (endDateBtn) {
             endDateBtn.disabled = false;
             endDateBtn.textContent = formatDate(weeklyLessonEndsOnDate);
+            try {
+                endDateBtn.dataset.fullDate = weeklyLessonEndsOnDate.toISOString().split('T')[0];
+            } catch (e) {}
         }
 
         $('#weeklyLessonStartDateBtnManage')?.addEventListener('click', () => {
@@ -2156,11 +2172,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 weeklyLessonStartDate = new Date(selectedDate);
                 if (startDateText) {
                     startDateText.textContent = formatDate(weeklyLessonStartDate);
+                    try {
+                        startDateText.dataset.fullDate = weeklyLessonStartDate.toISOString().split(
+                            'T')[0];
+                    } catch (e) {}
                 }
             } else {
                 weeklyLessonEndsOnDate = new Date(selectedDate);
                 if (endDateBtn) {
                     endDateBtn.textContent = formatDate(weeklyLessonEndsOnDate);
+                    try {
+                        endDateBtn.dataset.fullDate = weeklyLessonEndsOnDate.toISOString().split(
+                            'T')[0];
+                    } catch (e) {}
                 }
             }
             backdrop.style.display = 'none';
@@ -2369,7 +2393,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (lessonType === 'single') {
             const duration = $('#durationDropdownDisplayManage')?.textContent.trim() || '';
-            const date = $('#selectedDateTextManage')?.textContent.trim() || '';
+            const dateEl = document.getElementById('selectedDateTextManage');
+            const date = dateEl?.dataset?.fullDate || dateEl?.textContent.trim() || '';
             const time = $('.time-input')?.value.trim() || '';
 
             formData.singleLesson = {
@@ -2381,13 +2406,15 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             const interval = $('#weeklyLessonIntervalDisplayManage')?.textContent.trim() || '1';
             const period = $('#weeklyLessonPeriodDisplayManage')?.textContent.trim() || 'Week';
-            const startDate = $('#weeklyLessonStartDateTextManage')?.textContent.trim() || '';
+            const startEl = document.getElementById('weeklyLessonStartDateTextManage');
+            const startDate = startEl?.dataset?.fullDate || startEl?.textContent.trim() || '';
 
             const endRadio = document.querySelector(
                 'input[name="weeklyLessonEndOptionManage"]:checked');
             const endOption = endRadio?.id || 'weeklyLessonEndNeverManage';
             const endOptionLabel = endRadio?.nextElementSibling?.textContent || 'Never';
-            const endsOn = $('#weeklyLessonEndDateBtnManage')?.textContent.trim() || 'Never';
+            const endsOnEl = document.getElementById('weeklyLessonEndDateBtnManage');
+            const endsOn = endsOnEl?.dataset?.fullDate || endsOnEl?.textContent.trim() || 'Never';
             const occurrences = $('#weeklyLessonOccurrenceDisplayManage')?.textContent.trim() || '';
 
             const selectedDays = [];

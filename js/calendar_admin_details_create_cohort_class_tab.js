@@ -182,9 +182,44 @@ function monthName(monthIdx) {
     "December",
   ][monthIdx];
 }
-let calendarYear = 2025,
-  calendarMonth = 0,
-  selectedCalendarDay = 7;
+// initialize create-calendar state to today
+const _now = new Date();
+let calendarYear = _now.getFullYear(),
+  calendarMonth = _now.getMonth(),
+  selectedCalendarDay = _now.getDate();
+
+// manage modal (separate) calendar state
+let calendarYearManage = _now.getFullYear(),
+  calendarMonthManage = _now.getMonth(),
+  selectedCalendarDayManage = _now.getDate();
+
+// Helper to parse displayed date strings in the UI into a Date object
+function parseDisplayedDate(txt) {
+  if (!txt) return null;
+  txt = String(txt).trim();
+
+  // ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) {
+    const d = new Date(txt);
+    return isNaN(d) ? null : d;
+  }
+
+  // Try Date.parse directly
+  let d = new Date(txt);
+  if (!isNaN(d)) return d;
+
+  // Normalize: remove commas and weekday, add space between month and day if missing
+  let cleaned = txt
+    .replace(/,/g, "")
+    .replace(/^\w{3,9}\s+/, "")
+    .trim();
+  cleaned = cleaned.replace(/([A-Za-z])(?=\d)/g, "$1 ");
+  const hasYear = /\d{4}/.test(cleaned);
+  const tryStr = hasYear ? cleaned : `${cleaned} ${new Date().getFullYear()}`;
+  d = new Date(tryStr);
+  if (!isNaN(d)) return d;
+  return null;
+}
 function renderCalendar() {
   $("#calendarMonthYear").text(monthName(calendarMonth) + " " + calendarYear);
   let days = getMonthDays(calendarYear, calendarMonth);
@@ -197,7 +232,6 @@ function renderCalendar() {
     }" data-disabled="${d.disabled}">${d.day || ""}</div>`;
   });
   $("#calendarDaysGrid").html(html);
-  $("#calendarDaysGridManage").html(html);
 }
 renderCalendar();
 $("#calendarPrevMonth").on("click", function () {
@@ -216,15 +250,88 @@ $("#calendarNextMonth").on("click", function () {
   }
   renderCalendar();
 });
-$(document).on("click", ".calendar-modal-day", function () {
+// Create modal: day click
+$(document).on("click", "#calendarDaysGrid .calendar-modal-day", function () {
   if ($(this).data("disabled")) return;
   selectedCalendarDay = $(this).data("day");
   renderCalendar();
 });
+
+// Manage modal: day click (separate state)
+function renderCalendarManage() {
+  $("#calendarMonthYearManage").text(
+    monthName(calendarMonthManage) + " " + calendarYearManage
+  );
+  let days = getMonthDays(calendarYearManage, calendarMonthManage);
+  let html = "";
+  days.forEach((d, i) => {
+    let sel =
+      !d.disabled && d.day == selectedCalendarDayManage ? "selected" : "";
+    let dis = d.disabled ? "disabled" : "";
+    html += `<div class="calendar-modal-day ${sel} ${dis}" data-day="${
+      d.day
+    }" data-disabled="${d.disabled}">${d.day || ""}</div>`;
+  });
+  $("#calendarDaysGridManage").html(html);
+}
+
+$(document).on(
+  "click",
+  "#calendarDaysGridManage .calendar-modal-day",
+  function () {
+    if ($(this).data("disabled")) return;
+    selectedCalendarDayManage = $(this).data("day");
+    renderCalendarManage();
+  }
+);
+
+// Manage prev/next
+$("#calendarPrevMonthManage").on("click", function () {
+  calendarMonthManage--;
+  if (calendarMonthManage < 0) {
+    calendarMonthManage = 11;
+    calendarYearManage--;
+  }
+  renderCalendarManage();
+});
+$("#calendarNextMonthManage").on("click", function () {
+  calendarMonthManage++;
+  if (calendarMonthManage > 11) {
+    calendarMonthManage = 0;
+    calendarYearManage++;
+  }
+  renderCalendarManage();
+});
 $("#customDateDropdownDisplay").on("click", function () {
+  // set create calendar view from displayed date if possible
+  (function () {
+    const txt =
+      $("#selectedDateText").attr("data-full-date") ||
+      $("#selectedDateText").text().trim();
+    const parsed = parseDisplayedDate(txt);
+    if (parsed) {
+      calendarYear = parsed.getFullYear();
+      calendarMonth = parsed.getMonth();
+      selectedCalendarDay = parsed.getDate();
+      renderCalendar();
+    }
+  })();
   $("#calendarModalBackdrop").fadeIn(100);
 });
 $("#customDateDropdownDisplayManage").on("click", function () {
+  // set manage calendar view from displayed date if possible
+  (function () {
+    const txt =
+      $("#selectedDateTextManage").attr("data-full-date") ||
+      $("#selectedDateTextManage").text().trim();
+    const parsed = parseDisplayedDate(txt);
+    if (parsed) {
+      calendarYearManage = parsed.getFullYear();
+      calendarMonthManage = parsed.getMonth();
+      selectedCalendarDayManage = parsed.getDate();
+      renderCalendarManage();
+    }
+  })();
   $("#calendarModalBackdropManage").fadeIn(100);
 });
 $("#calendarDoneBtn").on("click", function () {
@@ -234,7 +341,9 @@ $("#calendarDoneBtn").on("click", function () {
     month: "short",
     day: "numeric",
   });
-  $("#selectedDateText").text(dayStr);
+  $("#selectedDateText")
+    .text(dayStr)
+    .attr("data-full-date", d.toISOString().split("T")[0]);
   $("#calendarModalBackdrop").fadeOut(100);
 });
 $("#calendarModalBackdrop").on("mousedown", function (e) {
@@ -242,13 +351,19 @@ $("#calendarModalBackdrop").on("mousedown", function (e) {
 });
 
 $("#calendarDoneBtnManage").on("click", function () {
-  let d = new Date(calendarYear, calendarMonth, selectedCalendarDay);
+  let d = new Date(
+    calendarYearManage,
+    calendarMonthManage,
+    selectedCalendarDayManage
+  );
   let dayStr = d.toLocaleString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  $("#selectedDateTextManage").text(dayStr);
+  $("#selectedDateTextManage")
+    .text(dayStr)
+    .attr("data-full-date", d.toISOString().split("T")[0]);
   $("#calendarModalBackdropManage").fadeOut(100);
 });
 $("#calendarModalBackdropManage").on("mousedown", function (e) {

@@ -784,10 +784,10 @@ echo $students_items_html;
                     <div class="monthly_cal_modal">
                         <div class="monthly_cal_header">
                             <button id="wl_cal_prev"
-                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;">&#8592;</button>
+                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#232323;" aria-label="Previous month">&#8592;</button>
                             <span class="monthly_cal_month_label" id="wl_cal_month"></span>
                             <button id="wl_cal_next"
-                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;">&#8594;</button>
+                                style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#232323;" aria-label="Next month">&#8594;</button>
                         </div>
                         <div class="monthly_cal_grid" id="wl_cal_days"></div>
                         <div class="monthly_cal_grid" id="wl_cal_dates"></div>
@@ -862,7 +862,7 @@ echo $students_items_html;
     <div class="calendar-modal" id="calendarModal">
         <div class="calendar-modal-header">
             <div class="calendar-modal-arrow" id="calendarPrevMonth">&#8592;</div>
-            <span id="calendarMonthYear">January 2025</span>
+            <span id="calendarMonthYear"></span>
             <div class="calendar-modal-arrow" id="calendarNextMonth">&#8594;</div>
         </div>
         <div class="calendar-modal-grid">
@@ -1338,9 +1338,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (wlCalendarTarget === 'start') {
             wlStartDate = new Date(wlCalSelectedDate);
             document.getElementById('wl_start_date_text').textContent = formatDate(wlStartDate);
+            document.getElementById('wl_start_date_text').dataset.fullDate = wlStartDate.toISOString().split('T')[0];
         } else if (wlCalendarTarget === 'ends') {
             wlEndsOnDate = new Date(wlCalSelectedDate);
             document.getElementById('wl_end_date_btn').textContent = formatDate(wlEndsOnDate);
+            document.getElementById('wl_end_date_btn').dataset.fullDate = wlEndsOnDate.toISOString().split('T')[0];
         }
         document.getElementById('wlStartDateCalendarBackdrop').style.display = 'none';
     });
@@ -1838,21 +1840,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
 
                     formData.weeklyLesson = {
-                        startDate: document.getElementById('wl_start_date_text')?.textContent
-                            .trim() || '',
-                        startDateUnix: Math.floor(new Date(document.getElementById(
-                            'wl_start_date_text')?.textContent).getTime() / 1000),
+                        startDate: document.getElementById('wl_start_date_text')?.dataset?.fullDate || document.getElementById('wl_start_date_text')?.textContent.trim() || '',
+                        startDateUnix: Math.floor(new Date(document.getElementById('wl_start_date_text')?.dataset?.fullDate || document.getElementById('wl_start_date_text')?.textContent).getTime() / 1000),
                         interval: parseInt(document.getElementById('wl_interval_display')
                             ?.textContent.trim() || '1'),
                         period: document.getElementById('wl_period_display')?.textContent
                             .trim() || 'Week',
                         endOption: document.querySelector('input[name="wl_end_option"]:checked')
                             ?.id || 'wl_end_never',
-                        endsOn: document.getElementById('wl_end_date_btn')?.textContent
-                            .trim() || 'Never',
+                        endsOn: document.getElementById('wl_end_date_btn')?.dataset?.fullDate || document.getElementById('wl_end_date_btn')?.textContent.trim() || 'Never',
                         endsOnUnix: document.getElementById('wl_end_on').checked ?
-                            Math.floor(new Date(document.getElementById('wl_end_date_btn')
-                                ?.textContent).getTime() / 1000) : null,
+                            Math.floor(new Date(document.getElementById('wl_end_date_btn')?.dataset?.fullDate || document.getElementById('wl_end_date_btn')?.textContent).getTime() / 1000) : null,
                         occurrences: parseInt(document.getElementById('wl_occ_display')
                             ?.textContent.replace('occurrences', '').trim() || '13'),
                         days: selectedDays,
