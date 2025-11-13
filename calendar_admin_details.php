@@ -173,9 +173,11 @@
                 </section>
 
                 <!-- Cohort Trigger -->
+                <!-- Cohort Trigger -->
                 <div class="cohort-search-dropdown" id="cohort-search-trigger">
                     <div class="cohort-search-trigger">
-                        <span id="cohort-display-text">Select Session</span>
+                        <span id="cohort-display-text">Select Cohorts</span>
+                        <div class="cohort-pill-container" id="cohort-pills"></div>
                         <span class="dropdown-arrow"><img src="./img/dropdown-arrow-down.svg" alt=""></span>
                     </div>
                 </div>
@@ -204,11 +206,11 @@
                             </div>
 
                             <div class="cohort-tab-contents">
-                                <!-- Cohort (single-select radios) -->
+                                <!-- Cohort (multi-select with checkboxes) -->
                                 <div class="cohort-tab-content" id="cohort-tab">
                                     <div class="search-input-wrapper">
                                         <input type="text" class="search-input-placeholder" id="cohort-search-input"
-                                            placeholder="Entre cohort name" />
+                                            placeholder="Search cohorts" />
                                     </div>
 
                                     <div id="cohort-no-results" class="cohort-no-results"
@@ -216,11 +218,13 @@
                                         No cohorts found
                                     </div>
 
+                                    <div class="selected-cohorts-container" id="selected-cohorts-container"></div>
+
                                     <div class="cohort-list-wrapper">
                                         <form class="cohort-list-form">
                                             <fieldset id="cohort-options-fieldset">
-                                                <legend class="visually-hidden">Select a cohort</legend>
-                                                <!-- JS injected (radio inputs expected) -->
+                                                <legend class="visually-hidden">Select cohorts</legend>
+                                                <!-- JS injected (checkbox inputs expected) -->
                                             </fieldset>
                                         </form>
                                     </div>
@@ -371,8 +375,7 @@ $(function() {
         $('#' + name + '-tab').show();
         $('.cohort-tab-btn').removeClass('cohort-tab-active');
         $('.cohort-tab-btn[data-tab="' + name + '"]').addClass('cohort-tab-active');
-        // show per-tab no-results if no inputs injected
-        // cohort -> check #cohort-options-fieldset
+
         var map = {
             'cohort': '#cohort-options-fieldset',
             'oneonone': '#oneonone-options-fieldset',
@@ -387,15 +390,12 @@ $(function() {
         }
     }
 
-    // initialize
     showCohortTab('cohort');
 
-    // click handler for tabs (delegate to container for robustness)
     $('.cohort-tabs').on('click', '.cohort-tab-btn', function(e) {
         e.preventDefault();
         var t = $(this).data('tab');
         if (!t) {
-            // fallback: try to read from text
             t = $(this).text().toLowerCase().replace(/[^a-z0-9]+/g, '');
         }
         showCohortTab(t);
@@ -409,47 +409,57 @@ $(function() {
             $('#cohort-value').val('');
         }
 
-        if (!obj) {
-            $('#cohort-display-text').text('Select Cohort');
+        if (!obj || !obj.ids || obj.ids.length === 0) {
+            $('#cohort-display-text').text('Select Cohorts');
             return;
         }
 
-        if (obj.type === 'cohort') {
-            var id = obj.id || '';
-            if (!id) {
-                $('#cohort-display-text').text('Select Cohort');
-            } else {
-                // try to find label text for selected radio
-                var $input = $('#cohort-options-fieldset input[value="' + id + '"]');
-                var text = id;
-                if ($input.length) {
-                    var rid = $input.attr('id');
-                    var lab = $('label[for="' + rid + '"]').text();
-                    if (lab) {
-                        text = lab;
-                    }
-                }
-                $('#cohort-display-text').text(text);
-            }
-        } else {
-            var count = (obj.ids || []).length;
-            $('#cohort-display-text').text(count ? (count + ' selected') : 'Select Cohort');
-        }
+        const count = obj.ids.length;
+        $('#cohort-display-text').text(count + ' cohort' + (count > 1 ? 's' : '') + ' selected');
     }
 
-    // handle cohort radio selection (single-select)
-    $(document).on('change', '#cohort-options-fieldset input[type=radio]', function() {
-        var val = $(this).val();
+    // Handle cohort checkbox selection (multi-select)
+    $(document).on('change', '#cohort-options-fieldset input[type=checkbox]', function() {
+        var selected = [];
+        $('#cohort-options-fieldset input[type=checkbox]:checked').each(function() {
+            selected.push($(this).val());
+        });
+
+        var $container = $('#selected-cohorts-container');
+        $container.empty();
+
+        if (selected.length > 0) {
+            $container.show();
+            selected.forEach(function(sid) {
+                var iid = $('#cohort-options-fieldset input[value="' + sid + '"]').attr('id');
+                var label = $('label[for="' + iid + '"]').text() || sid;
+                var $pill = $('<span class="selected-pill" data-id="' + sid +
+                    '" data-type="cohort">' + label +
+                    ' <button type="button" class="remove-pill">×</button></span>');
+                $container.append($pill);
+            });
+        } else {
+            $container.hide();
+        }
+
         updateCohortValue({
             type: 'cohort',
-            id: val
+            ids: selected
         });
     });
 
-    // handle multi-select (checkbox) behavior for oneonone / conference / peertalk
+    // Click remove on pill -> uncheck corresponding checkbox
+    $(document).on('click', '#selected-cohorts-container .remove-pill', function(e) {
+        var pid = $(this).parent().data('id');
+        var $cb = $('#cohort-options-fieldset input[value="' + pid + '"]');
+        if ($cb.length) {
+            $cb.prop('checked', false).trigger('change');
+        }
+    });
+
+    // Handle multi-select for other tabs (oneonone, conference, peertalk)
     var multiTypes = ['oneonone', 'conference', 'peertalk'];
     multiTypes.forEach(function(type) {
-        // checkbox change -> rebuild pills and update hidden value
         $(document).on('change', '#' + type + '-options-fieldset input[type=checkbox]', function() {
             var selected = [];
             $('#' + type + '-options-fieldset input[type=checkbox]:checked').each(function() {
@@ -474,25 +484,11 @@ $(function() {
             });
         });
 
-        // click remove on pill -> uncheck corresponding checkbox
         $(document).on('click', '#' + type + '-selected-container .remove-pill', function(e) {
             var pid = $(this).parent().data('id');
             var $cb = $('#' + type + '-options-fieldset input[value="' + pid + '"]');
             if ($cb.length) {
                 $cb.prop('checked', false).trigger('change');
-            } else {
-                // if input not present, just remove pill
-                $(this).parent().remove();
-                // rebuild value
-                var remaining = [];
-                $('#' + type + '-options-fieldset input[type=checkbox]:checked').each(
-                    function() {
-                        remaining.push($(this).val());
-                    });
-                updateCohortValue({
-                    type: type,
-                    ids: remaining
-                });
             }
         });
     });
