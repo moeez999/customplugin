@@ -1481,32 +1481,47 @@ function populateSingleLessonDropdown(jsonData) {
                     .remove('selected'));
                 this.classList.add('selected');
 
+                // ✅ Read values dynamically from the clicked element
+                const clickedStartTime = this.dataset.startTime;
+                const clickedEndTime = this.dataset.endTime;
+                const activityIndex = this.dataset.activityIndex;
+                const activity = jsonData.activities[activityIndex];
+
+                if (!activity || !activity.googlemeet) return;
+
+                const gm = activity.googlemeet;
+                const clickedStartDate = parseFirstStartDisp(gm.first_start_disp);
+                const durationSeconds = gm.events[0]?.duration || 0;
+                const clickedDurationMinutes = Math.round(durationSeconds / 60);
+
                 const disp = document.getElementById('singleLessonDropdownDisplayManage');
                 if (disp) {
-                    disp.textContent = `${month} ${day}, ${dayOfWeek}, ${startTime} - ${endTime}`;
+                    const month = clickedStartDate.toLocaleDateString('en-US', {
+                        month: 'short'
+                    });
+                    const day = clickedStartDate.getDate();
+                    const dayOfWeek = clickedStartDate.toLocaleDateString('en-US', {
+                        weekday: 'long'
+                    });
+
+                    disp.textContent =
+                        `${month} ${day}, ${dayOfWeek}, ${clickedStartTime} - ${clickedEndTime}`;
+
                     const cmidVal = (gm && typeof gm.id !== 'undefined') ? gm.id : (this.dataset
                         ?.cmid ?? null);
                     if (cmidVal !== null && typeof cmidVal !== 'undefined' && cmidVal !== '') {
                         disp.dataset.cmid = String(cmidVal);
-                        // also reflect on wrapper for easier querying
                         const wrapper = document.getElementById('singleLessonDropdownWrapper');
                         if (wrapper) wrapper.dataset.cmid = String(cmidVal);
-                    } else {
-                        disp.removeAttribute('data-cmid');
-                        const wrapper = document.getElementById('singleLessonDropdownWrapper');
-                        if (wrapper) wrapper.removeAttribute('data-cmid');
                     }
                 }
 
-                // store the selected cmid globally so payload builders can read it
-                window.selectedCmidManage = (gm && typeof gm.id !== 'undefined') ? gm.id : (this
-                    .dataset?.cmid ?? null);
-                try {
-                    console.log('single selected cmid:', window.selectedCmidManage, 'element dataset:',
-                        this.dataset.cmid, 'display dataset:', document.getElementById(
-                            'singleLessonDropdownDisplayManage')?.dataset?.cmid, 'gm:', gm);
-                } catch (e) {}
-                updateDateTimeFields(startDate, startTime, endTime, durationMinutes);
+                window.selectedCmidManage = (gm && typeof gm.id !== 'undefined') ? gm.id : (this.dataset
+                    ?.cmid ?? null);
+
+                // ✅ Use the dynamically read values
+                updateDateTimeFields(clickedStartDate, clickedStartTime, clickedEndTime,
+                    clickedDurationMinutes);
             });
 
             dropdownCard.appendChild(item);
@@ -2511,11 +2526,63 @@ document.addEventListener('DOMContentLoaded', function() {
         createTimeDropdown(endInput);
     })();
 
+
+    // Add this in your DOMContentLoaded section
+
+    /* =========================================
+       9) DETECT MANUAL DATE/TIME CHANGES
+    ========================================== */
+
+    // Listen for date changes
+    const customDateDisplay = document.getElementById('customDateDropdownDisplayManage');
+    if (customDateDisplay) {
+        // Create a MutationObserver to watch for text changes
+        const dateObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                    console.log('Date manually changed to:', customDateDisplay.textContent);
+                    // Update the data attribute
+                    const selectedDateText = document.getElementById('selectedDateTextManage');
+                    if (selectedDateText) {
+                        console.log('Updated date data:', selectedDateText.dataset.fullDate);
+                    }
+                }
+            });
+        });
+
+        dateObserver.observe(customDateDisplay, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+    }
+
+    // Listen for time changes
+    const timeInput = document.querySelector('#manageclassTabContent .custom-time-pill .time-input');
+    if (timeInput) {
+        timeInput.addEventListener('change', () => {
+            console.log('Time manually changed to:', timeInput.value);
+        });
+
+        timeInput.addEventListener('input', () => {
+            console.log('Time input changed to:', timeInput.value);
+        });
+    }
+
+    // Listen for duration changes (already handled, but verify)
+    const durationOptions = document.querySelectorAll('.one2one-duration-option');
+    durationOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const minutes = parseInt(option.dataset.minutes);
+            console.log('Duration manually changed to:', minutes, 'minutes');
+        });
+    });
+
     /* =========================================
        8) MAIN SCHEDULE BUTTON
     ========================================== */
 
-    scheduleBtn?.addEventListener('click', async () => { // Added 'async' keyword
+    scheduleBtn?.addEventListener('click', async () => {
         const teacher = {
             id: teacherTrigger?.dataset.userid || null,
             name: teacherLabel?.textContent.trim() || 'Unknown Teacher',
@@ -2530,7 +2597,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const lessonType = $('.one2one-lesson-type-btn-manage.selected')?.dataset.type || 'single';
 
-        // Get cmid based on lesson type
         let cmid = null;
         if (lessonType === 'single') {
             const selectedSingleEl = document.querySelector(
@@ -2561,13 +2627,59 @@ document.addEventListener('DOMContentLoaded', function() {
         );
 
         if (lessonType === 'single') {
-            // Get duration in minutes
+            // ✅ FIX: Always read CURRENT values from DOM
             const durationMinutes = getSelectedDurationInMinutes();
             const durationDisplay = formatMinutesToDisplay(durationMinutes);
 
+            // ✅ Read the ACTUAL current date from the display element
             const dateEl = document.getElementById('selectedDateTextManage');
-            const date = dateEl?.dataset?.fullDate || dateEl?.textContent.trim() || '';
-            const time = $('.time-input')?.value.trim() || '';
+            const currentDateText = dateEl?.textContent.trim() || '';
+
+            // ✅ Parse the display text to get the actual date
+            let date = dateEl?.dataset?.fullDate || '';
+
+            // If dataset.fullDate is not set, parse from text
+            if (!date && currentDateText) {
+                // Parse format like "Tue, Feb 11" or "Tue, Feb11"
+                const parts = currentDateText.replace(',', '').split(' ').filter(p => p);
+                if (parts.length >= 3) {
+                    const monthStr = parts[1].replace(/\d+/g, ''); // Remove any digits from month
+                    const dayMatch = currentDateText.match(/\d+/); // Find first number
+                    const day = dayMatch ? parseInt(dayMatch[0]) : 1;
+                    const year = new Date().getFullYear(); // Use current year
+
+                    const monthMap = {
+                        'Jan': 0,
+                        'Feb': 1,
+                        'Mar': 2,
+                        'Apr': 3,
+                        'May': 4,
+                        'Jun': 5,
+                        'Jul': 6,
+                        'Aug': 7,
+                        'Sep': 8,
+                        'Oct': 9,
+                        'Nov': 10,
+                        'Dec': 11
+                    };
+
+                    const month = monthMap[monthStr];
+                    if (month !== undefined) {
+                        // ✅ FIX: Create date at noon to avoid timezone issues
+                        const dateObj = new Date(year, month, day, 12, 0, 0);
+                        // Format as YYYY-MM-DD without timezone conversion
+                        const yyyy = dateObj.getFullYear();
+                        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        const dd = String(dateObj.getDate()).padStart(2, '0');
+                        date = `${yyyy}-${mm}-${dd}`;
+                    }
+                }
+            }
+
+            // ✅ Read the ACTUAL current time from the input
+            const timeInput = document.querySelector(
+                '#manageclassTabContent .custom-time-pill .time-input');
+            const time = timeInput?.value.trim() || '';
 
             formData.singleLesson = {
                 duration: durationMinutes,
@@ -2578,40 +2690,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 fullDateTime: `${date} at ${time}`
             };
 
-            console.log(`Duration: ${durationMinutes} minutes (displayed as: ${durationDisplay})`);
+            console.log('✅ CURRENT Single Lesson Data:');
+            console.log(`  - Date Display Text: ${currentDateText}`);
+            console.log(`  - Parsed Date: ${date}`);
+            console.log(`  - Duration: ${durationMinutes} minutes (${durationDisplay})`);
+            console.log(`  - Time: ${time}`);
+            console.log(`  - CMID: ${cmid}`);
         } else {
-            const interval = $('#weeklyLessonIntervalDisplayManage')?.textContent.trim() || '1';
-            const period = $('#weeklyLessonPeriodDisplayManage')?.textContent.trim() || 'Week';
+            // ✅ FIX: Read CURRENT values for weekly lesson
+            const intervalEl = document.getElementById('weeklyLessonIntervalDisplayManage');
+            const interval = intervalEl?.textContent.trim() || '1';
+
+            const periodEl = document.getElementById('weeklyLessonPeriodDisplayManage');
+            const period = periodEl?.textContent.trim() || 'Week';
+
             const startEl = document.getElementById('weeklyLessonStartDateTextManage');
-            const startDate = startEl?.dataset?.fullDate || startEl?.textContent.trim() || '';
+            const startDateText = startEl?.textContent.trim() || '';
+            const startDate = startEl?.dataset?.fullDate || startDateText;
 
             const endRadio = document.querySelector(
                 'input[name="weeklyLessonEndOptionManage"]:checked');
             const endOption = endRadio?.id || 'weeklyLessonEndNeverManage';
             const endOptionLabel = endRadio?.nextElementSibling?.textContent || 'Never';
+
             const endsOnEl = document.getElementById('weeklyLessonEndDateBtnManage');
             const endsOn = endsOnEl?.dataset?.fullDate || endsOnEl?.textContent.trim() || 'Never';
-            const occurrences = $('#weeklyLessonOccurrenceDisplayManage')?.textContent.trim() || '';
 
+            const occurrencesEl = document.getElementById('weeklyLessonOccurrenceDisplayManage');
+            const occurrences = occurrencesEl?.textContent.trim() || '';
+
+            // ✅ Read CURRENT selected days and times
             const selectedDays = [];
-            $$('.weekly_lesson_scroll_widget_manage.selected').forEach(widget => {
-                const raw = widget.querySelector('.weekly_lesson_widget_text_manage')
+            const dayWidgets = document.querySelectorAll(
+                '.weekly_lesson_scroll_widget_manage.selected');
+
+            dayWidgets.forEach(widget => {
+                const dayText = widget.querySelector('.weekly_lesson_widget_text_manage')
                     ?.textContent || '';
-                const start = widget.querySelector(
+                const startTime = widget.querySelector(
                     '.weekly_lesson_widget_hour_minute_manage.start')?.textContent || '';
-                const end = widget.querySelector(
+                const endTime = widget.querySelector(
                     '.weekly_lesson_widget_hour_minute_manage.end')?.textContent || '';
-                const period1 = widget.querySelector(
+                const startPeriod = widget.querySelector(
                         '.weekly_lesson_widget_period_manage.start-period')?.textContent ||
                     '';
-                const period2 = widget.querySelector(
+                const endPeriod = widget.querySelector(
                     '.weekly_lesson_widget_period_manage.end-period')?.textContent || '';
 
-                if (start && end) {
+                if (startTime && endTime) {
                     selectedDays.push({
-                        day: raw,
-                        start: `${start} ${period1}`,
-                        end: `${end} ${period2}`
+                        day: dayText,
+                        start: `${startTime} ${startPeriod}`,
+                        end: `${endTime} ${endPeriod}`
                     });
                 }
             });
@@ -2628,16 +2758,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 totalDays: selectedDays.length,
                 cmid: cmid
             };
+
+            console.log('✅ CURRENT Weekly Lesson Data:');
+            console.log(`  - Start Date: ${startDate}`);
+            console.log(`  - Interval: ${interval} ${period}`);
+            console.log(`  - End Option: ${endOptionLabel}`);
+            console.log(`  - Ends On: ${endsOn}`);
+            console.log(`  - Selected Days:`, selectedDays);
+            console.log(`  - CMID: ${cmid}`);
         }
 
-        console.log('Manage Schedule 1:1 Form Data:', formData);
-        console.log('CMID for this lesson:', cmid);
+        console.log('📤 Final Form Data:', formData);
 
         const payload = {
             data: formData
         };
-
-        console.log('Sending UPDATE payload:', payload);
 
         try {
             const response = await fetch('ajax/update_one2one.php', {
@@ -2650,8 +2785,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const result = await response.json();
-
-            console.log('Update One-to-One Response:', result);
+            console.log('Update Response:', result);
 
             if (!result.success) {
                 alert('Error: ' + result.message);
@@ -2659,12 +2793,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             alert('Session updated successfully!');
-
-            // Optionally refresh UI here
-            // refreshCalendar();
-
         } catch (error) {
-            console.error('Update One-to-One Error:', error);
+            console.error('Update Error:', error);
             alert('Something went wrong while updating the session.');
         }
     });

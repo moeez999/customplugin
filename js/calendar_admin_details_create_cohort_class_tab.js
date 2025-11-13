@@ -194,14 +194,19 @@ let calendarYearManage = _now.getFullYear(),
   selectedCalendarDayManage = _now.getDate();
 
 // Helper to parse displayed date strings in the UI into a Date object
+
 function parseDisplayedDate(txt) {
   if (!txt) return null;
   txt = String(txt).trim();
 
-  // ISO YYYY-MM-DD
+  // ✅ FIX: ISO YYYY-MM-DD - parse without timezone conversion
   if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) {
-    const d = new Date(txt);
-    return isNaN(d) ? null : d;
+    const parts = txt.split("-");
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+    const day = parseInt(parts[2]);
+    // Create date at noon in local timezone to avoid timezone shifts
+    return new Date(year, month, day, 12, 0, 0);
   }
 
   // Try Date.parse directly
@@ -354,16 +359,34 @@ $("#calendarDoneBtnManage").on("click", function () {
   let d = new Date(
     calendarYearManage,
     calendarMonthManage,
-    selectedCalendarDayManage
+    selectedCalendarDayManage,
+    12,
+    0,
+    0 // ✅ Add time at noon to avoid timezone issues
   );
+
   let dayStr = d.toLocaleString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
+
+  // ✅ FIX: Format date manually without timezone conversion
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const formattedDate = `${yyyy}-${mm}-${dd}`;
+
   $("#selectedDateTextManage")
     .text(dayStr)
-    .attr("data-full-date", d.toISOString().split("T")[0]);
+    .attr("data-full-date", formattedDate);
+
+  console.log("Date selected:", {
+    display: dayStr,
+    stored: formattedDate,
+    day: selectedCalendarDayManage,
+  });
+
   $("#calendarModalBackdropManage").fadeOut(100);
 });
 $("#calendarModalBackdropManage").on("mousedown", function (e) {

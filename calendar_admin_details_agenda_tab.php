@@ -2,10 +2,29 @@
 #calendar_admin_agenda_content {
     background: #ffffff;
     padding: 0px 14px 7px 14px;
-    min-height: 100vh;
+    max-height: 75vh;
     padding-top: 24px;
     padding-bottom: 48px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
+
+#calendar_admin_agenda_content::-webkit-scrollbar {
+    width: 0px;
+}
+
+#calendar_admin_agenda_content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#calendar_admin_agenda_content::-webkit-scrollbar-thumb {
+    background: #888;
+}
+
+#calendar_admin_agenda_content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
 .calendar-meeting-items {
     margin-top: 17px;
