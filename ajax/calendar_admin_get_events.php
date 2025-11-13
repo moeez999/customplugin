@@ -6,7 +6,8 @@
 // Filters:
 //  - start (Y-m-d or timestamp) [required]
 //  - end   (Y-m-d or timestamp) [required]
-//  - teacherid (int, optional)
+//  - teacherid (int, optional) [deprecated - use teacherids]
+//  - teacherids (comma-separated int list, optional) [new - for multiple teachers]
 //  - cohortid  (int, optional)
 //  - studentid (int, optional)
 //
@@ -42,8 +43,19 @@ $courseid_group   = 2;
 $startraw   = required_param('start', PARAM_RAW_TRIMMED);
 $endraw     = required_param('end', PARAM_RAW_TRIMMED);
 $teacherid  = optional_param('teacherid', 0, PARAM_INT);
+$teacheridsraw = optional_param('teacherids', '', PARAM_RAW_TRIMMED);
 $cohortid   = optional_param('cohortid', 0, PARAM_INT);
 $studentid  = optional_param('studentid', 0, PARAM_INT);
+
+// Parse multiple teacher IDs if provided (comma-separated)
+$teacherids = [];
+if ($teacheridsraw) {
+    $ids = array_map('intval', explode(',', $teacheridsraw));
+    $teacherids = array_filter($ids);
+} elseif ($teacherid) {
+    // Fallback to single teacherid for backward compatibility
+    $teacherids = [$teacherid];
+}
 
 // Parse dates → timestamps
 $startts = is_numeric($startraw)
@@ -124,7 +136,21 @@ $fmt_iso = static function(int $ts) { return gmdate('c', $ts); };
 
 // ---- Relevant user/cohort lookups ----
 
-$teacher = $teacherid ? $DB->get_record('user', ['id' => $teacherid, 'deleted' => 0], 'id,email', IGNORE_MISSING) : null;
+// Support multiple teachers
+$teachers = [];
+$teacherEmails = [];
+if (!empty($teacherids)) {
+    list($tsql, $tparams) = $DB->get_in_or_equal($teacherids, SQL_PARAMS_NAMED);
+    $teachers = $DB->get_records_select('user', "id $tsql AND deleted = 0", $tparams, '', 'id,email');
+    foreach ($teachers as $t) {
+        if ($t->email) {
+            $teacherEmails[core_text::strtolower(trim($t->email))] = $t->id;
+        }
+    }
+}
+
+// Keep legacy single teacher support
+$teacher = (count($teachers) === 1) ? reset($teachers) : null;
 $student = $studentid ? $DB->get_record('user', ['id' => $studentid, 'deleted' => 0], 'id,email', IGNORE_MISSING) : null;
 $cohort  = $cohortid  ? $DB->get_record('cohort', ['id' => $cohortid], 'id', IGNORE_MISSING) : null;
 
@@ -170,13 +196,18 @@ $add_one2one_events = function() use (
 
     $sections = $DB->get_records('course_sections', ['course' => $courseid_one2one], 'id ASC', 'id,availability');
 
-    // Map section → teacher (when teacher filter present)
+    // Map section → teachers (when teacher filter present)
     $sectionTeachers = [];
-    if ($teacherid && $teacherEmailLower) {
+    if (!empty($teacherEmails)) {
         foreach ($sections as $sec) {
             $emails = $availability_collect_emails($sec->availability ?? null);
-            if ($emails && in_array($teacherEmailLower, $emails, true)) {
-                $sectionTeachers[$sec->id][] = $teacherid;
+            if ($emails) {
+                foreach ($emails as $em) {
+                    $emailLower = core_text::strtolower(trim($em));
+                    if (isset($teacherEmails[$emailLower])) {
+                        $sectionTeachers[$sec->id][] = $teacherEmails[$emailLower];
+                    }
+                }
             }
         }
     }
@@ -226,10 +257,17 @@ $add_one2one_events = function() use (
 
         // Derive teacher from section (for filtered cases)
         $teacherIds = [];
-        if ($teacherid) {
-            if (!empty($sectionTeachers[$cm->section]) && in_array($teacherid, $sectionTeachers[$cm->section], true)) {
-                $teacherIds[] = $teacherid;
-            } else {
+        if (!empty($teacherids)) {
+            // Filter: only include if any of the selected teachers match this section
+            if (!empty($sectionTeachers[$cm->section])) {
+                foreach ($sectionTeachers[$cm->section] as $tid) {
+                    if (in_array($tid, $teacherids, true)) {
+                        $teacherIds[] = $tid;
+                    }
+                }
+            }
+            // If no matching teachers for this section, skip it
+            if (empty($teacherIds)) {
                 continue;
             }
         }
@@ -472,8 +510,18 @@ try {
     // Final strict filter pass (intersection safety net)
     $filtered = [];
     foreach ($events as $ev) {
-        if ($teacherid && !in_array($teacherid, $ev['teacherids'], true)) {
-            continue;
+        // Filter by teachers (support both single and multiple)
+        if (!empty($teacherids)) {
+            $hasTeacher = false;
+            foreach ($teacherids as $tid) {
+                if (in_array($tid, $ev['teacherids'], true)) {
+                    $hasTeacher = true;
+                    break;
+                }
+            }
+            if (!$hasTeacher) {
+                continue;
+            }
         }
         if ($cohortid && !in_array($cohortid, $ev['cohortids'], true)) {
             continue;
@@ -504,11 +552,12 @@ try {
     echo json_encode([
         'ok'      => true,
         'filters' => [
-            'start'     => $startts,
-            'end'       => $endts,
-            'teacherid' => $teacherid,
-            'cohortid'  => $cohortid,
-            'studentid' => $studentid,
+            'start'      => $startts,
+            'end'        => $endts,
+            'teacherid'  => $teacherid,
+            'teacherids' => $teacherids,
+            'cohortid'   => $cohortid,
+            'studentid'  => $studentid,
         ],
         'events'  => array_values($filtered),
     ]);

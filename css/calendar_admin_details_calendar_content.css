@@ -147,10 +147,17 @@ body {
 .event {
   position: absolute;
   z-index: 1;
-  overflow: hidden;
-  background: #fff;
-  border: 2px solid #7c96ff;
-  border-bottom: 5px solid #7c96ff;
+  overflow: visible;
+  /* Background should be a light tint of the border color.  
+     --event-border-color should be provided by event classes or inline style. */
+  background: #fff; /* fallback for older browsers */
+  background: color-mix(
+    in srgb,
+    var(--event-border-color, #7c96ff) 10%,
+    #ffffff
+  );
+  border: 2px solid var(--event-border-color, #7c96ff);
+  border-bottom: 5px solid var(--event-border-color, #7c96ff);
   border-radius: var(--event-radius);
   padding: 8px 8px 6px;
   box-shadow: 0 4px 10px rgba(25, 35, 60, 0.08);
@@ -190,13 +197,45 @@ body {
 .ev-repeat {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
+
+  height: 15px;
+  font-size: 10px;
+  line-height: 1;
+  width: 100%;
+}
+
+/* Single session icon (for non-recurring events) */
+.ev-single {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  height: 15px;
+  font-size: 10px;
+  line-height: 1;
+  width: 100%;
+}
+
+/* Midnight-crossing event indicator icon */
+.ev-midnight-icon {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
   width: 15px;
   height: 15px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.1);
+  border-radius: 3px;
+  margin: 0 2px;
+  cursor: help;
+}
 
-  font-size: 10px;
-
-  line-height: 1;
+/* Highlight midnight-crossing events with subtle border */
+.event.midnight-crossing {
+  border-left: 3px solid #ff3b30;
 }
 
 .ev-when {
@@ -218,23 +257,30 @@ body {
 }
 
 .e-blue {
-  border-color: #7c96ff;
+  --event-border-color: #7c96ff;
+  border-color: var(--event-border-color);
 }
 .e-green {
-  border-color: #2faa7f;
+  --event-border-color: #2faa7f;
+  border-color: var(--event-border-color);
 }
 .e-rose {
-  border-color: #ea3a3a;
+  --event-border-color: #ea3a3a;
+  border-color: var(--event-border-color);
 }
 .e-purple {
-  border-color: #a855f7;
+  --event-border-color: #a855f7;
+  border-color: var(--event-border-color);
 }
 .e-gold {
-  border-color: #d4a017;
+  --event-border-color: #d4a017;
+  border-color: var(--event-border-color);
 }
 .e-gray {
-  border-color: rgba(255, 138, 6, 0.7);
-  background: rgba(255, 138, 6, 0.05);
+  --event-border-color: rgba(255, 138, 6, 0.7);
+  border-color: var(--event-border-color);
+  /* keep a subtle tint for gray/gold-like classes as before */
+  background: color-mix(in srgb, var(--event-border-color) 8%, #ffffff);
 }
 
 /* Teacher indicator dot on event */
@@ -246,7 +292,7 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #ccc;
+  background-color: var(--teacher-dot-color, #ccc);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -255,7 +301,7 @@ body {
   opacity: 1;
 }
 
-/* Teacher color dots - 10 colors */
+/* Teacher color dots - 10 colors (predefined) */
 .event.teacher-1::after {
   background-color: var(--teacher-color-1);
 }

@@ -11,18 +11,19 @@
   --calendar-admin-btn-radius: 8px;
   --calendar-admin-gap: 20px;
   --calendar-admin-red: #ff3d1f;
-  
+
   /* Teacher Colors */
-  --teacher-color-1: #7c96ff;
-  --teacher-color-2: #ff6b6b;
-  --teacher-color-3: #2faa7f;
-  --teacher-color-4: #a855f7;
-  --teacher-color-5: #f59e0b;
-  --teacher-color-6: #ec4899;
-  --teacher-color-7: #06b6d4;
-  --teacher-color-8: #8b5cf6;
-  --teacher-color-9: #10b981;
-  --teacher-color-10: #f97316;
+  /* Teacher Colors – More Prominent */
+  --teacher-color-1: #4f5dff; /* Stronger blue */
+  --teacher-color-2: #ff2b2b; /* Brighter red */
+  --teacher-color-3: #16c784; /* Vivid teal-green */
+  --teacher-color-4: #9333ea; /* Deeper purple */
+  --teacher-color-5: #fbbf24; /* Brighter golden yellow */
+  --teacher-color-6: #f472b6; /* More saturated pink */
+  --teacher-color-7: #06d6d4; /* Brighter cyan */
+  --teacher-color-8: #7c3aed; /* Bold violet */
+  --teacher-color-9: #22c55e; /* Vibrant green */
+  --teacher-color-10: #fb923c; /* Rich orange */
 }
 html,
 body {

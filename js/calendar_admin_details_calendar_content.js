@@ -21,10 +21,33 @@ const REVEAL_MID =
     getComputedStyle(document.documentElement).getPropertyValue("--reveal-mid")
   ) || 8;
 
-// Helper function to get teacher color index (1-10) based on teacher ID
+// Helper function to get teacher color based on teacher ID (unlimited colors)
 function getTeacherColorIndex(teacherId) {
   if (!teacherId) return 1;
-  return ((Math.abs(teacherId) % 10) || 10);
+  // Use modulo 10 to map to predefined colors 1-10
+  return Math.abs(teacherId) % 10 || 10;
+}
+
+// Helper function to generate HSL color for any teacher ID (supports unlimited teachers)
+function getTeacherColor(teacherId) {
+  if (!teacherId) return "hsl(240, 100%, 50%)"; // Default blue
+
+  // Generate hue based on teacher ID (0-360 degrees)
+  const hue = (Math.abs(teacherId) * 137.5) % 360; // Golden angle for good color distribution
+
+  // Use predefined CSS variable if available (1-10), otherwise generate color
+  const colorIndex = Math.abs(teacherId) % 10 || 10;
+  const cssVar = `--teacher-color-${colorIndex}`;
+  const cssValue = getComputedStyle(document.documentElement)
+    .getPropertyValue(cssVar)
+    .trim();
+
+  if (cssValue && cssValue !== "") {
+    return cssValue;
+  }
+
+  // Fallback: generate HSL color dynamically
+  return `hsl(${hue}, 75%, 50%)`;
 }
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -274,7 +297,35 @@ $(function () {
       const e = { ...raw };
       e.start = typeof e.start === "string" ? minutes(e.start) : e.start;
       e.end = typeof e.end === "string" ? minutes(e.end) : e.end;
-      perDay[di].push(e);
+
+      // Handle midnight-crossing events (e.g., 9 PM to 9 AM)
+      // Create two event instances: one for each day
+      if (e.end < e.start) {
+        // Assign unique ID for pairing
+        const pairedId = `paired-${Date.now()}-${Math.random()}`;
+
+        // First part: from start time to end of day (24:00)
+        const e1 = { ...e };
+        e1.end = 24 * 60; // Ends at midnight
+        e1.isMidnightCrossing = true;
+        e1.pairedId = pairedId;
+        e1.part = "start"; // Indicates this is the start part (PM)
+        perDay[di].push(e1);
+
+        // Second part: from start of day (00:00) to original end time
+        const e2 = { ...e };
+        e2.start = 0; // Starts at midnight
+        e2.isMidnightCrossing = true;
+        e2.pairedId = pairedId;
+        e2.part = "end"; // Indicates this is the end part (AM)
+
+        // Add to next day if within week
+        if (di < 6) {
+          perDay[di + 1].push(e2);
+        }
+      } else {
+        perDay[di].push(e);
+      }
     });
 
     // Overlap logic (unchanged)
@@ -309,14 +360,30 @@ $(function () {
               left: MAX_LEFT - ev.stackIndex * STACK_OFFSET + "px",
               width: `calc(100% - ${MAX_LEFT + 1}px)`,
             };
-        
-        // Get teacher color class if teacher ID exists
-        const teacherColorClass = ev.teacherId ? `teacher-${getTeacherColorIndex(ev.teacherId)} has-teacher-indicator` : "";
-        
+
+        // Get teacher color class and inline style for unlimited colors
+        let teacherColorClass = "";
+        let teacherColorStyle = "";
+
+        if (ev.teacherId) {
+          const colorIndex = getTeacherColorIndex(ev.teacherId);
+          teacherColorClass = `teacher-${colorIndex} has-teacher-indicator`;
+
+          // Generate dynamic color for the ::after pseudo-element
+          const teacherColor = getTeacherColor(ev.teacherId);
+          // Use CSS custom properties to style the ::after element and event border/background
+          // --teacher-dot-color controls the small dot; --event-border-color drives border + derived background
+          teacherColorStyle = `--teacher-dot-color: ${teacherColor}; --event-border-color: ${teacherColor};`;
+        }
+
         const $ev = $(`
-          <div class="event ${ev.color || "e-blue"} ${teacherColorClass}" data-start="${
-          ev.start
-        }" data-end="${ev.end}" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}>
+          <div class="event ${ev.color || "e-blue"} ${teacherColorClass}${
+          ev.isMidnightCrossing ? " midnight-crossing" : ""
+        }" style="${teacherColorStyle}" data-start="${ev.start}" data-end="${
+          ev.end
+        }" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}${
+          ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""
+        }${ev.part ? ` data-part="${ev.part}"` : ""}>
             <div class="ev-top">
               <div class="ev-left">${
                 ev.avatar
@@ -326,6 +393,11 @@ $(function () {
               ${
                 ev.repeat
                   ? `<span class="ev-repeat" title="Repeats"><img src="./img/ev-repeat.svg" alt=""></span>`
+                  : `<span class="ev-single" title="Single Session"><img src="./img/single-lesson.svg" alt=""></span>`
+              }
+              ${
+                ev.isMidnightCrossing
+                  ? `<span class="ev-midnight-icon" title="Continues to next day">↪</span>`
                   : ""
               }
             </div>
@@ -1191,6 +1263,33 @@ document.addEventListener("DOMContentLoaded", () => {
     return 0;
   }
 
+  function getSelectedTeacherIds() {
+    // Use the exposed state if available - returns ALL selected teachers
+    if (window.calendarFilterState) {
+      const teachers = window.calendarFilterState.getSelectedTeachers();
+      return teachers || [];
+    }
+
+    // Fallback: get from teacher options
+    const selected = Array.from(
+      document.querySelectorAll(
+        ".teacher-option.selected, .teacher-option input.teacher-checkbox:checked"
+      )
+    )
+      .map((el) => {
+        const li = el.classList.contains("teacher-option")
+          ? el
+          : el.closest(".teacher-option");
+        if (li && li.dataset.teacherId) {
+          return parseInt(li.dataset.teacherId, 10);
+        }
+        return null;
+      })
+      .filter((id) => id !== null);
+
+    return selected;
+  }
+
   function getSelectedCohortId() {
     // Use the exposed state if available
     if (window.calendarFilterState) {
@@ -1252,12 +1351,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------------- API call ----------------
 
   async function fetchCalendarEvents() {
-    const teacherid = getSelectedTeacherId();
+    const teacherids = getSelectedTeacherIds();
     const cohortid = getSelectedCohortId();
     const studentid = getSelectedStudentId();
 
     console.log("Fetching calendar events with filters:", {
-      teacherid,
+      teacherids,
       cohortid,
       studentid,
       dateRange: `${formatYMD(currentStart)} to ${formatYMD(currentEnd)}`,
@@ -1267,7 +1366,8 @@ document.addEventListener("DOMContentLoaded", () => {
     params.set("start", formatYMD(currentStart));
     params.set("end", formatYMD(currentEnd));
 
-    if (teacherid) params.set("teacherid", teacherid);
+    if (teacherids && teacherids.length > 0)
+      params.set("teacherids", teacherids.join(","));
     if (cohortid) params.set("cohortid", cohortid);
     if (studentid) params.set("studentid", studentid);
     try {
@@ -1297,6 +1397,12 @@ document.addEventListener("DOMContentLoaded", () => {
           const startDate = new Date(ev.start);
           const endDate = new Date(ev.end);
 
+          // Get first teacher ID from array
+          const teacherId =
+            Array.isArray(ev.teacherids) && ev.teacherids.length > 0
+              ? ev.teacherids[0]
+              : ev.teacher_id || null;
+
           return {
             date: startDate.toISOString().split("T")[0],
             title: ev.title,
@@ -1306,7 +1412,7 @@ document.addEventListener("DOMContentLoaded", () => {
             repeat: ev.is_recurring,
             meetingurl: ev.meetingurl,
             avatar: "",
-            teacherId: ev.teacher_id || null,
+            teacherId: teacherId,
           };
         });
 
