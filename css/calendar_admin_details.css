@@ -12,18 +12,17 @@
   --calendar-admin-gap: 20px;
   --calendar-admin-red: #ff3d1f;
 
-  /* Teacher Colors */
-  /* Teacher Colors – More Prominent */
-  --teacher-color-1: #4f5dff; /* Stronger blue */
-  --teacher-color-2: #ff2b2b; /* Brighter red */
-  --teacher-color-3: #16c784; /* Vivid teal-green */
-  --teacher-color-4: #9333ea; /* Deeper purple */
-  --teacher-color-5: #fbbf24; /* Brighter golden yellow */
-  --teacher-color-6: #f472b6; /* More saturated pink */
-  --teacher-color-7: #06d6d4; /* Brighter cyan */
-  --teacher-color-8: #7c3aed; /* Bold violet */
-  --teacher-color-9: #22c55e; /* Vibrant green */
-  --teacher-color-10: #fb923c; /* Rich orange */
+  /* Teacher Colors – Ultra Vibrant & Distinctive */
+  --teacher-color-1: #ff1744; /* Vibrant Red */
+  --teacher-color-2: #ff6f00; /* Bold Orange */
+  --teacher-color-3: #ffd600; /* Bright Yellow */
+  --teacher-color-4: #00e676; /* Electric Green */
+  --teacher-color-5: #00b0ff; /* Vivid Blue */
+  --teacher-color-6: #651fff; /* Deep Purple */
+  --teacher-color-7: #ff4081; /* Hot Pink */
+  --teacher-color-8: #6d4c41; /* Rich Brown */
+  --teacher-color-9: #00e5ff; /* Bright Cyan */
+  --teacher-color-10: #d500f9; /* Vibrant Magenta */
 }
 html,
 body {
@@ -776,16 +775,6 @@ body {
   text-overflow: ellipsis;
 }
 
-.selected-cohorts-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px;
-
-  border-radius: 8px;
-}
-
 .selected-cohort-pill {
   display: inline-flex;
   align-items: center;
@@ -861,40 +850,44 @@ body {
   border: 2px solid #fff;
   object-fit: cover;
   margin-left: -6px;
-  box-shadow: 0 0 0 1px #ddd;
-  transition: box-shadow 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 /* Teacher avatar color borders based on teacher ID */
 .teacher-summary-avatar[data-teacher-color="1"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-1);
+  border-color: var(--teacher-color-1);
 }
 .teacher-summary-avatar[data-teacher-color="2"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-2);
+  border-color: var(--teacher-color-2);
 }
 .teacher-summary-avatar[data-teacher-color="3"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-3);
+  border-color: var(--teacher-color-3);
 }
 .teacher-summary-avatar[data-teacher-color="4"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-4);
+  border-color: var(--teacher-color-4);
 }
 .teacher-summary-avatar[data-teacher-color="5"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-5);
+  border-color: var(--teacher-color-5);
 }
 .teacher-summary-avatar[data-teacher-color="6"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-6);
+  border-color: var(--teacher-color-6);
 }
 .teacher-summary-avatar[data-teacher-color="7"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-7);
+  border-color: var(--teacher-color-7);
 }
 .teacher-summary-avatar[data-teacher-color="8"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-8);
+  border-color: var(--teacher-color-8);
 }
 .teacher-summary-avatar[data-teacher-color="9"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-9);
+  border-color: var(--teacher-color-9);
 }
 .teacher-summary-avatar[data-teacher-color="10"] {
-  box-shadow: 0 0 0 3px var(--teacher-color-10);
+  border-color: var(--teacher-color-10);
+}
+
+/* Student avatars keep default border */
+.student-summary-avatar {
+  box-shadow: 0 0 0 1px #ddd;
 }
 
 .teacher-summary-avatar:first-child,
@@ -908,6 +901,20 @@ body {
   font-weight: 600;
   font-size: 13px;
   color: #111;
+}
+
+.cohort-summary-names {
+  margin-left: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #111;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+  cursor: help;
 }
 .legends-container {
   overflow-y: auto;
@@ -991,18 +998,24 @@ body {
   color: #6a697c;
 }
 
-.selected-teachers-container {
+.selected-teachers-container,
+.selected-cohorts-container,
+.selected-items-container {
   display: flex;
   overflow-x: auto;
   gap: 8px;
   max-height: 150px;
   overflow-y: auto;
 }
-.selected-teachers-container::-webkit-scrollbar {
+.selected-teachers-container::-webkit-scrollbar,
+.selected-cohorts-container::-webkit-scrollbar,
+.selected-items-container::-webkit-scrollbar {
   width: 3px;
 }
 
-.selected-teachers-container::-webkit-scrollbar-thumb {
+.selected-teachers-container::-webkit-scrollbar-thumb,
+.selected-cohorts-container::-webkit-scrollbar-thumb,
+.selected-items-container::-webkit-scrollbar-thumb {
   background: #ddd;
   border-radius: 3px;
 }
@@ -1058,7 +1071,8 @@ body {
 }
 
 .teacher-list-wrapper,
-.cohort-list-wrapper {
+.cohort-list-wrapper,
+.oneonone-list-wrapper {
   background-color: #ffffff;
   border: 1.07px solid #f4f4f8;
   border-radius: 8.5px;
@@ -1069,7 +1083,8 @@ body {
 }
 
 .teacher-list-form fieldset,
-.cohort-list-form fieldset {
+.cohort-list-form fieldset,
+.oneonone-list-form fieldset {
   border: none;
   padding: 0;
   margin: 0;
@@ -1131,6 +1146,43 @@ body {
   height: 100%;
   border-radius: 8px;
   object-fit: cover;
+}
+
+/* Teacher avatar color borders in dropdown */
+.teacher-avatar {
+  border: 2px solid #ddd;
+  transition: border-color 0.2s ease;
+}
+
+.teacher-avatar[data-teacher-color="1"] {
+  border-color: var(--teacher-color-1);
+}
+.teacher-avatar[data-teacher-color="2"] {
+  border-color: var(--teacher-color-2);
+}
+.teacher-avatar[data-teacher-color="3"] {
+  border-color: var(--teacher-color-3);
+}
+.teacher-avatar[data-teacher-color="4"] {
+  border-color: var(--teacher-color-4);
+}
+.teacher-avatar[data-teacher-color="5"] {
+  border-color: var(--teacher-color-5);
+}
+.teacher-avatar[data-teacher-color="6"] {
+  border-color: var(--teacher-color-6);
+}
+.teacher-avatar[data-teacher-color="7"] {
+  border-color: var(--teacher-color-7);
+}
+.teacher-avatar[data-teacher-color="8"] {
+  border-color: var(--teacher-color-8);
+}
+.teacher-avatar[data-teacher-color="9"] {
+  border-color: var(--teacher-color-9);
+}
+.teacher-avatar[data-teacher-color="10"] {
+  border-color: var(--teacher-color-10);
 }
 
 .teacher-name,
@@ -1544,14 +1596,16 @@ body {
 .teacher-list-wrapper::-webkit-scrollbar,
 .cohort-list-wrapper::-webkit-scrollbar,
 .student-list-wrapper::-webkit-scrollbar,
-.peertalk-list-wrapper::-webkit-scrollbar {
+.peertalk-list-wrapper::-webkit-scrollbar,
+.oneonone-list-wrapper::-webkit-scrollbar {
   width: 6px;
 }
 
 .teacher-list-wrapper::-webkit-scrollbar-thumb,
 .cohort-list-wrapper::-webkit-scrollbar-thumb,
 .student-list-wrapper::-webkit-scrollbar-thumb,
-.peertalk-list-wrapper::-webkit-scrollbar-thumb {
+.peertalk-list-wrapper::-webkit-scrollbar-thumb
+  .oneonone-list-wrapper::-webkit-scrollbar-thumb {
   background: #d1d1d1;
   border-radius: 2px;
   border: 1px solid transparent;
@@ -1560,14 +1614,16 @@ body {
 .teacher-list-wrapper::-webkit-scrollbar-thumb:hover,
 .cohort-list-wrapper::-webkit-scrollbar-thumb:hover,
 .student-list-wrapper::-webkit-scrollbar-thumb:hover,
-.peertalk-list-wrapper::-webkit-scrollbar-thumb:hover {
+.peertalk-list-wrapper::-webkit-scrollbar-thumb:hover
+  .oneonone-list-wrapper::-webkit-scrollbar-thumb:hover {
   background: #a3a3a3;
 }
 
 .teacher-list-wrapper::-webkit-scrollbar-track,
 .cohort-list-wrapper::-webkit-scrollbar-track,
 .student-list-wrapper::-webkit-scrollbar-track,
-.peertalk-list-wrapper::-webkit-scrollbar-track {
+.peertalk-list-wrapper::-webkit-scrollbar-track,
+.oneonone-list-wrapper::-webkit-scrollbar-track {
   background-color: transparent;
 }
 

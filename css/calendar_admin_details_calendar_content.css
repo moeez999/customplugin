@@ -156,7 +156,7 @@ body {
     var(--event-border-color, #7c96ff) 10%,
     #ffffff
   );
-  border: 2px solid var(--event-border-color, #7c96ff);
+  border: 1px solid var(--event-border-color, #7c96ff);
   border-bottom: 5px solid var(--event-border-color, #7c96ff);
   border-radius: var(--event-radius);
   padding: 8px 8px 6px;
@@ -172,6 +172,61 @@ body {
 .event.is-front {
   box-shadow: 0 10px 24px rgba(17, 24, 39, 0.18);
   filter: saturate(1.05);
+}
+
+/* Short events (less than 1 hour) - compact display */
+.event.short-event {
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.event.short-event .ev-when {
+  font-size: 11px;
+  font-weight: 500;
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Hide avatar and icons in short events */
+.event.short-event .ev-top,
+.event.short-event .ev-title {
+  display: none;
+}
+
+/* Class type styles: Main vs Tutoring */
+/* Main class: solid border with blue color - teacher dot shows teacher color separately */
+.event.class-type-main {
+  --event-border-color: #095df3;
+  border-color: #095df3;
+  background: color-mix(in srgb, #095df3 10%, #ffffff);
+}
+
+/* Tutoring class: dashed border with blue color - teacher dot shows teacher color separately */
+.event.class-type-tutoring {
+  --event-border-color: #095df3;
+  border-color: #095df3;
+  border-style: dashed;
+  border-width: 2px;
+  border-bottom-width: 5px;
+  border-bottom-style: dashed;
+  background: color-mix(in srgb, #095df3 10%, #ffffff);
+}
+
+/* One-on-One Weekly class: solid border with green color - teacher dot shows teacher color separately */
+.event.class-type-one2one_weekly {
+  --event-border-color: #00b100;
+  border-color: #00b100;
+  background: color-mix(in srgb, #00b100 10%, #ffffff);
+}
+
+/* One-on-One Single class: solid border with green color - teacher dot shows teacher color separately */
+.event.class-type-one2one_single {
+  --event-border-color: #00b100;
+  border-color: #00b100;
+  background: color-mix(in srgb, #00b100 10%, #ffffff);
 }
 
 .ev-top {
@@ -299,38 +354,8 @@ body {
 
 .event.has-teacher-indicator::after {
   opacity: 1;
-}
-
-/* Teacher color dots - 10 colors (predefined) */
-.event.teacher-1::after {
-  background-color: var(--teacher-color-1);
-}
-.event.teacher-2::after {
-  background-color: var(--teacher-color-2);
-}
-.event.teacher-3::after {
-  background-color: var(--teacher-color-3);
-}
-.event.teacher-4::after {
-  background-color: var(--teacher-color-4);
-}
-.event.teacher-5::after {
-  background-color: var(--teacher-color-5);
-}
-.event.teacher-6::after {
-  background-color: var(--teacher-color-6);
-}
-.event.teacher-7::after {
-  background-color: var(--teacher-color-7);
-}
-.event.teacher-8::after {
-  background-color: var(--teacher-color-8);
-}
-.event.teacher-9::after {
-  background-color: var(--teacher-color-9);
-}
-.event.teacher-10::after {
-  background-color: var(--teacher-color-10);
+  /* Use dynamic teacher color set via inline style */
+  background-color: var(--teacher-dot-color);
 }
 
 /* NOW line: arrows pointing toward each other */
@@ -368,9 +393,104 @@ body {
   border-right: 10px solid #ff3b30; /* Was border-left before */
 }
 
+/* ====== Event Tooltip Styles ====== */
+.event-tooltip {
+  display: none;
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #e1e3ec;
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 220px;
+  max-width: 300px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.15),
+    0 2px 8px rgba(17, 24, 39, 0.08);
+  z-index: 10000;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tooltip-header {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.tooltip-header strong {
+  color: #0f1320;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tooltip-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.tooltip-time svg {
+  flex-shrink: 0;
+}
+
+.tooltip-teacher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.tooltip-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e5e7eb;
+}
+
+.tooltip-teacher span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.tooltip-type {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tooltip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #f3f4f6;
+  color: #4b5563;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Add pointer cursor to small events to indicate hover interaction */
+.event:hover {
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.18);
+  filter: saturate(1.05);
+}
+
 @media (max-width: 700px) {
   .cal-head,
   .grid {
     grid-template-columns: 70px repeat(7, 320px);
+  }
+
+  .event-tooltip {
+    max-width: 250px;
+    font-size: 12px;
   }
 }

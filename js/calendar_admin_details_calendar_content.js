@@ -28,26 +28,18 @@ function getTeacherColorIndex(teacherId) {
   return Math.abs(teacherId) % 10 || 10;
 }
 
-// Helper function to generate HSL color for any teacher ID (supports unlimited teachers)
+// Helper function to generate unique vibrant color for any teacher ID
 function getTeacherColor(teacherId) {
-  if (!teacherId) return "hsl(240, 100%, 50%)"; // Default blue
+  if (!teacherId) return "#FF1744"; // Default vibrant red
 
-  // Generate hue based on teacher ID (0-360 degrees)
-  const hue = (Math.abs(teacherId) * 137.5) % 360; // Golden angle for good color distribution
+  // Generate unique hue based on teacher ID using golden angle for optimal color distribution
+  const hue = Math.round((Math.abs(teacherId) * 137.508) % 360); // Golden angle: 137.508°
 
-  // Use predefined CSS variable if available (1-10), otherwise generate color
-  const colorIndex = Math.abs(teacherId) % 10 || 10;
-  const cssVar = `--teacher-color-${colorIndex}`;
-  const cssValue = getComputedStyle(document.documentElement)
-    .getPropertyValue(cssVar)
-    .trim();
+  // Maximum saturation and optimal lightness for ultra-vibrant colors
+  const saturation = 100; // Always 100% for maximum vibrancy
+  const lightness = 50; // Fixed at 50% for optimal brightness and color purity
 
-  if (cssValue && cssValue !== "") {
-    return cssValue;
-  }
-
-  // Fallback: generate HSL color dynamically
-  return `hsl(${hue}, 75%, 50%)`;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -369,22 +361,52 @@ $(function () {
           const colorIndex = getTeacherColorIndex(ev.teacherId);
           teacherColorClass = `teacher-${colorIndex} has-teacher-indicator`;
 
-          // Generate dynamic color for the ::after pseudo-element
+          // Generate dynamic color for the ::after pseudo-element (teacher dot indicator)
           const teacherColor = getTeacherColor(ev.teacherId);
-          // Use CSS custom properties to style the ::after element and event border/background
-          // --teacher-dot-color controls the small dot; --event-border-color drives border + derived background
-          teacherColorStyle = `--teacher-dot-color: ${teacherColor}; --event-border-color: ${teacherColor};`;
+          // Debug: log teacher ID and color for troubleshooting
+
+          // Only set --teacher-dot-color for the dot indicator
+          // Border and background colors are controlled by class-type CSS classes
+          teacherColorStyle = `--teacher-dot-color: ${teacherColor};`;
         }
 
+        // Determine class type CSS class and border color
+        let classTypeClass = "class-type-main";
+        let borderColorStyle = "";
+
+        if (ev.classType === "tutoring") {
+          classTypeClass = "class-type-tutoring";
+        } else if (ev.classType === "one2one_weekly") {
+          classTypeClass = "class-type-one2one_weekly";
+          borderColorStyle = "border-left-color: #4CAF50 !important;"; // Green border for one2one weekly
+        } else if (ev.classType === "one2one_single") {
+          classTypeClass = "class-type-one2one_single";
+          borderColorStyle = "border-left-color: #4CAF50 !important;"; // Green border for one2one single
+        }
+
+        // Combine styles
+        const combinedStyle = `${teacherColorStyle}${borderColorStyle}`.trim();
+
+        // Check if event is short (less than 1 hour)
+        const eventDuration = ev.end - ev.start;
+        const isShortEvent = eventDuration < 60;
+
+        // Build event HTML - hide details for short events
         const $ev = $(`
-          <div class="event ${ev.color || "e-blue"} ${teacherColorClass}${
+          <div class="event ${
+            ev.color || "e-blue"
+          } ${teacherColorClass} ${classTypeClass}${
           ev.isMidnightCrossing ? " midnight-crossing" : ""
-        }" style="${teacherColorStyle}" data-start="${ev.start}" data-end="${
+        }${
+          isShortEvent ? " short-event" : ""
+        }" style="${combinedStyle}" data-start="${ev.start}" data-end="${
           ev.end
         }" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}${
           ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""
         }${ev.part ? ` data-part="${ev.part}"` : ""}>
-            <div class="ev-top">
+            ${
+              !isShortEvent
+                ? `<div class="ev-top">
               <div class="ev-left">${
                 ev.avatar
                   ? `<img class="ev-avatar" src="${ev.avatar}" alt="">`
@@ -400,11 +422,95 @@ $(function () {
                   ? `<span class="ev-midnight-icon" title="Continues to next day">↪</span>`
                   : ""
               }
-            </div>
+            </div>`
+                : ""
+            }
             <div class="ev-when">${fmt12(ev.start)} – ${fmt12(ev.end)}</div>
-            <div class="ev-title">${ev.title || ""}</div>
+            ${
+              !isShortEvent
+                ? `<div class="ev-title">${ev.title || ""}</div>`
+                : ""
+            }
           </div>
         `).css({ top: top + "px", height: h + "px", ...cssPos });
+
+        // Add hover tooltip for short events (less than 1 hour)
+        if (isShortEvent) {
+          // Create tooltip element
+          const $tooltip = $(`
+            <div class="event-tooltip">
+              <div class="tooltip-header">
+                <strong>${ev.title || "Event"}</strong>
+              </div>
+              <div class="tooltip-time">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                ${fmt12(ev.start)} – ${fmt12(ev.end)}
+              </div>
+              ${
+                ev.avatar
+                  ? `
+                <div class="tooltip-teacher">
+                  <img src="${ev.avatar}" alt="" class="tooltip-avatar">
+                  <span>Teacher</span>
+                </div>
+              `
+                  : ""
+              }
+              <div class="tooltip-type">
+                ${
+                  ev.repeat
+                    ? '<span class="tooltip-badge">Recurring Class</span>'
+                    : '<span class="tooltip-badge">Single Session</span>'
+                }
+                ${
+                  ev.classType === "one2one_weekly" ||
+                  ev.classType === "one2one_single"
+                    ? '<span class="tooltip-badge">1:1 Class</span>'
+                    : ev.classType === "tutoring"
+                    ? '<span class="tooltip-badge">Tutoring</span>'
+                    : '<span class="tooltip-badge">Main Class</span>'
+                }
+              </div>
+            </div>
+          `);
+
+          $ev.on("mouseenter", function (e) {
+            const $event = $(this);
+            const eventOffset = $event.offset();
+            const eventWidth = $event.outerWidth();
+            const eventHeight = $event.outerHeight();
+
+            // Position tooltip to the right of the event
+            $tooltip.css({
+              position: "fixed",
+              top: eventOffset.top + "px",
+              left: eventOffset.left + eventWidth + 10 + "px",
+              zIndex: 10000,
+            });
+
+            $("body").append($tooltip);
+
+            // Adjust if tooltip goes off screen
+            const tooltipRect = $tooltip[0].getBoundingClientRect();
+            if (tooltipRect.right > window.innerWidth) {
+              // Position to the left instead
+              $tooltip.css({
+                left: eventOffset.left - $tooltip.outerWidth() - 10 + "px",
+              });
+            }
+
+            $tooltip.fadeIn(200);
+          });
+
+          $ev.on("mouseleave", function () {
+            $tooltip.fadeOut(200, function () {
+              $tooltip.remove();
+            });
+          });
+        }
 
         dayEls[di].append($ev);
       });
@@ -456,6 +562,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const cohortHidden = document.getElementById("cohort-value");
   const cohortSearchInput = document.getElementById("cohort-search-input");
   const cohortNoResults = document.getElementById("cohort-no-results");
+  const cohortPillsContainer = document.getElementById("cohort-pills");
+
+  // 1:1 Class tab elements
+  const oneOnOneFieldset = document.getElementById("oneonone-options-fieldset");
+  const oneOnOneSearchInput = document.getElementById("oneonone-search-input");
+  const oneOnOneNoResults = document.getElementById("oneonone-no-results");
 
   const studentTrigger = document.getElementById("student-search-trigger");
   const studentWidget = document.getElementById("search-student");
@@ -468,7 +580,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // State
   let selectedTeacherIds = [];
-  let selectedCohortId = null;
+  let selectedCohortIds = []; // Changed from single to array
   let selectedStudentIds = [];
 
   // ---------- helpers ----------
@@ -547,7 +659,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.fetchCalendarEvents &&
         typeof window.fetchCalendarEvents === "function"
       ) {
-        console.log("Triggering calendar reload...");
         window.fetchCalendarEvents();
       }
     }, 200);
@@ -564,6 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Get teacher color for the indicator dot
     const teacherColor = getTeacherColor(t.id);
+    const colorIndex = getTeacherColorIndex(t.id);
 
     wrap.innerHTML = `
             <label class="teacher-label">
@@ -571,7 +683,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="teacher-avatar-container">
                         <img class="teacher-avatar" src="${
                           t.avatar || ""
-                        }" alt="${t.name}">
+                        }" alt="${
+      t.name
+    }" style="border-color: ${teacherColor};">
                     </div>
                     <span class="teacher-name">${
                       t.name
@@ -662,6 +776,9 @@ document.addEventListener("DOMContentLoaded", () => {
           const checkbox = opt.querySelector(".teacher-checkbox");
           if (checkbox) checkbox.checked = false;
           opt.classList.remove("selected");
+          // Hide the color dot when deselecting
+          const colorDot = opt.querySelector(".teacher-color-dot");
+          if (colorDot) colorDot.style.display = "none";
           updateTeacherPills();
           onTeacherFilterChange();
         });
@@ -683,9 +800,9 @@ document.addEventListener("DOMContentLoaded", () => {
       img.alt = opt.dataset.teacherName || "";
       img.className = "teacher-summary-avatar";
       img.style.zIndex = maxAvatars - idx;
-      // Add teacher color data attribute
-      const colorIndex = getTeacherColorIndex(id);
-      img.dataset.teacherColor = colorIndex;
+      // Use dynamic teacher color for border
+      const teacherColor = getTeacherColor(id);
+      img.style.borderColor = teacherColor;
       teacherPillsContainer.appendChild(img);
     });
 
@@ -759,39 +876,123 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- Cohorts ----------
 
-  function selectCohort(cohortId) {
-    const opt = cohortFieldset.querySelector(`[data-cohort-id="${cohortId}"]`);
+  function updateCohortPills() {
+    // Clear old pills
+    if (cohortPillsContainer) clear(cohortPillsContainer);
 
-    if (!opt) {
-      console.log("Cohort option not found for ID:", cohortId);
+    const selectedCohortsContainer = document.getElementById(
+      "selected-cohorts-container"
+    );
+    const selectedOneOnOneContainer = document.getElementById(
+      "oneonone-selected-container"
+    );
+
+    if (selectedCohortsContainer) clear(selectedCohortsContainer);
+    if (selectedOneOnOneContainer) clear(selectedOneOnOneContainer);
+
+    if (!selectedCohortIds.length) {
+      cohortDisplayText.textContent = "Select Cohort";
+      if (selectedCohortsContainer)
+        selectedCohortsContainer.style.display = "none";
+      if (selectedOneOnOneContainer)
+        selectedOneOnOneContainer.style.display = "none";
       return;
     }
 
-    console.log("Selecting cohort:", cohortId);
+    cohortDisplayText.textContent = "";
 
-    // Clear previous selections
-    cohortFieldset.querySelectorAll(".cohort-option").forEach((o) => {
-      o.classList.remove("selected");
-      const r = o.querySelector(".cohort-radio");
-      if (r) r.checked = false;
+    selectedCohortIds.forEach((id) => {
+      // Find cohort in either group or 1:1 fieldset
+      let opt = cohortFieldset.querySelector(
+        `.cohort-option[data-cohort-id="${id}"]`
+      );
+      let isOneOnOne = false;
+
+      if (!opt && oneOnOneFieldset) {
+        opt = oneOnOneFieldset.querySelector(
+          `.cohort-option[data-cohort-id="${id}"]`
+        );
+        isOneOnOne = true;
+      }
+      if (!opt) return;
+
+      const name = opt.dataset.cohortName || "";
+
+      // Determine which container to use based on cohort type
+      const targetContainer = isOneOnOne
+        ? selectedOneOnOneContainer
+        : selectedCohortsContainer;
+
+      if (targetContainer) {
+        // Show the container
+        targetContainer.style.display = "flex";
+
+        const dropdownPill = document.createElement("div");
+        dropdownPill.className = "selected-cohort-pill";
+        dropdownPill.innerHTML = `
+          <div class="pill-user-info">
+            <span class="pill-user-name">${name}</span>
+          </div>
+          <button type="button" class="pill-close-btn" data-cohort-id="${id}">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M11.25 3.75L3.75 11.25M3.75 3.75L11.25 11.25"
+                stroke="#6a697c" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </button>
+        `;
+        dropdownPill
+          .querySelector(".pill-close-btn")
+          .addEventListener("click", async (e) => {
+            e.stopPropagation();
+            selectedCohortIds = selectedCohortIds.filter((x) => x !== id);
+            const checkbox = opt.querySelector(".cohort-checkbox");
+            if (checkbox) checkbox.checked = false;
+            opt.classList.remove("selected");
+            updateCohortPills();
+
+            // Update students based on remaining selected cohorts
+            await updateStudentsForCohortChange();
+
+            // Trigger immediate calendar reload
+            setTimeout(() => {
+              if (
+                window.fetchCalendarEvents &&
+                typeof window.fetchCalendarEvents === "function"
+              ) {
+                window.fetchCalendarEvents();
+              }
+            }, 100);
+          });
+        targetContainer.appendChild(dropdownPill);
+      }
     });
 
-    // Select new cohort
-    opt.classList.add("selected");
-    const radio = opt.querySelector(".cohort-radio");
-    if (radio) radio.checked = true;
+    // Top summary (trigger view)
+    if (cohortPillsContainer) {
+      const namesList = selectedCohortIds
+        .map((id) => {
+          let opt = cohortFieldset.querySelector(
+            `.cohort-option[data-cohort-id="${id}"]`
+          );
+          if (!opt && oneOnOneFieldset) {
+            opt = oneOnOneFieldset.querySelector(
+              `.cohort-option[data-cohort-id="${id}"]`
+            );
+          }
+          if (!opt) return "";
+          return opt.dataset.cohortName || "";
+        })
+        .filter(Boolean);
 
-    selectedCohortId = cohortId;
-    cohortHidden.value = cohortId;
-    cohortDisplayText.textContent = opt.dataset.cohortName || "Select Cohort";
-
-    // Close dropdown
-    cohortWidget.style.display = "none";
-
-    // Load students and trigger calendar refresh
-    loadStudentsForSingleCohort(cohortId).then(() => {
-      triggerCalendarReload();
-    });
+      if (namesList.length) {
+        const fullText = namesList.join(", ");
+        const text = document.createElement("span");
+        text.className = "cohort-summary-names";
+        text.textContent = fullText;
+        text.title = fullText; // Show full text on hover
+        cohortPillsContainer.appendChild(text);
+      }
+    }
   }
 
   function createCohortOption(c) {
@@ -799,6 +1000,7 @@ document.addEventListener("DOMContentLoaded", () => {
     wrap.className = "cohort-option";
     wrap.dataset.cohortId = c.id;
     wrap.dataset.cohortName = c.name;
+    wrap.dataset.cohortType = c.cohorttype || "group";
 
     wrap.innerHTML = `
             <label class="cohort-label">
@@ -809,33 +1011,86 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="radio-custom-dot"></div>
                 </div>
             </label>
-            <input type="radio" name="cohort-radio" class="visually-hidden cohort-radio">
+            <input type="checkbox" class="visually-hidden cohort-checkbox">
         `;
 
     wrap.addEventListener("click", (e) => {
+      if (e.target.tagName === "INPUT") return;
       e.preventDefault();
       e.stopPropagation();
 
-      const cohortId = parseInt(wrap.dataset.cohortId, 10);
-      selectCohort(cohortId);
+      const checkbox = wrap.querySelector(".cohort-checkbox");
+      const id = parseInt(wrap.dataset.cohortId, 10);
+
+      // Toggle checkbox
+      checkbox.checked = !checkbox.checked;
+
+      if (checkbox.checked) {
+        if (!selectedCohortIds.includes(id)) {
+          selectedCohortIds.push(id);
+        }
+        wrap.classList.add("selected");
+      } else {
+        selectedCohortIds = selectedCohortIds.filter((x) => x !== id);
+        wrap.classList.remove("selected");
+      }
+
+      updateCohortPills();
+
+      // Load students and auto-select based on events
+      updateStudentsForCohortChange();
+
+      // Trigger immediate calendar reload
+      setTimeout(() => {
+        if (
+          window.fetchCalendarEvents &&
+          typeof window.fetchCalendarEvents === "function"
+        ) {
+          window.fetchCalendarEvents();
+        }
+      }, 100);
     });
 
-    // Also handle label clicks
-    const label = wrap.querySelector(".cohort-label");
-    if (label) {
-      label.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        wrap.click();
-      });
-    }
+    // Also handle direct checkbox clicks
+    const checkbox = wrap.querySelector(".cohort-checkbox");
+    checkbox.addEventListener("change", (e) => {
+      e.stopPropagation();
+      const id = parseInt(wrap.dataset.cohortId, 10);
+
+      if (checkbox.checked) {
+        if (!selectedCohortIds.includes(id)) {
+          selectedCohortIds.push(id);
+        }
+        wrap.classList.add("selected");
+      } else {
+        selectedCohortIds = selectedCohortIds.filter((x) => x !== id);
+        wrap.classList.remove("selected");
+      }
+
+      updateCohortPills();
+
+      // Load students and auto-select based on events
+      updateStudentsForCohortChange();
+
+      // Trigger immediate calendar reload
+      setTimeout(() => {
+        if (
+          window.fetchCalendarEvents &&
+          typeof window.fetchCalendarEvents === "function"
+        ) {
+          window.fetchCalendarEvents();
+        }
+      }, 100);
+    });
 
     return wrap;
   }
 
   async function loadAllCohorts() {
     clear(cohortFieldset);
+    clear(oneOnOneFieldset);
     cohortNoResults.style.display = "none";
+    if (oneOnOneNoResults) oneOnOneNoResults.style.display = "none";
 
     const data = await fetchJSON(`${API_BASE}?action=cohorts`);
     if (!data.ok) return [];
@@ -846,13 +1101,52 @@ document.addEventListener("DOMContentLoaded", () => {
       return [];
     }
 
-    list.forEach((c) => cohortFieldset.appendChild(createCohortOption(c)));
+    // Separate cohorts by type
+    const groupCohorts = list.filter((c) => c.cohorttype !== "one1one");
+    const oneOnOneCohorts = list.filter((c) => c.cohorttype === "one1one");
+
+    // Add group cohorts to Cohorts tab
+    if (groupCohorts.length > 0) {
+      groupCohorts.forEach((c) => {
+        const option = createCohortOption(c);
+        cohortFieldset.appendChild(option);
+
+        // Restore selection state if previously selected
+        if (selectedCohortIds.includes(c.id)) {
+          const checkbox = option.querySelector(".cohort-checkbox");
+          if (checkbox) checkbox.checked = true;
+          option.classList.add("selected");
+        }
+      });
+    } else {
+      cohortNoResults.style.display = "block";
+    }
+
+    // Add 1:1 cohorts to 1:1 Class tab
+    if (oneOnOneCohorts.length > 0) {
+      oneOnOneCohorts.forEach((c) => {
+        const option = createCohortOption(c);
+        oneOnOneFieldset.appendChild(option);
+
+        // Restore selection state if previously selected
+        if (selectedCohortIds.includes(c.id)) {
+          const checkbox = option.querySelector(".cohort-checkbox");
+          if (checkbox) checkbox.checked = true;
+          option.classList.add("selected");
+        }
+      });
+    } else if (oneOnOneNoResults) {
+      oneOnOneNoResults.style.display = "block";
+    }
+
     return list;
   }
 
   async function loadCohortsForTeachers(teacherIds, returnList = false) {
     clear(cohortFieldset);
+    clear(oneOnOneFieldset);
     cohortNoResults.style.display = "none";
+    if (oneOnOneNoResults) oneOnOneNoResults.style.display = "none";
 
     if (!teacherIds || !teacherIds.length) {
       return loadAllCohorts();
@@ -865,12 +1159,50 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!data.ok) return [];
 
     const list = data.data || [];
+
     if (!list.length) {
       cohortNoResults.style.display = "block";
       return [];
     }
 
-    list.forEach((c) => cohortFieldset.appendChild(createCohortOption(c)));
+    // Separate cohorts by type
+    const groupCohorts = list.filter((c) => c.cohorttype !== "one1one");
+    const oneOnOneCohorts = list.filter((c) => c.cohorttype === "one1one");
+
+    // Add group cohorts to Cohorts tab
+    if (groupCohorts.length > 0) {
+      groupCohorts.forEach((c) => {
+        const option = createCohortOption(c);
+        cohortFieldset.appendChild(option);
+
+        // Restore selection state if previously selected
+        if (selectedCohortIds.includes(c.id)) {
+          const checkbox = option.querySelector(".cohort-checkbox");
+          if (checkbox) checkbox.checked = true;
+          option.classList.add("selected");
+        }
+      });
+    } else {
+      cohortNoResults.style.display = "block";
+    }
+
+    // Add 1:1 cohorts to 1:1 Class tab
+    if (oneOnOneCohorts.length > 0) {
+      oneOnOneCohorts.forEach((c) => {
+        const option = createCohortOption(c);
+        oneOnOneFieldset.appendChild(option);
+
+        // Restore selection state if previously selected
+        if (selectedCohortIds.includes(c.id)) {
+          const checkbox = option.querySelector(".cohort-checkbox");
+          if (checkbox) checkbox.checked = true;
+          option.classList.add("selected");
+        }
+      });
+    } else if (oneOnOneNoResults) {
+      oneOnOneNoResults.style.display = "block";
+    }
+
     return returnList ? list : [];
   }
 
@@ -927,7 +1259,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       updateStudentPills();
-      triggerCalendarReload();
+
+      // Trigger immediate calendar reload
+      setTimeout(() => {
+        if (
+          window.fetchCalendarEvents &&
+          typeof window.fetchCalendarEvents === "function"
+        ) {
+          window.fetchCalendarEvents();
+        }
+      }, 100);
     });
 
     return wrap;
@@ -989,7 +1330,16 @@ document.addEventListener("DOMContentLoaded", () => {
           if (checkbox) checkbox.checked = false;
           opt.classList.remove("selected");
           updateStudentPills();
-          triggerCalendarReload();
+
+          // Trigger immediate calendar reload
+          setTimeout(() => {
+            if (
+              window.fetchCalendarEvents &&
+              typeof window.fetchCalendarEvents === "function"
+            ) {
+              window.fetchCalendarEvents();
+            }
+          }, 100);
         });
 
       selectedStudentsContainer.appendChild(dropdownPill);
@@ -1084,6 +1434,49 @@ document.addEventListener("DOMContentLoaded", () => {
     list.forEach((s) => studentFieldset.appendChild(createStudentOption(s)));
   }
 
+  async function loadStudentsForCohorts(cohortIds) {
+    clear(studentFieldset);
+    selectedStudentIds = [];
+
+    if (!cohortIds || !cohortIds.length) {
+      const div = document.createElement("div");
+      div.style.padding = "8px";
+      div.textContent = "Select cohorts to see students";
+      studentFieldset.appendChild(div);
+      return;
+    }
+
+    const url = `${API_BASE}?action=students&cohortids=${encodeURIComponent(
+      cohortIds.join(",")
+    )}`;
+    const data = await fetchJSON(url);
+    if (!data.ok) return;
+
+    const list = data.data || [];
+    if (!list.length) {
+      const div = document.createElement("div");
+      div.style.padding = "8px";
+      div.textContent = "No students found in selected cohorts";
+      studentFieldset.appendChild(div);
+      return;
+    }
+
+    // Add students to list (selection will be driven by events)
+    list.forEach((s) => {
+      const option = createStudentOption(s);
+      studentFieldset.appendChild(option);
+
+      // Restore selection state if previously selected
+      if (selectedStudentIds.includes(s.id)) {
+        const checkbox = option.querySelector(".student-checkbox");
+        if (checkbox) checkbox.checked = true;
+        option.classList.add("selected");
+      }
+    });
+
+    updateStudentPills();
+  }
+
   studentSearchInput.addEventListener("input", () => {
     const term = studentSearchInput.value.trim().toLowerCase();
     studentFieldset.querySelectorAll(".student-option").forEach((opt) => {
@@ -1095,13 +1488,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------- Filter change logic ----------
 
   async function onTeacherFilterChange() {
-    console.log("Teacher filter changed, selected:", selectedTeacherIds);
-
     // Reset cohort + student UI
-    selectedCohortId = null;
+    selectedCohortIds = [];
     cohortHidden.value = "";
     cohortDisplayText.textContent = "Select Cohort";
     clear(cohortFieldset);
+    if (oneOnOneFieldset) clear(oneOnOneFieldset);
+    updateCohortPills();
 
     selectedStudentIds = [];
     updateStudentPills();
@@ -1118,19 +1511,164 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load cohorts for selected teachers
     const cohorts = await loadCohortsForTeachers(selectedTeacherIds, true);
-    if (cohorts && cohorts.length) {
-      // Do NOT auto-select any cohort
-      cohortDisplayText.textContent = "Select Cohort";
-      cohortHidden.value = "";
-      // Keep students empty until a cohort is picked
-      clear(studentFieldset);
-      const helper = document.createElement("div");
-      helper.style.padding = "8px";
-      helper.textContent = "Select a cohort to see its students";
-      studentFieldset.appendChild(helper);
 
-      // Refresh calendar using only the teacher filter
-      triggerCalendarReload();
+    if (cohorts && cohorts.length) {
+      // Fetch events first to determine which cohorts/students have events
+      const eventsData = await fetchEventsForTeachers(selectedTeacherIds);
+
+      if (eventsData && eventsData.length > 0) {
+        console.log("Auto-selection: Processing", eventsData.length, "events");
+
+        // Extract unique cohort IDs and student IDs from events
+        const eventCohortIds = new Set();
+        const eventStudentIds = new Set();
+
+        eventsData.forEach((ev) => {
+          if (
+            ev.cohortids &&
+            Array.isArray(ev.cohortids) &&
+            ev.cohortids.length > 0
+          ) {
+            ev.cohortids.forEach((cid) => eventCohortIds.add(cid));
+          }
+          if (ev.studentids && Array.isArray(ev.studentids)) {
+            ev.studentids.forEach((sid) => eventStudentIds.add(sid));
+          }
+        });
+
+        console.log(
+          "Auto-selection: Found cohort IDs from events:",
+          Array.from(eventCohortIds)
+        );
+        console.log(
+          "Auto-selection: Found student IDs from events:",
+          Array.from(eventStudentIds)
+        );
+
+        // Auto-select cohorts that have events
+        // This includes both group cohorts (from eventCohortIds) and 1:1 cohorts (inferred from students)
+        const cohortsToSelect = new Set();
+
+        // Add cohorts that are directly in events
+        eventCohortIds.forEach((cid) => cohortsToSelect.add(cid));
+
+        // For 1:1 events (no cohortids but have studentids), find which 1:1 cohorts contain those students
+        if (eventStudentIds.size > 0) {
+          cohorts.forEach((c) => {
+            // Check if this is a 1:1 cohort that should be selected based on student presence
+            if (c.cohorttype === "one1one") {
+              // We need to select 1:1 cohorts - we'll select them all if there are student IDs
+              // since we don't have the cohort-student mapping at this point
+              // The students will be loaded and filtered correctly later
+              cohortsToSelect.add(c.id);
+            }
+          });
+        }
+
+        // Apply selection to all cohorts that should be selected
+        if (cohortsToSelect.size > 0) {
+          console.log(
+            "Auto-selection: Selecting cohorts:",
+            Array.from(cohortsToSelect)
+          );
+
+          cohorts.forEach((c) => {
+            if (cohortsToSelect.has(c.id)) {
+              if (!selectedCohortIds.includes(c.id)) {
+                selectedCohortIds.push(c.id);
+              }
+              // Update UI for selected cohort
+              const fieldset =
+                c.cohorttype === "one1one" ? oneOnOneFieldset : cohortFieldset;
+              const option = fieldset?.querySelector(
+                `.cohort-option[data-cohort-id="${c.id}"]`
+              );
+              if (option) {
+                const checkbox = option.querySelector(".cohort-checkbox");
+                if (checkbox) checkbox.checked = true;
+                option.classList.add("selected");
+                console.log(
+                  "Auto-selection: Selected cohort",
+                  c.id,
+                  c.name,
+                  "type:",
+                  c.cohorttype
+                );
+              } else {
+                console.warn(
+                  "Auto-selection: Could not find option for cohort",
+                  c.id,
+                  "in fieldset"
+                );
+              }
+            }
+          });
+
+          console.log(
+            "Auto-selection: Final selectedCohortIds:",
+            selectedCohortIds
+          );
+          cohortDisplayText.textContent = "";
+          updateCohortPills();
+        }
+
+        // Load students for selected cohorts (or all students if no cohorts)
+        if (selectedCohortIds.length > 0) {
+          await loadStudentsForCohorts(selectedCohortIds);
+        } else {
+          // If no cohorts selected but we have student IDs from events (1:1 classes),
+          // load all students so we can select the ones with events
+          await loadAllStudents();
+        }
+
+        // Auto-select only students that have events
+        if (eventStudentIds.size > 0) {
+          console.log(
+            "Auto-selection: Selecting students:",
+            Array.from(eventStudentIds)
+          );
+
+          eventStudentIds.forEach((sid) => {
+            if (!selectedStudentIds.includes(sid)) {
+              selectedStudentIds.push(sid);
+            }
+            const option = studentFieldset.querySelector(
+              `.student-option[data-student-id="${sid}"]`
+            );
+            if (option) {
+              const checkbox = option.querySelector(".student-checkbox");
+              if (checkbox) checkbox.checked = true;
+              option.classList.add("selected");
+            } else {
+              console.warn(
+                "Auto-selection: Could not find option for student",
+                sid
+              );
+            }
+          });
+
+          console.log(
+            "Auto-selection: Final selectedStudentIds:",
+            selectedStudentIds
+          );
+          updateStudentPills();
+        }
+      }
+
+      // Clear events immediately to remove old teacher dots
+      window.events = [];
+      if (typeof renderWeek === "function") renderWeek(true);
+
+      // Refresh calendar using the teacher and cohort filters - call directly with small delay
+      // to ensure all state updates are complete
+      setTimeout(() => {
+        if (
+          window.fetchCalendarEvents &&
+          typeof window.fetchCalendarEvents === "function"
+        ) {
+          window.fetchCalendarEvents();
+        }
+      }, 100);
     } else {
       // No cohorts for that teacher -> keep students empty and show message
       clear(studentFieldset);
@@ -1138,7 +1676,20 @@ document.addEventListener("DOMContentLoaded", () => {
       div.style.padding = "8px";
       div.textContent = "No cohorts for selected teacher";
       cohortFieldset.appendChild(div);
-      triggerCalendarReload();
+
+      // Clear events immediately to remove old teacher dots
+      window.events = [];
+      if (typeof renderWeek === "function") renderWeek(true);
+
+      // Refresh calendar - call directly with small delay
+      setTimeout(() => {
+        if (
+          window.fetchCalendarEvents &&
+          typeof window.fetchCalendarEvents === "function"
+        ) {
+          window.fetchCalendarEvents();
+        }
+      }, 100);
     }
   }
 
@@ -1184,6 +1735,146 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Helper function to fetch events data for auto-selection (doesn't update UI)
+  async function fetchEventsForTeachers(teacherIds) {
+    if (!teacherIds || !teacherIds.length) return [];
+
+    const params = new URLSearchParams();
+    const now = new Date();
+    const startDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 30
+    );
+    const endDate = new Date(
+      now.getFullYear(),
+      now.getMonth() + 3,
+      now.getDate()
+    );
+
+    const formatYMD = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    params.set("start", formatYMD(startDate));
+    params.set("end", formatYMD(endDate));
+    params.set("teacherids", teacherIds.join(","));
+
+    try {
+      const response = await fetch(
+        `ajax/calendar_admin_get_events.php?${params.toString()}`,
+        {
+          credentials: "same-origin",
+        }
+      );
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      return data.ok && Array.isArray(data.events) ? data.events : [];
+    } catch (err) {
+      console.error("Failed to fetch events for auto-selection:", err);
+      return [];
+    }
+  }
+
+  // Helper function to update students when cohort selection changes
+  async function updateStudentsForCohortChange() {
+    console.log(
+      "updateStudentsForCohortChange: Selected cohorts:",
+      selectedCohortIds
+    );
+
+    // Clear current student selection
+    selectedStudentIds = [];
+
+    if (!selectedCohortIds.length) {
+      console.log(
+        "updateStudentsForCohortChange: No cohorts selected, clearing students"
+      );
+      clear(studentFieldset);
+      updateStudentPills();
+      return;
+    }
+
+    // Load students for selected cohorts
+    await loadStudentsForCohorts(selectedCohortIds);
+
+    // If teachers are selected, fetch events and auto-select students based on events
+    if (selectedTeacherIds.length > 0) {
+      const eventsData = await fetchEventsForTeachers(selectedTeacherIds);
+
+      if (eventsData && eventsData.length > 0) {
+        const eventStudentIds = new Set();
+
+        // Get all 1:1 cohort IDs from selected cohorts
+        const selected1to1CohortIds = [];
+        selectedCohortIds.forEach((cid) => {
+          // Check if this cohort is in the 1:1 fieldset
+          const option = oneOnOneFieldset?.querySelector(
+            `.cohort-option[data-cohort-id="${cid}"]`
+          );
+          if (option) {
+            selected1to1CohortIds.push(cid);
+          }
+        });
+
+        console.log(
+          "updateStudentsForCohortChange: Selected 1:1 cohorts:",
+          selected1to1CohortIds
+        );
+
+        eventsData.forEach((ev) => {
+          // Check if event matches selected cohorts (for group classes)
+          const hasMatchingGroupCohort =
+            ev.cohortids &&
+            ev.cohortids.length > 0 &&
+            ev.cohortids.some((cid) => selectedCohortIds.includes(cid));
+
+          // For 1:1 classes: event has empty cohortids but populated studentids
+          // We need to check if ANY selected cohort is a 1:1 cohort
+          const is1to1Event =
+            (!ev.cohortids || ev.cohortids.length === 0) &&
+            ev.studentids &&
+            ev.studentids.length > 0;
+
+          const shouldInclude =
+            hasMatchingGroupCohort ||
+            (is1to1Event && selected1to1CohortIds.length > 0);
+
+          if (shouldInclude && ev.studentids && Array.isArray(ev.studentids)) {
+            ev.studentids.forEach((sid) => eventStudentIds.add(sid));
+          }
+        });
+
+        console.log(
+          "updateStudentsForCohortChange: Students to auto-select:",
+          Array.from(eventStudentIds)
+        );
+
+        // Auto-select students that have events
+        eventStudentIds.forEach((sid) => {
+          if (!selectedStudentIds.includes(sid)) {
+            selectedStudentIds.push(sid);
+          }
+          const option = studentFieldset.querySelector(
+            `.student-option[data-student-id="${sid}"]`
+          );
+          if (option) {
+            const checkbox = option.querySelector(".student-checkbox");
+            if (checkbox) checkbox.checked = true;
+            option.classList.add("selected");
+          }
+        });
+
+        updateStudentPills();
+      }
+    }
+  }
+
   // ---------- Init ----------
 
   clear(teacherFieldset);
@@ -1203,7 +1894,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Expose state for calendar query usage
   window.calendarFilterState = {
     getSelectedTeachers: () => [...selectedTeacherIds],
-    getSelectedCohort: () => selectedCohortId,
+    getSelectedCohorts: () => [...selectedCohortIds],
     getSelectedStudents: () => [...selectedStudentIds],
   };
 
@@ -1222,16 +1913,39 @@ document.addEventListener("DOMContentLoaded", () => {
         (activeBtn && activeBtn.dataset && activeBtn.dataset.tab) || "cohort";
 
       if (tab === "cohort") {
-        // clear radio selection
-        cohortFieldset.querySelectorAll("input[type=radio]").forEach((r) => {
-          r.checked = false;
-          const opt = r.closest(".cohort-option");
-          if (opt) opt.classList.remove("selected");
-          r.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-        selectedCohortId = null;
+        // clear checkbox selections for cohorts (multi-select)
+        cohortFieldset
+          .querySelectorAll(".cohort-checkbox:checked")
+          .forEach((cb) => {
+            cb.checked = false;
+            const opt = cb.closest(".cohort-option");
+            if (opt) opt.classList.remove("selected");
+          });
+        selectedCohortIds = [];
         if (cohortHidden) cohortHidden.value = "";
         if (cohortDisplayText) cohortDisplayText.textContent = "Select Cohort";
+        updateCohortPills();
+      } else if (tab === "oneonone") {
+        // clear 1:1 cohort selections
+        if (oneOnOneFieldset) {
+          oneOnOneFieldset
+            .querySelectorAll(".cohort-checkbox:checked")
+            .forEach((cb) => {
+              cb.checked = false;
+              const opt = cb.closest(".cohort-option");
+              if (opt) opt.classList.remove("selected");
+            });
+        }
+        // Remove 1:1 cohort IDs from selectedCohortIds
+        const oneOnOneIds = Array.from(
+          oneOnOneFieldset?.querySelectorAll(".cohort-option") || []
+        ).map((opt) => parseInt(opt.dataset.cohortId, 10));
+        selectedCohortIds = selectedCohortIds.filter(
+          (id) => !oneOnOneIds.includes(id)
+        );
+        if (cohortHidden) cohortHidden.value = "";
+        if (cohortDisplayText) cohortDisplayText.textContent = "Select Cohort";
+        updateCohortPills();
       } else {
         // clear checkboxes for the active multi-select tab
         const fs = document.getElementById(tab + "-options-fieldset");
@@ -1249,16 +1963,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function resetAllCohortTabs() {
     try {
-      // Clear cohort radio selections
-      cohortFieldset.querySelectorAll("input[type=radio]").forEach((r) => {
-        r.checked = false;
-        const opt = r.closest(".cohort-option");
-        if (opt) opt.classList.remove("selected");
-        r.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-      selectedCohortId = null;
+      // Clear cohort checkbox selections (multi-select)
+      cohortFieldset
+        .querySelectorAll(".cohort-checkbox:checked")
+        .forEach((cb) => {
+          cb.checked = false;
+          const opt = cb.closest(".cohort-option");
+          if (opt) opt.classList.remove("selected");
+        });
+      selectedCohortIds = [];
       if (cohortHidden) cohortHidden.value = "";
       if (cohortDisplayText) cohortDisplayText.textContent = "Select Cohort";
+      updateCohortPills();
 
       // Clear all multi-select tabs (oneonone / conference / peertalk)
       ["oneonone", "conference", "peertalk"].forEach((t) => {
@@ -1388,36 +2104,31 @@ document.addEventListener("DOMContentLoaded", () => {
     return selected;
   }
 
-  function getSelectedCohortId() {
+  function getSelectedCohortIds() {
     // Use the exposed state if available
     if (window.calendarFilterState) {
-      const cohortId = window.calendarFilterState.getSelectedCohort();
-      if (cohortId) return cohortId;
+      const cohortIds = window.calendarFilterState.getSelectedCohorts();
+      return cohortIds || [];
     }
 
-    // selected cohort option
-    const selected = document.querySelector(
-      ".cohort-option.selected, .cohort-option input.cohort-radio:checked"
-    );
-    if (selected) {
-      const li = selected.classList.contains("cohort-option")
-        ? selected
-        : selected.closest(".cohort-option");
-      if (li) {
-        const cohortId = li.getAttribute("data-cohort-id");
-        if (cohortId) {
-          return parseInt(cohortId, 10) || 0;
+    // Fallback: get from cohort options
+    const selected = Array.from(
+      document.querySelectorAll(
+        ".cohort-option.selected, .cohort-option input.cohort-checkbox:checked"
+      )
+    )
+      .map((el) => {
+        const li = el.classList.contains("cohort-option")
+          ? el
+          : el.closest(".cohort-option");
+        if (li && li.dataset.cohortId) {
+          return parseInt(li.dataset.cohortId, 10);
         }
-      }
-    }
+        return null;
+      })
+      .filter((id) => id !== null);
 
-    // from hidden field (if you set it elsewhere)
-    const hidden = document.getElementById("cohort-value");
-    if (hidden && hidden.value) {
-      return parseInt(hidden.value, 10) || 0;
-    }
-
-    return 0;
+    return selected;
   }
 
   function getSelectedStudentId() {
@@ -1446,19 +2157,39 @@ document.addEventListener("DOMContentLoaded", () => {
     return 0;
   }
 
+  function getSelectedStudentIds() {
+    // Use the exposed state if available - returns ALL selected students
+    if (window.calendarFilterState) {
+      const students = window.calendarFilterState.getSelectedStudents();
+      return students || [];
+    }
+
+    // Fallback: get from student options
+    const selected = Array.from(
+      document.querySelectorAll(
+        ".student-option.selected, .student-option input.student-checkbox:checked"
+      )
+    )
+      .map((el) => {
+        const li = el.classList.contains("student-option")
+          ? el
+          : el.closest(".student-option");
+        if (li && li.dataset.studentId) {
+          return parseInt(li.dataset.studentId, 10);
+        }
+        return null;
+      })
+      .filter((id) => id !== null);
+
+    return selected;
+  }
+
   // ---------------- API call ----------------
 
   async function fetchCalendarEvents() {
     const teacherids = getSelectedTeacherIds();
-    const cohortid = getSelectedCohortId();
-    const studentid = getSelectedStudentId();
-
-    console.log("Fetching calendar events with filters:", {
-      teacherids,
-      cohortid,
-      studentid,
-      dateRange: `${formatYMD(currentStart)} to ${formatYMD(currentEnd)}`,
-    });
+    const cohortids = getSelectedCohortIds();
+    const studentids = getSelectedStudentIds();
 
     const params = new URLSearchParams();
     params.set("start", formatYMD(currentStart));
@@ -1466,8 +2197,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (teacherids && teacherids.length > 0)
       params.set("teacherids", teacherids.join(","));
-    if (cohortid) params.set("cohortid", cohortid);
-    if (studentid) params.set("studentid", studentid);
+    if (cohortids && cohortids.length > 0)
+      params.set("cohortids", cohortids.join(","));
+    if (studentids && studentids.length > 0)
+      params.set("studentids", studentids.join(","));
     try {
       $("#loader").css("display", "flex");
     } catch (e) {
@@ -1495,22 +2228,50 @@ document.addEventListener("DOMContentLoaded", () => {
           const startDate = new Date(ev.start);
           const endDate = new Date(ev.end);
 
-          // Get first teacher ID from array
-          const teacherId =
-            Array.isArray(ev.teacherids) && ev.teacherids.length > 0
-              ? ev.teacherids[0]
-              : ev.teacher_id || null;
+          // Match event teacher with selected teachers for proper color assignment
+          let teacherId = null;
+
+          if (teacherids && teacherids.length > 0) {
+            // Find which selected teacher is associated with this event
+            const eventTeacherIds = Array.isArray(ev.teacherids)
+              ? ev.teacherids
+              : ev.teacher_id
+              ? [ev.teacher_id]
+              : [];
+
+            // Find first match between selected teachers and event teachers
+            teacherId =
+              teacherids.find((selectedId) =>
+                eventTeacherIds.includes(selectedId)
+              ) || eventTeacherIds[0]; // Fallback to event's first teacher
+          } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
+            // No teacher filter: use first teacher from event data
+            teacherId = ev.teacherids[0];
+          } else if (ev.teacher_id) {
+            // Fallback: use single teacher_id field
+            teacherId = ev.teacher_id;
+          }
+
+          // Determine event color based on class type
+          let eventColor = "e-blue"; // Default for main classes
+          if (
+            ev.class_type === "one2one_weekly" ||
+            ev.class_type === "one2one_single"
+          ) {
+            eventColor = "e-green";
+          }
 
           return {
             date: startDate.toISOString().split("T")[0],
             title: ev.title,
             start: startDate.toTimeString().slice(0, 5),
             end: endDate.toTimeString().slice(0, 5),
-            color: ev.class_type === "weekly" ? "e-blue" : "e-green",
+            color: eventColor,
             repeat: ev.is_recurring,
             meetingurl: ev.meetingurl,
             avatar: "",
             teacherId: teacherId,
+            classType: ev.class_type,
           };
         });
 

@@ -7,10 +7,10 @@
 //  - start (Y-m-d or timestamp) [required]
 //  - end   (Y-m-d or timestamp) [required]
 //  - teacherid  (int, optional) [deprecated - use teacherids]
-//  - teacherids (comma-separated int list, optional) [new - for multiple teachers]
+//  - teacherids (comma-separated int list, optional) [new: for multiple teachers]
 //  - cohortid   (int, optional)
 //  - studentid  (int, optional)
-//  - one2one_gmid (int, optional)   // NEW: filter 1:1 events for a specific googlemeet id
+//  - one2one_gmid (int, optional)   // filter 1:1 events for a specific googlemeet id
 //
 //
 // Returns concrete occurrences from {googlemeet_events} for:
@@ -23,7 +23,9 @@
 //  - is_parent      : bool
 //  - sequence       : order within that meet
 //  - googlemeetid, cmid, courseid
-//  - teacherids[], studentids[], cohortids[]
+//  - teacherids[],  teachernames[]
+//  - studentids[],  studentnames[]
+//  - cohortids[]
 //  - class_type     :
 //        * courseid 24 → 'one2one_single' | 'one2one_weekly'
 //        * courseid  2 → 'main' | 'tutoring'
@@ -48,9 +50,10 @@ $startraw      = required_param('start', PARAM_RAW_TRIMMED);
 $endraw        = required_param('end', PARAM_RAW_TRIMMED);
 $teacherid     = optional_param('teacherid', 0, PARAM_INT);              // legacy
 $teacheridsraw = optional_param('teacherids', '', PARAM_RAW_TRIMMED);    // new: multi
-$cohortid      = optional_param('cohortid', 0, PARAM_INT);
+$cohortid      = optional_param('cohortid', 0, PARAM_INT);               // legacy single
+$cohortidsraw  = optional_param('cohortids', '', PARAM_RAW_TRIMMED);     // new: multi
 $studentid     = optional_param('studentid', 0, PARAM_INT);
-// NEW: specific googlemeet id filter for 1:1
+// specific googlemeet id filter for 1:1
 $one2onegmid   = optional_param('one2one_gmid', 0, PARAM_INT);
 
 // Parse multiple teacher IDs if provided (comma-separated)
@@ -61,6 +64,16 @@ if ($teacheridsraw) {
 } elseif ($teacherid) {
     // Fallback to single teacherid for backward compatibility
     $teacherids = [$teacherid];
+}
+
+// Parse multiple cohort IDs if provided (comma-separated)
+$cohortids = [];
+if ($cohortidsraw) {
+    $ids = array_map('intval', explode(',', $cohortidsraw));
+    $cohortids = array_filter($ids);
+} elseif ($cohortid) {
+    // Fallback to single cohortid for backward compatibility
+    $cohortids = [$cohortid];
 }
 
 // Parse dates → timestamps
@@ -256,7 +269,7 @@ $add_one2one_events = function() use (
     $teacherids,
     $teacherEmails,
     $studentid,
-    $one2onegmid,            // NEW: capture googlemeet filter
+    $one2onegmid,
     $cohortid,
     $teacherEmailLower,
     $studentEmailLower,
@@ -320,13 +333,26 @@ $add_one2one_events = function() use (
         $gminstances = $DB->get_records_select('googlemeet', "id $insql", $inparams);
     }
 
+    // Preload teacher fullnames for all filtered teacher IDs (used in 1:1)
+    $teacherUserMap = [];
+    if (!empty($teacherids)) {
+        list($insqlT, $paramsT) = $DB->get_in_or_equal($teacherids, SQL_PARAMS_NAMED);
+        $teacherUserMap = $DB->get_records_select(
+            'user',
+            "id $insqlT AND deleted = 0 AND suspended = 0",
+            $paramsT,
+            '',
+            'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename'
+        );
+    }
+
     foreach ($cms as $cmid => $cm) {
         $gm = $gminstances[$cm->instance] ?? null;
         if (!$gm) {
             continue;
         }
 
-        // NEW: if one2one_gmid is set, only keep this googlemeet
+        // if one2one_gmid is set, only keep this googlemeet
         if ($one2onegmid && (int)$gm->id !== $one2onegmid) {
             continue;
         }
@@ -343,6 +369,19 @@ $add_one2one_events = function() use (
 
         if ($studentid && !in_array($studentid, $studentIds, true)) {
             continue;
+        }
+
+        // Load full student user records for names (for this CM)
+        $studentUserMap = [];
+        if (!empty($studentIds)) {
+            list($insqlS, $paramsS) = $DB->get_in_or_equal($studentIds, SQL_PARAMS_NAMED);
+            $studentUserMap = $DB->get_records_select(
+                'user',
+                "id $insqlS AND deleted = 0 AND suspended = 0",
+                $paramsS,
+                '',
+                'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename'
+            );
         }
 
         // Derive teacher(s) from section (for filtered cases)
@@ -407,6 +446,21 @@ $add_one2one_events = function() use (
         }
         $viewurl = (new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]))->out(false);
 
+        // Precompute teacher/student fullnames for this CM
+        $teacherNames = [];
+        foreach ($teacherIdsForEvent as $tid) {
+            if (isset($teacherUserMap[$tid])) {
+                $teacherNames[] = fullname($teacherUserMap[$tid], true);
+            }
+        }
+
+        $studentNames = [];
+        foreach ($studentIds as $sid) {
+            if (isset($studentUserMap[$sid])) {
+                $studentNames[] = fullname($studentUserMap[$sid], true);
+            }
+        }
+
         // Build event entries
         $seq = 1;
         foreach ($allevents as $e) {
@@ -442,7 +496,9 @@ $add_one2one_events = function() use (
                 'end'           => $fmt_iso($eventEnd),
 
                 'teacherids'    => $teacherIdsForEvent,
+                'teachernames'  => $teacherNames,
                 'studentids'    => $studentIds,
+                'studentnames'  => $studentNames,
                 'cohortids'     => [],
 
                 'class_type'    => $classType,   // 'one2one_single' | 'one2one_weekly'
@@ -525,27 +581,27 @@ $add_group_events = function() use (
             continue;
         }
 
-        // Teacher(s) from cohorts
-        $teacherIds = [];
+        // Teacher(s) from cohorts (for filtering only – may include both main & guide)
+        $teacherIdsAll = [];
         foreach ($cohortIds as $cid) {
             if (!isset($cohortById[$cid])) {
                 continue;
             }
             $c = $cohortById[$cid];
             if (!empty($c->cohortmainteacher)) {
-                $teacherIds[] = (int)$c->cohortmainteacher;
+                $teacherIdsAll[] = (int)$c->cohortmainteacher;
             }
             if (!empty($c->cohortguideteacher)) {
-                $teacherIds[] = (int)$c->cohortguideteacher;
+                $teacherIdsAll[] = (int)$c->cohortguideteacher;
             }
         }
-        $teacherIds = array_values(array_unique(array_filter($teacherIds)));
+        $teacherIdsAll = array_values(array_unique(array_filter($teacherIdsAll)));
 
-        // Teacher filter (legacy single teacherid)
-        if ($teacherid && $teacherIds && !in_array($teacherid, $teacherIds, true)) {
+        // Teacher filter (legacy single teacherid) based on all teachers tied to the cohorts
+        if ($teacherid && $teacherIdsAll && !in_array($teacherid, $teacherIdsAll, true)) {
             continue;
         }
-        if ($teacherid && !$cohortid && !$teacherIds) {
+        if ($teacherid && !$cohortid && !$teacherIdsAll) {
             // For "only teacher" view: skip meets that don't relate to that teacher by cohort
             continue;
         }
@@ -600,6 +656,40 @@ $add_group_events = function() use (
             $classType = 'tutoring';
         }
 
+        // ---- PICK EXACT ONE TEACHER BASED ON CLASS TYPE ----
+        $teacherIdDisplay = 0;
+        if ($classType === 'main') {
+            foreach ($cohortIds as $cid) {
+                if (!empty($cohortById[$cid]) && !empty($cohortById[$cid]->cohortmainteacher)) {
+                    $teacherIdDisplay = (int)$cohortById[$cid]->cohortmainteacher;
+                    break;
+                }
+            }
+        } else { // tutoring
+            foreach ($cohortIds as $cid) {
+                if (!empty($cohortById[$cid]) && !empty($cohortById[$cid]->cohortguideteacher)) {
+                    $teacherIdDisplay = (int)$cohortById[$cid]->cohortguideteacher;
+                    break;
+                }
+            }
+        }
+
+        $teacherIdsSingle = $teacherIdDisplay ? [$teacherIdDisplay] : [];
+
+        // Preload that specific teacher for name
+        $teacherNames = [];
+        if ($teacherIdDisplay) {
+            $tuser = $DB->get_record(
+                'user',
+                ['id' => $teacherIdDisplay, 'deleted' => 0, 'suspended' => 0],
+                'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename',
+                IGNORE_MISSING
+            );
+            if ($tuser) {
+                $teacherNames[] = fullname($tuser, true);
+            }
+        }
+
         $meetingurl = '';
         foreach (['meetingurl', 'meeting_url', 'meeturl', 'joinurl', 'join_url', 'url', 'link'] as $f) {
             if (!empty($gm->$f)) {
@@ -642,8 +732,11 @@ $add_group_events = function() use (
                 'start'         => $fmt_iso($eventStart),
                 'end'           => $fmt_iso($eventEnd),
 
-                'teacherids'    => $teacherIds,
-                'studentids'    => [], // implicit via cohort
+                // NOW: exactly one teacher (based on main/tutoring)
+                'teacherids'    => $teacherIdsSingle,
+                'teachernames'  => $teacherNames,
+                'studentids'    => [],            // implicit via cohort
+                'studentnames'  => [],            // no explicit list
                 'cohortids'     => $cohortIds,
 
                 'class_type'    => $classType,   // 'main' | 'tutoring'
@@ -685,8 +778,24 @@ try {
             }
         }
 
-        if ($cohortid && !in_array($cohortid, $ev['cohortids'], true)) {
-            continue;
+        // Filter by cohort IDs (multi-select support)
+        if (!empty($cohortids)) {
+            // Check if ANY selected cohort matches ANY cohort in the event
+            $hasMatchingCohort = false;
+            foreach ($cohortids as $selectedCid) {
+                if (in_array($selectedCid, $ev['cohortids'], true)) {
+                    $hasMatchingCohort = true;
+                    break;
+                }
+            }
+            
+            // Special case: 1:1 events have empty cohortids but we still want to include them
+            // if the event's students match our selected students (handled by studentid filter below)
+            if (!$hasMatchingCohort && !empty($ev['cohortids'])) {
+                // Event has cohorts but none match our selection - skip it
+                continue;
+            }
+            // If event has empty cohortids (1:1 events), let it pass through to student filtering
         }
 
         if ($studentid) {
@@ -722,8 +831,9 @@ try {
             'teacherid'    => $teacherid,
             'teacherids'   => $teacherids,
             'cohortid'     => $cohortid,
+            'cohortids'    => $cohortids,
             'studentid'    => $studentid,
-            'one2one_gmid' => $one2onegmid, // debug echo-back
+            'one2one_gmid' => $one2onegmid,
         ],
         'events'  => array_values($filtered),
     ]);

@@ -414,8 +414,29 @@ try {
     // -------------------------------------------------
     if ($action === 'students') {
         $cohortid = optional_param('cohortid', 0, PARAM_INT);
+        $cohortids_csv = optional_param('cohortids', '', PARAM_RAW);
 
-        if ($cohortid > 0) {
+        // Support multiple cohort IDs
+        if (!empty($cohortids_csv)) {
+            $cohort_ids = caf_parse_ids($cohortids_csv);
+            if (count($cohort_ids) > 0) {
+                list($in_sql, $params) = $DB->get_in_or_equal($cohort_ids, SQL_PARAMS_NAMED);
+                $sql = "
+                    SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                    u.firstnamephonetic, u.lastnamephonetic,
+                                    u.middlename, u.alternatename
+                      FROM {cohort_members} cm
+                      JOIN {user} u ON u.id = cm.userid
+                     WHERE cm.cohortid $in_sql
+                       AND u.deleted = 0
+                       AND u.suspended = 0
+                     ORDER BY u.firstname ASC, u.lastname ASC
+                ";
+                $students = $DB->get_records_sql($sql, $params);
+            } else {
+                $students = [];
+            }
+        } elseif ($cohortid > 0) {
             // Students in the selected cohort.
             $sql = "
                 SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
