@@ -1021,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let wlEndDate = new Date();
     let wlDayTimes = {};
     let wlCurrentDayKey = null;
-    const dayNamesShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const dayNamesShort = ['S', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
     const dayNamesLong = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     // Initialize widgets

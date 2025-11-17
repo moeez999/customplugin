@@ -149,7 +149,7 @@ try {
     $activityAvailability       = $profile_availability('email', $studentEmail);
     $moduleinfo->availability   = $activityAvailability;
 
-    // Base name (if you want different naming, change here).
+    // Base name.
     $baseMeetName               = $meet->name ?: ('1:1 ' . $studentFull . ' with Teacher ' . $teacherFirst);
     $moduleinfo->name           = $baseMeetName;
 
@@ -214,19 +214,19 @@ try {
         }
         $moduleinfo->coursemodule = $cm->id;
 
-        // 🔁 This is the key call: triggers googlemeet_update_instance and calendar/event updates.
         list($cm, $moduleinfo) = update_moduleinfo($cm, $moduleinfo, $course, null);
-
         $updated = 1;
 
     // ================= WEEKLY / RECURRING UPDATE =================
     } else {
         $weekly = $data['weeklyLesson'] ?? [];
-        $interval     = max(1, (int)($weekly['interval'] ?? 1));
-        $period       = strtolower((string)($weekly['period'] ?? 'week'));
-        $endOptionId  = (string)($weekly['endOption'] ?? 'wl_end_never');
-        $endsOnLbl    = (string)($weekly['endsOn']   ?? '');
-        $daysIn       = is_array($weekly['days'] ?? null) ? $weekly['days'] : [];
+        $interval       = max(1, (int)($weekly['interval'] ?? 1));
+        $period         = strtolower((string)($weekly['period'] ?? 'week'));
+        $endOptionId    = (string)($weekly['endOption'] ?? 'wl_end_never');
+        $endsOnLbl      = (string)($weekly['endsOn']   ?? '');
+        $startDateUnix  = (int)($weekly['startDateUnix'] ?? 0);
+        $startDateLbl   = (string)($weekly['startDate'] ?? '');
+        $daysIn         = is_array($weekly['days'] ?? null) ? $weekly['days'] : [];
 
         if ($period !== 'week') {
             throw new moodle_exception('invaliddata', 'error', '', 'Only weekly recurrence supported here.');
@@ -235,44 +235,96 @@ try {
             throw new moodle_exception('missingparam', 'error', '', 'No days selected for weekly lesson');
         }
 
-        // Normalize days + times.
+        // Normalize days + times (same logic as schedule_one2one).
         $normalized = [];
         foreach ($daysIn as $d) {
             $dayname  = (string)($d['day'] ?? '');
+
+            // Map short day labels (e.g. "M") to full names if needed.
+            $dayaliases = [
+                'M'  => 'Mon',
+                'T'  => 'Tue',
+                'W'  => 'Wed',
+                'Th' => 'Thu',
+                'F'  => 'Fri',
+                'Sa' => 'Sat',
+                'Su' => 'Sun',
+            ];
+            if (isset($dayaliases[$dayname])) {
+                $dayname = $dayaliases[$dayname];
+            }
+
             if ($dayname === '' || !isset($dayname_to_index[$dayname])) {
                 continue;
             }
+
             $key = $index_to_daykey[$dayname_to_index[$dayname]];
 
-            $startLbl = (string)($d['start'] ?? '09:00 AM');
-            [$H,$i]   = $parse_ampm($startLbl);
-
-            $endLbl   = (string)($d['end'] ?? '');
-            if ($endLbl !== '') {
-                [$eH, $eI] = $parse_ampm($endLbl);
+            // START time: prefer 24h -> then AM/PM -> default
+            if (!empty($d['start24'])) {
+                [$H, $i] = array_map('intval', explode(':', (string)$d['start24'], 2));
             } else {
-                $eH = $H + 1;
-                $eI = $i;
+                $startLbl = (string)($d['start'] ?? $d['startTime'] ?? '');
+                if ($startLbl === '') {
+                    $startLbl = '09:00 AM';
+                }
+                [$H, $i] = $parse_ampm($startLbl);
             }
 
-            $normalized[] = ['key' => $key, 'H' => $H, 'i' => $i, 'eH' => $eH, 'eI' => $eI];
+            // END time: prefer 24h -> then AM/PM -> else +1 hour from start
+            if (!empty($d['end24'])) {
+                [$eH, $eI] = array_map('intval', explode(':', (string)$d['end24'], 2));
+            } else {
+                $endLbl = (string)($d['end'] ?? $d['endTime'] ?? '');
+                if ($endLbl !== '') {
+                    [$eH, $eI] = $parse_ampm($endLbl);
+                } else {
+                    $eH = $H + 1;
+                    $eI = $i;
+                }
+            }
+
+            $normalized[] = [
+                'key' => $key,
+                'H'   => $H,
+                'i'   => $i,
+                'eH'  => $eH,
+                'eI'  => $eI
+            ];
         }
+
         if (empty($normalized)) {
             throw new moodle_exception('invaliddata', 'error', '', 'Could not parse weekly days/times');
         }
 
-        // For updating an existing Meet we assume **one time window**.
+        // Use the first time window as the base for this Meet.
         $first = $normalized[0];
-        foreach ($normalized as $t) {
-            if ($t['H'] !== $first['H'] || $t['i'] !== $first['i'] || $t['eH'] !== $first['eH'] || $t['eI'] !== $first['eI']) {
-                throw new moodle_exception('invaliddata', 'error', '', 'Update expects same time across selected days for this Meet');
-            }
+
+        // === eventdate: use startDateUnix / startDate from frontend ===
+        if ($startDateUnix > 0) {
+            // Already a Unix timestamp (seconds).
+            $eventdate = $startDateUnix;
+        } elseif ($startDateLbl !== '') {
+            [$SY, $Sn, $Sj] = $parse_date($startDateLbl);
+            $eventdate = $make_ts($SY, $Sn, $Sj, 0, 0, $tzid);
+        } else {
+            // Fallback – should rarely happen.
+            $today     = time();
+            $eventdate = $make_ts((int)date('Y',$today), (int)date('n',$today), (int)date('j',$today), 0, 0, $tzid);
         }
 
-        $today     = time();
-        $eventdate = $make_ts((int)date('Y',$today), (int)date('n',$today), (int)date('j',$today), 0, 0, $tzid);
+        $endOptionId   = (string)($weekly['endOption'] ?? 'wl_end_never');
+        $endOptionLbl  = strtolower((string)($weekly['endOptionLabel'] ?? ''));
+        $endsOnLbl     = (string)($weekly['endsOn'] ?? '');
 
-        if ($endOptionId === 'wl_end_on' && $endsOnLbl !== '') {
+        // Treat all these as "end on"
+        $hasEndOn = in_array($endOptionId, [
+            'wl_end_on',
+            'weeklyLessonEndOn',
+            'weeklyLessonEndOnManage'
+        ], true) || $endOptionLbl === 'on';
+
+        if ($hasEndOn && $endsOnLbl !== '') {
             [$EY,$En,$Ej] = $parse_date($endsOnLbl);
             $eventenddate = $make_ts($EY,$En,$Ej, 0, 0, $tzid);
         } else {
@@ -305,7 +357,6 @@ try {
         $moduleinfo->coursemodule = $cm->id;
 
         list($cm, $moduleinfo) = update_moduleinfo($cm, $moduleinfo, $course, null);
-
         $updated = 1;
     }
 

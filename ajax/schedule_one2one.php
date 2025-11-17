@@ -255,22 +255,33 @@ try {
             throw new moodle_exception('missingparam', 'error', '', 'No days selected for weekly lesson');
         }
 
-        // --- build normalized day/time entries ---
+// --- build normalized day/time entries ---
 $normalized = [];
 foreach ($daysIn as $d) {
-    $dayname  = (string)($d['day'] ?? '');
+    $dayname = (string)($d['day'] ?? '');
     if ($dayname === '' || !isset($dayname_to_index[$dayname])) continue;
 
     $key = $index_to_daykey[$dayname_to_index[$dayname]];
 
-    $startLbl = (string)($d['start'] ?? '09:00 AM');
-    [$H,$i]   = $parse_ampm($startLbl);
-
-    $endLbl   = (string)($d['end'] ?? '');
-    if ($endLbl !== '') {
-        [$eH, $eI] = $parse_ampm($endLbl);
+    // START time: prefer 24h -> then AM/PM -> default
+    if (!empty($d['start24'])) {
+        [$H, $i] = array_map('intval', explode(':', (string)$d['start24'], 2));
     } else {
-        $eH = $H + 1; $eI = $i;
+        $startLbl = (string)($d['start'] ?? $d['startTime'] ?? '');
+        if ($startLbl === '') $startLbl = '09:00 AM';
+        [$H, $i] = $parse_ampm($startLbl);
+    }
+
+    // END time: prefer 24h -> then AM/PM -> else +1 hour from start
+    if (!empty($d['end24'])) {
+        [$eH, $eI] = array_map('intval', explode(':', (string)$d['end24'], 2));
+    } else {
+        $endLbl = (string)($d['end'] ?? $d['endTime'] ?? '');
+        if ($endLbl !== '') {
+            [$eH, $eI] = $parse_ampm($endLbl);
+        } else {
+            $eH = $H + 1; $eI = $i;
+        }
     }
 
     $normalized[] = ['key' => $key, 'H' => $H, 'i' => $i, 'eH' => $eH, 'eI' => $eI];
@@ -280,8 +291,24 @@ if (empty($normalized)) {
 }
 
 // --- anchor event dates (same as before) ---
-$today     = time();
-$eventdate = $make_ts((int)date('Y',$today), (int)date('n',$today), (int)date('j',$today), 0, 0, $tzid);
+// --- anchor event date: use startDate/startDateUnix from frontend if provided ---
+if (!empty($weekly['startDateUnix'])) {
+    // Frontend already sends unix timestamp at midnight.
+    $eventdate = (int)$weekly['startDateUnix'];
+} else if (!empty($weekly['startDate'])) {
+    // Frontend sends a date string like "2025-11-25".
+    [$SY, $Sn, $Sj] = $parse_date($weekly['startDate']); // we only need Y, n, j
+    $eventdate = $make_ts($SY, $Sn, $Sj, 0, 0, $tzid);
+} else {
+    // Fallback: keep old behaviour (today).
+    $today     = time();
+    $eventdate = $make_ts(
+        (int)date('Y', $today),
+        (int)date('n', $today),
+        (int)date('j', $today),
+        0, 0, $tzid
+    );
+}
 
 if ($endOptionId === 'wl_end_on' && $endsOnLbl !== '') {
     [$EY,$En,$Ej] = $parse_date($endsOnLbl);
@@ -309,8 +336,10 @@ if (count($groups) === 1) {
     $g = reset($groups);
     $t = $g['time'];
 
-    $days = ['Sun'=>"0",'Mon'=>"0",'Tue'=>"0",'Wed'=>"0",'Thu'=>"0",'Fri'=>"0",'Sat'=>"0"];
-    foreach ($g['days'] as $dk) { $days[$dk] = "1"; }
+    $days = [];
+    foreach ($g['days'] as $dk) {
+        $days[$dk] = "1";
+    }
 
     $cm = $create_meet([
         'name'               => $baseMeetName,
@@ -340,8 +369,10 @@ if (count($groups) === 1) {
     foreach ($groups as $sig => $g) {
         $t = $g['time'];
 
-        $days = ['Sun'=>"0",'Mon'=>"0",'Tue'=>"0",'Wed'=>"0",'Thu'=>"0",'Fri'=>"0",'Sat'=>"0"];
-        foreach ($g['days'] as $dk) { $days[$dk] = "1"; }
+        $days = [];
+        foreach ($g['days'] as $dk) {
+            $days[$dk] = "1";
+        }
 
         // Optional: append the days to title so it's clear (e.g., "(Mon/Thu)")
         $labelDays = implode('/', $g['days']);
