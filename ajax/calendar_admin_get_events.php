@@ -52,7 +52,8 @@ $teacherid     = optional_param('teacherid', 0, PARAM_INT);              // lega
 $teacheridsraw = optional_param('teacherids', '', PARAM_RAW_TRIMMED);    // new: multi
 $cohortid      = optional_param('cohortid', 0, PARAM_INT);               // legacy single
 $cohortidsraw  = optional_param('cohortids', '', PARAM_RAW_TRIMMED);     // new: multi
-$studentid     = optional_param('studentid', 0, PARAM_INT);
+$studentid     = optional_param('studentid', 0, PARAM_INT);              // legacy single
+$studentidsraw = optional_param('studentids', '', PARAM_RAW_TRIMMED);    // new: multi
 // specific googlemeet id filter for 1:1
 $one2onegmid   = optional_param('one2one_gmid', 0, PARAM_INT);
 
@@ -74,6 +75,16 @@ if ($cohortidsraw) {
 } elseif ($cohortid) {
     // Fallback to single cohortid for backward compatibility
     $cohortids = [$cohortid];
+}
+
+// Parse multiple student IDs if provided (comma-separated)
+$studentids = [];
+if ($studentidsraw) {
+    $ids = array_map('intval', explode(',', $studentidsraw));
+    $studentids = array_filter($ids);
+} elseif ($studentid) {
+    // Fallback to single studentid for backward compatibility
+    $studentids = [$studentid];
 }
 
 // Parse dates → timestamps
@@ -798,17 +809,27 @@ try {
             // If event has empty cohortids (1:1 events), let it pass through to student filtering
         }
 
-        if ($studentid) {
+        // Filter by student IDs (multi-select support)
+        if (!empty($studentids)) {
             $ok = false;
 
-            if (in_array($studentid, $ev['studentids'], true)) {
-                $ok = true;
-            } elseif (!empty($ev['cohortids'])) {
-                list($insql, $params) = $DB->get_in_or_equal($ev['cohortids'], SQL_PARAMS_NAMED);
-                $params['uid'] = $studentid;
+            // Check if ANY selected student matches ANY student in the event
+            foreach ($studentids as $selectedSid) {
+                if (in_array($selectedSid, $ev['studentids'], true)) {
+                    $ok = true;
+                    break;
+                }
+            }
+
+            // If event doesn't have direct student match, check cohort membership
+            if (!$ok && !empty($ev['cohortids'])) {
+                list($insqlCohort, $paramsCohort) = $DB->get_in_or_equal($ev['cohortids'], SQL_PARAMS_NAMED, 'coh');
+                list($insqlStudent, $paramsStudent) = $DB->get_in_or_equal($studentids, SQL_PARAMS_NAMED, 'stu');
+                $params = array_merge($paramsCohort, $paramsStudent);
+                
                 $ok = $DB->record_exists_sql(
                     "SELECT 1 FROM {cohort_members}
-                      WHERE userid = :uid AND cohortid $insql",
+                      WHERE userid $insqlStudent AND cohortid $insqlCohort",
                     $params
                 );
             }
@@ -833,6 +854,7 @@ try {
             'cohortid'     => $cohortid,
             'cohortids'    => $cohortids,
             'studentid'    => $studentid,
+            'studentids'   => $studentids,
             'one2one_gmid' => $one2onegmid,
         ],
         'events'  => array_values($filtered),

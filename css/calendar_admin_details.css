@@ -1575,6 +1575,16 @@ body {
   gap: 8px;
 }
 
+/* Shared header with controls for teacher/student widgets */
+.widget-header-with-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e6e6e9;
+  padding-bottom: 12px;
+}
+
 .calendar-control-btn {
   background: transparent;
   border: 1px solid #e6e6e9;
@@ -1584,6 +1594,20 @@ body {
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.calendar-control-btn:hover {
+  background-color: #f8f9fa;
+  border-color: #d1d5db;
+}
+
+.calendar-control-btn img {
+  width: 14px;
+  height: 14px;
 }
 
 .cohort-no-results {

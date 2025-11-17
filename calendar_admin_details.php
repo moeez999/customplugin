@@ -149,7 +149,10 @@
                 <!-- Teacher Search Widget -->
                 <section id="search-teacher" class="search-teacher-section" style="display:none">
                     <div class="search-widget-container" id="teacher-search-widget">
-                        <h1 class="widget-title">Search Teacher</h1>
+                        <div class="widget-header-with-controls">
+                            <h1 class="widget-title">Search Teacher</h1>
+                            <button type="button" id="teacher-reset" class="calendar-control-btn"><img src="./img/reset-icon.svg" alt=""> Reset</button>
+                        </div>
                         <div class="search-component">
                             <div class="search-input-wrapper">
                                 <input type="text" class="search-input-placeholder" id="teacher-search-input"
@@ -306,7 +309,10 @@
                 <!-- Student Widget -->
                 <section id="search-student" class="search-student-section" style="display:none">
                     <div class="search-widget-container" id="student-search-widget">
-                        <h1 class="widget-title">Search Student</h1>
+                        <div class="widget-header-with-controls">
+                            <h1 class="widget-title">Search Student</h1>
+                            <button type="button" id="student-reset" class="calendar-control-btn"><img src="./img/reset-icon.svg" alt=""> Reset</button>
+                        </div>
                         <div class="search-component">
                             <div class="search-input-wrapper">
                                 <input type="text" class="search-input-placeholder" id="student-search-input"

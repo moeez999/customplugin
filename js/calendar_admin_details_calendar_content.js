@@ -1448,9 +1448,13 @@ document.addEventListener("DOMContentLoaded", () => {
     list.forEach((s) => studentFieldset.appendChild(createStudentOption(s)));
   }
 
-  async function loadStudentsForCohorts(cohortIds) {
+  async function loadStudentsForCohorts(cohortIds, clearSelection = true) {
     clear(studentFieldset);
-    selectedStudentIds = [];
+
+    // Only clear selection if explicitly requested
+    if (clearSelection) {
+      selectedStudentIds = [];
+    }
 
     if (!cohortIds || !cohortIds.length) {
       const div = document.createElement("div");
@@ -1652,14 +1656,61 @@ document.addEventListener("DOMContentLoaded", () => {
           updateCohortPills();
         }
 
-        // Load students for selected cohorts (or all students if no cohorts)
+        // Load students for selected cohorts
+        // Don't clear selection yet - we'll rebuild it after loading
         if (selectedCohortIds.length > 0) {
-          await loadStudentsForCohorts(selectedCohortIds);
+          await loadStudentsForCohorts(selectedCohortIds, false);
         } else {
           // If no cohorts selected but we have student IDs from events (1:1 classes),
           // load all students so we can select the ones with events
           await loadAllStudents();
         }
+
+        // If we have student IDs from 1:1 events, we need to ensure those students are loaded
+        // even if their 1:1 cohorts weren't auto-selected (they might not be in selectedCohortIds)
+        if (eventStudentIds.size > 0) {
+          // Check if any students from events are missing from the loaded student list
+          const loadedStudentIds = new Set();
+          studentFieldset.querySelectorAll(".student-option").forEach((opt) => {
+            loadedStudentIds.add(parseInt(opt.dataset.studentId, 10));
+          });
+
+          const missingStudentIds = Array.from(eventStudentIds).filter(
+            (sid) => !loadedStudentIds.has(sid)
+          );
+
+          if (missingStudentIds.length > 0) {
+            console.log(
+              "Auto-selection: Some students not in selected cohorts, finding their cohorts:",
+              missingStudentIds
+            );
+
+            // Find which cohorts from events are NOT in selectedCohortIds (these contain the missing students)
+            const missingCohortIds = Array.from(eventCohortIds).filter(
+              (cid) => !selectedCohortIds.includes(cid)
+            );
+
+            if (missingCohortIds.length > 0) {
+              console.log(
+                "Auto-selection: Found missing cohorts from events:",
+                missingCohortIds
+              );
+              // Combine selected cohorts with missing cohorts to load all students grouped properly
+              const allCohortsToLoad = [
+                ...selectedCohortIds,
+                ...missingCohortIds,
+              ];
+              console.log(
+                "Auto-selection: Reloading students with all cohorts:",
+                allCohortsToLoad
+              );
+              await loadStudentsForCohorts(allCohortsToLoad, false);
+            }
+          }
+        }
+
+        // Clear previous selection and rebuild based on events
+        selectedStudentIds = [];
 
         // Auto-select only students that have events
         if (eventStudentIds.size > 0) {
@@ -1679,10 +1730,16 @@ document.addEventListener("DOMContentLoaded", () => {
               const checkbox = option.querySelector(".student-checkbox");
               if (checkbox) checkbox.checked = true;
               option.classList.add("selected");
+              console.log(
+                "Auto-selection: Selected student",
+                sid,
+                option.dataset.studentName
+              );
             } else {
               console.warn(
                 "Auto-selection: Could not find option for student",
-                sid
+                sid,
+                "- student may not be in selected cohorts"
               );
             }
           });
@@ -1828,20 +1885,21 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedCohortIds
     );
 
-    // Clear current student selection
-    selectedStudentIds = [];
-
     if (!selectedCohortIds.length) {
       console.log(
         "updateStudentsForCohortChange: No cohorts selected, clearing students"
       );
+      selectedStudentIds = [];
       clear(studentFieldset);
       updateStudentPills();
       return;
     }
 
-    // Load students for selected cohorts
-    await loadStudentsForCohorts(selectedCohortIds);
+    // Load students for selected cohorts first (keep existing selection temporarily)
+    await loadStudentsForCohorts(selectedCohortIds, false);
+
+    // Now clear and rebuild selection based on events
+    selectedStudentIds = [];
 
     // If teachers are selected, fetch events and auto-select students based on events
     if (selectedTeacherIds.length > 0) {
@@ -2050,6 +2108,82 @@ document.addEventListener("DOMContentLoaded", () => {
       resetAllCohortTabs();
       if (typeof triggerCalendarReload === "function") triggerCalendarReload();
       else if (typeof fetchCalendarEvents === "function") fetchCalendarEvents();
+    });
+  }
+
+  // ----------------- Teacher Reset -----------------
+  const teacherResetBtn = document.getElementById("teacher-reset");
+  if (teacherResetBtn) {
+    teacherResetBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      try {
+        // Uncheck all teacher checkboxes
+        teacherFieldset
+          .querySelectorAll(".teacher-checkbox:checked")
+          .forEach((cb) => {
+            cb.checked = false;
+            const opt = cb.closest(".teacher-option");
+            if (opt) {
+              opt.classList.remove("selected");
+              const colorDot = opt.querySelector(".teacher-color-dot");
+              if (colorDot) colorDot.style.display = "none";
+            }
+          });
+
+        // Clear selected teachers array
+        selectedTeacherIds = [];
+        updateTeacherPills();
+
+        // Clear cohorts and students as they depend on teacher selection
+        selectedCohortIds = [];
+        selectedStudentIds = [];
+        updateCohortPills();
+        updateStudentPills();
+
+        // Clear calendar events
+        window.events = [];
+        if (typeof renderWeek === "function") renderWeek(true);
+
+        // Reload cohorts and students
+        loadAllCohorts();
+        loadAllStudents();
+      } catch (err) {
+        console.error("Teacher reset error:", err);
+      }
+    });
+  }
+
+  // ----------------- Student Reset -----------------
+  const studentResetBtn = document.getElementById("student-reset");
+  if (studentResetBtn) {
+    studentResetBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      try {
+        // Uncheck all student checkboxes
+        studentFieldset
+          .querySelectorAll(".student-checkbox:checked")
+          .forEach((cb) => {
+            cb.checked = false;
+            const opt = cb.closest(".student-option");
+            if (opt) opt.classList.remove("selected");
+          });
+
+        // Clear selected students array
+        selectedStudentIds = [];
+        updateStudentPills();
+
+        // Trigger calendar reload
+        setTimeout(() => {
+          if (
+            window.fetchCalendarEvents &&
+            typeof window.fetchCalendarEvents === "function"
+          ) {
+            window.fetchCalendarEvents();
+          }
+        }, 100);
+      } catch (err) {
+        console.error("Student reset error:", err);
+      }
     });
   }
 });
