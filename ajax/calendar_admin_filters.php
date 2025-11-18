@@ -302,7 +302,7 @@ try {
                         'course'             => $courseid_one2one,
                         'module'             => $gmModule->id,
                         'deletioninprogress' => 0
-                    ], 'id ASC', 'id, instance, section, module');
+                    ], 'id ASC', 'id, instance, section, module, availability');
 
                     if ($cms11) {
                         // Collect googlemeet instance IDs
@@ -379,6 +379,26 @@ try {
                                     }
                                     $seen[$key] = true;
 
+                                    // --- NEW: derive student name from this CM's availability (1:1) ---
+                                    $studentname = '';
+                                    $studentEmails = caf_availability_collect_emails($cm->availability ?? null);
+                                    if (!empty($studentEmails)) {
+                                        list($insqlS, $paramsS) = $DB->get_in_or_equal($studentEmails, SQL_PARAMS_NAMED, 'se');
+                                        $srecs = $DB->get_records_select(
+                                            'user',
+                                            "LOWER(email) $insqlS AND deleted = 0 AND suspended = 0",
+                                            $paramsS,
+                                            '',
+                                            'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename, email'
+                                        );
+                                        if ($srecs) {
+                                            // 1:1 → typically only one student; take first.
+                                            $first = reset($srecs);
+                                            $studentname = fullname($first, true);
+                                        }
+                                    }
+                                    // --- END NEW ---
+
                                     // Label = googlemeet name (fallback to originalname)
                                     $label = '';
                                     if (!empty($gm->name)) {
@@ -395,7 +415,8 @@ try {
                                         'name'         => $label,
                                         'mainteacher'  => (int)$tid,
                                         'guideteacher' => 0,
-                                        'cohorttype'   => 'one1one', // NEW type marker for 1:1 classes
+                                        'cohorttype'   => 'one1one', // type marker for 1:1 classes
+                                        'studentname'  => $studentname, // NEW PROP: 1:1 student name
                                     ];
                                 }
                             }
@@ -414,82 +435,44 @@ try {
     // -------------------------------------------------
     if ($action === 'students') {
         $cohortid = optional_param('cohortid', 0, PARAM_INT);
-        $cohortids_csv = optional_param('cohortids', '', PARAM_RAW);
 
-        // Support multiple cohort IDs
-        if (!empty($cohortids_csv)) {
-            $cohort_ids = caf_parse_ids($cohortids_csv);
-            if (count($cohort_ids) > 0) {
-                list($in_sql, $params) = $DB->get_in_or_equal($cohort_ids, SQL_PARAMS_NAMED);
-                $sql = "
-                    SELECT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                           u.firstnamephonetic, u.lastnamephonetic,
-                           u.middlename, u.alternatename,
-                           cm.cohortid,
-                           c.name as cohort_name,
-                           c.idnumber as cohort_idnumber,
-                           c.shortname as cohort_shortname
-                      FROM {cohort_members} cm
-                      JOIN {user} u ON u.id = cm.userid
-                      JOIN {cohort} c ON c.id = cm.cohortid
-                     WHERE cm.cohortid $in_sql
-                       AND u.deleted = 0
-                       AND u.suspended = 0
-                     ORDER BY c.name ASC, u.firstname ASC, u.lastname ASC
-                ";
-                $students = $DB->get_records_sql($sql, $params);
-            } else {
-                $students = [];
-            }
-        } elseif ($cohortid > 0) {
+        if ($cohortid > 0) {
             // Students in the selected cohort.
             $sql = "
-                SELECT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                       u.firstnamephonetic, u.lastnamephonetic,
-                       u.middlename, u.alternatename,
-                       cm.cohortid,
-                       c.name as cohort_name,
-                       c.idnumber as cohort_idnumber,
-                       c.shortname as cohort_shortname
+                SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                u.firstnamephonetic, u.lastnamephonetic,
+                                u.middlename, u.alternatename
                   FROM {cohort_members} cm
                   JOIN {user} u ON u.id = cm.userid
-                  JOIN {cohort} c ON c.id = cm.cohortid
                  WHERE cm.cohortid = :cid
                    AND u.deleted = 0
                    AND u.suspended = 0
-                 ORDER BY c.name ASC, u.firstname ASC, u.lastname ASC
+                 ORDER BY u.firstname ASC, u.lastname ASC
             ";
             $students = $DB->get_records_sql($sql, ['cid' => $cohortid]);
         } else {
             // All students across visible cohorts.
             $sql = "
-                SELECT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                       u.firstnamephonetic, u.lastnamephonetic,
-                       u.middlename, u.alternatename,
-                       cm.cohortid,
-                       c.name as cohort_name,
-                       c.idnumber as cohort_idnumber,
-                       c.shortname as cohort_shortname
+                SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                u.firstnamephonetic, u.lastnamephonetic,
+                                u.middlename, u.alternatename
                   FROM {cohort_members} cm
                   JOIN {cohort} c ON c.id = cm.cohortid
                   JOIN {user} u   ON u.id = cm.userid
                  WHERE c.visible = 1
                    AND u.deleted = 0
                    AND u.suspended = 0
-                 ORDER BY c.name ASC, u.firstname ASC, u.lastname ASC
+                 ORDER BY u.firstname ASC, u.lastname ASC
             ";
             $students = $DB->get_records_sql($sql);
         }
 
         $data = [];
         foreach ($students as $s) {
-            $cohort_label = trim((string)$s->cohort_idnumber) !== '' ? $s->cohort_shortname : $s->cohort_name;
             $data[] = [
-                'id'           => (int)$s->id,
-                'name'         => fullname($s, true),
-                'avatar'       => caf_get_user_avatar_url($s),
-                'cohortid'     => (int)$s->cohortid,
-                'cohortname'   => $cohort_label,
+                'id'     => (int)$s->id,
+                'name'   => fullname($s, true),
+                'avatar' => caf_get_user_avatar_url($s),
             ];
         }
 

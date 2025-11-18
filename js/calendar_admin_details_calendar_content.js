@@ -275,6 +275,7 @@ $(function () {
 
     // Prepare per-day buckets
     const perDay = Array.from({ length: 7 }, () => []);
+    console.log("Events to render:", events);
     events.forEach((raw) => {
       let di = null;
       if (raw.date) {
@@ -413,7 +414,7 @@ $(function () {
                   : ""
               }</div>
               ${
-                ev.repeat
+                ev.repeat || !ev.repeat
                   ? `<span class="ev-repeat" title="Repeats"><img src="./img/ev-repeat.svg" alt=""></span>`
                   : `<span class="ev-single" title="Single Session"><img src="./img/single-lesson.svg" alt=""></span>`
               }
@@ -530,7 +531,17 @@ $(function () {
       });
     });
 
-    if (resetScroll) $grid.scrollTop(0);
+    if (resetScroll) {
+      $grid.scrollTop(0);
+    } else {
+      // Scroll to first event if there are any events
+      const firstEvent = $grid.find('.event').first();
+      if (firstEvent.length) {
+        const firstEventTop = parseInt(firstEvent.css('top')) || 0;
+        // Scroll to position the first event near the top, with some padding
+        $grid.scrollTop(Math.max(0, firstEventTop - 50));
+      }
+    }
     drawNow();
   }
   window.renderWeek = renderWeek;
@@ -930,7 +941,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (!opt) return;
 
-      const name = opt.dataset.cohortName || "";
+      // Use student name for one1one cohorts, otherwise use cohort name
+      const cohortType = opt.dataset.cohortType;
+      const name = (cohortType === "one1one" && opt.dataset.studentName) 
+        ? opt.dataset.studentName 
+        : (opt.dataset.cohortName || "");
 
       // Determine which container to use based on cohort type
       const targetContainer = isOneOnOne
@@ -994,7 +1009,11 @@ document.addEventListener("DOMContentLoaded", () => {
             );
           }
           if (!opt) return "";
-          return opt.dataset.cohortName || "";
+          // Use student name for one1one cohorts, otherwise use cohort name
+          const cohortType = opt.dataset.cohortType;
+          return (cohortType === "one1one" && opt.dataset.studentName) 
+            ? opt.dataset.studentName 
+            : (opt.dataset.cohortName || "");
         })
         .filter(Boolean);
 
@@ -1015,11 +1034,18 @@ document.addEventListener("DOMContentLoaded", () => {
     wrap.dataset.cohortId = c.id;
     wrap.dataset.cohortName = c.name;
     wrap.dataset.cohortType = c.cohorttype || "group";
+    // Store student name for one1one cohorts
+    if (c.cohorttype === "one1one" && c.studentname) {
+      wrap.dataset.studentName = c.studentname;
+    }
+
+    // Display student name for one1one cohorts, otherwise show cohort name
+    const displayName = (c.cohorttype === "one1one" && c.studentname) ? c.studentname : c.name;
 
     wrap.innerHTML = `
             <label class="cohort-label">
                 <div class="cohort-details">
-                    <span class="cohort-name">${c.name}</span>
+                    <span class="cohort-name">${displayName}</span>
                 </div>
                 <div class="radio-custom">
                     <div class="radio-custom-dot"></div>
@@ -1170,6 +1196,7 @@ document.addEventListener("DOMContentLoaded", () => {
       teacherIds.join(",")
     )}`;
     const data = await fetchJSON(url);
+
     if (!data.ok) return [];
 
     const list = data.data || [];
@@ -1468,7 +1495,9 @@ document.addEventListener("DOMContentLoaded", () => {
       cohortIds.join(",")
     )}`;
     const data = await fetchJSON(url);
-    if (!data.ok) return;
+    if (!data.ok) {
+      return;
+    }
 
     const list = data.data || [];
     if (!list.length) {
@@ -1546,6 +1575,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!selectedTeacherIds.length) {
       const allCohorts = await loadAllCohorts();
+    
       await loadAllStudents();
       // No teacher selected → clear events and re-render blank calendar
       window.events = [];
@@ -1561,13 +1591,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const eventsData = await fetchEventsForTeachers(selectedTeacherIds);
 
       if (eventsData && eventsData.length > 0) {
-        console.log("Auto-selection: Processing", eventsData.length, "events");
 
         // Extract unique cohort IDs and student IDs from events
         const eventCohortIds = new Set();
         const eventStudentIds = new Set();
 
-        eventsData.forEach((ev) => {
+     
+
+        eventsData.forEach((ev, idx) => {
           if (
             ev.cohortids &&
             Array.isArray(ev.cohortids) &&
@@ -1575,19 +1606,21 @@ document.addEventListener("DOMContentLoaded", () => {
           ) {
             ev.cohortids.forEach((cid) => eventCohortIds.add(cid));
           }
-          if (ev.studentids && Array.isArray(ev.studentids)) {
+          
+          // Check for studentids in multiple possible formats
+          if (ev.studentids && Array.isArray(ev.studentids) && ev.studentids.length > 0) {
             ev.studentids.forEach((sid) => eventStudentIds.add(sid));
+          } else if (ev.studentIds && Array.isArray(ev.studentIds) && ev.studentIds.length > 0) {
+            // Try camelCase variant
+            ev.studentIds.forEach((sid) => eventStudentIds.add(sid));
+          } else if (ev.students && Array.isArray(ev.students) && ev.students.length > 0) {
+            // Try students array
+            ev.students.forEach((s) => {
+              if (s.id) eventStudentIds.add(s.id);
+              else if (typeof s === 'number') eventStudentIds.add(s);
+            });
           }
         });
-
-        console.log(
-          "Auto-selection: Found cohort IDs from events:",
-          Array.from(eventCohortIds)
-        );
-        console.log(
-          "Auto-selection: Found student IDs from events:",
-          Array.from(eventStudentIds)
-        );
 
         // Auto-select cohorts that have events
         // This includes both group cohorts (from eventCohortIds) and 1:1 cohorts (inferred from students)
@@ -1596,26 +1629,20 @@ document.addEventListener("DOMContentLoaded", () => {
         // Add cohorts that are directly in events
         eventCohortIds.forEach((cid) => cohortsToSelect.add(cid));
 
-        // For 1:1 events (no cohortids but have studentids), find which 1:1 cohorts contain those students
+        // For 1:1 events (no cohortids but have studentids), we need to find which specific 1:1 cohorts contain those students
+        // We'll do this by loading students for each 1:1 cohort and checking if any event students are in it
         if (eventStudentIds.size > 0) {
-          cohorts.forEach((c) => {
-            // Check if this is a 1:1 cohort that should be selected based on student presence
-            if (c.cohorttype === "one1one") {
-              // We need to select 1:1 cohorts - we'll select them all if there are student IDs
-              // since we don't have the cohort-student mapping at this point
-              // The students will be loaded and filtered correctly later
-              cohortsToSelect.add(c.id);
-            }
+          const oneOnOneCohorts = cohorts.filter((c) => c.cohorttype === "one1one");
+          // For now, we'll select all 1:1 cohorts and let the student filtering handle it
+          // A better approach would be to fetch students for each 1:1 cohort first, but that would be too many API calls
+          // Instead, we'll select all 1:1 cohorts and the loadStudentsForCohorts will fetch all their students
+          oneOnOneCohorts.forEach((c) => {
+            cohortsToSelect.add(c.id);
           });
         }
 
         // Apply selection to all cohorts that should be selected
         if (cohortsToSelect.size > 0) {
-          console.log(
-            "Auto-selection: Selecting cohorts:",
-            Array.from(cohortsToSelect)
-          );
-
           cohorts.forEach((c) => {
             if (cohortsToSelect.has(c.id)) {
               if (!selectedCohortIds.includes(c.id)) {
@@ -1631,27 +1658,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 const checkbox = option.querySelector(".cohort-checkbox");
                 if (checkbox) checkbox.checked = true;
                 option.classList.add("selected");
-                console.log(
-                  "Auto-selection: Selected cohort",
-                  c.id,
-                  c.name,
-                  "type:",
-                  c.cohorttype
-                );
-              } else {
-                console.warn(
-                  "Auto-selection: Could not find option for cohort",
-                  c.id,
-                  "in fieldset"
-                );
               }
             }
           });
 
-          console.log(
-            "Auto-selection: Final selectedCohortIds:",
-            selectedCohortIds
-          );
           cohortDisplayText.textContent = "";
           updateCohortPills();
         }
@@ -1659,54 +1669,70 @@ document.addEventListener("DOMContentLoaded", () => {
         // Load students for selected cohorts
         // Don't clear selection yet - we'll rebuild it after loading
         if (selectedCohortIds.length > 0) {
-          await loadStudentsForCohorts(selectedCohortIds, false);
+          // Load students for all selected teachers (not just selected cohorts)
+          // This ensures we get students from 1:1 cohorts even if those cohorts weren't explicitly selected
+          const url = `${API_BASE}?action=students&teacherids=${encodeURIComponent(
+            selectedTeacherIds.join(",")
+          )}`;
+          const data = await fetchJSON(url);
+          
+          if (data.ok) {
+            const list = data.data || [];
+            
+            // Clear and render all students
+            clear(studentFieldset);
+            if (list.length > 0) {
+              // Group students by cohort
+              const studentsByCohort = {};
+              list.forEach((s) => {
+                const cohortKey = s.cohortid || 0;
+                const cohortName = s.cohortname || "Unknown Cohort";
+
+                if (!studentsByCohort[cohortKey]) {
+                  studentsByCohort[cohortKey] = {
+                    name: cohortName,
+                    students: [],
+                  };
+                }
+                studentsByCohort[cohortKey].students.push(s);
+              });
+
+              // Render grouped students
+              Object.keys(studentsByCohort).forEach((cohortKey) => {
+                const cohortGroup = studentsByCohort[cohortKey];
+
+                // Add cohort header
+                const cohortHeader = document.createElement("div");
+                cohortHeader.className = "student-cohort-header";
+                cohortHeader.textContent = cohortGroup.name;
+                studentFieldset.appendChild(cohortHeader);
+
+                // Add students under this cohort
+                cohortGroup.students.forEach((s) => {
+                  const option = createStudentOption(s);
+                  studentFieldset.appendChild(option);
+                });
+              });
+            }
+          }
+          
+          // Check if any students from events are missing from the loaded student list
+          if (eventStudentIds.size > 0) {
+            const loadedStudentIds = new Set();
+            studentFieldset.querySelectorAll(".student-option").forEach((opt) => {
+              loadedStudentIds.add(parseInt(opt.dataset.studentId, 10));
+            });
+
+            const missingStudentIds = Array.from(eventStudentIds).filter(
+              (sid) => !loadedStudentIds.has(sid)
+            );
+
+            // Silent check - students loaded
+          }
         } else {
           // If no cohorts selected but we have student IDs from events (1:1 classes),
           // load all students so we can select the ones with events
           await loadAllStudents();
-        }
-
-        // If we have student IDs from 1:1 events, we need to ensure those students are loaded
-        // even if their 1:1 cohorts weren't auto-selected (they might not be in selectedCohortIds)
-        if (eventStudentIds.size > 0) {
-          // Check if any students from events are missing from the loaded student list
-          const loadedStudentIds = new Set();
-          studentFieldset.querySelectorAll(".student-option").forEach((opt) => {
-            loadedStudentIds.add(parseInt(opt.dataset.studentId, 10));
-          });
-
-          const missingStudentIds = Array.from(eventStudentIds).filter(
-            (sid) => !loadedStudentIds.has(sid)
-          );
-
-          if (missingStudentIds.length > 0) {
-            console.log(
-              "Auto-selection: Some students not in selected cohorts, finding their cohorts:",
-              missingStudentIds
-            );
-
-            // Find which cohorts from events are NOT in selectedCohortIds (these contain the missing students)
-            const missingCohortIds = Array.from(eventCohortIds).filter(
-              (cid) => !selectedCohortIds.includes(cid)
-            );
-
-            if (missingCohortIds.length > 0) {
-              console.log(
-                "Auto-selection: Found missing cohorts from events:",
-                missingCohortIds
-              );
-              // Combine selected cohorts with missing cohorts to load all students grouped properly
-              const allCohortsToLoad = [
-                ...selectedCohortIds,
-                ...missingCohortIds,
-              ];
-              console.log(
-                "Auto-selection: Reloading students with all cohorts:",
-                allCohortsToLoad
-              );
-              await loadStudentsForCohorts(allCohortsToLoad, false);
-            }
-          }
         }
 
         // Clear previous selection and rebuild based on events
@@ -1714,40 +1740,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Auto-select only students that have events
         if (eventStudentIds.size > 0) {
-          console.log(
-            "Auto-selection: Selecting students:",
-            Array.from(eventStudentIds)
-          );
-
           eventStudentIds.forEach((sid) => {
-            if (!selectedStudentIds.includes(sid)) {
-              selectedStudentIds.push(sid);
-            }
             const option = studentFieldset.querySelector(
               `.student-option[data-student-id="${sid}"]`
             );
             if (option) {
+              // Only add to selectedStudentIds if the option exists
+              if (!selectedStudentIds.includes(sid)) {
+                selectedStudentIds.push(sid);
+              }
               const checkbox = option.querySelector(".student-checkbox");
               if (checkbox) checkbox.checked = true;
               option.classList.add("selected");
-              console.log(
-                "Auto-selection: Selected student",
-                sid,
-                option.dataset.studentName
-              );
-            } else {
-              console.warn(
-                "Auto-selection: Could not find option for student",
-                sid,
-                "- student may not be in selected cohorts"
-              );
             }
           });
 
-          console.log(
-            "Auto-selection: Final selectedStudentIds:",
-            selectedStudentIds
-          );
           updateStudentPills();
         }
       }
@@ -1948,20 +1955,16 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        console.log(
-          "updateStudentsForCohortChange: Students to auto-select:",
-          Array.from(eventStudentIds)
-        );
-
         // Auto-select students that have events
         eventStudentIds.forEach((sid) => {
-          if (!selectedStudentIds.includes(sid)) {
-            selectedStudentIds.push(sid);
-          }
           const option = studentFieldset.querySelector(
             `.student-option[data-student-id="${sid}"]`
           );
           if (option) {
+            // Only add to selectedStudentIds if the option exists
+            if (!selectedStudentIds.includes(sid)) {
+              selectedStudentIds.push(sid);
+            }
             const checkbox = option.querySelector(".student-checkbox");
             if (checkbox) checkbox.checked = true;
             option.classList.add("selected");
@@ -2395,7 +2398,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const data = await response.json();
-      console.log("Calendar events API result:", data);
 
       if (data.ok && Array.isArray(data.events)) {
         window.events = data.events.map((ev) => {
@@ -2451,11 +2453,9 @@ document.addEventListener("DOMContentLoaded", () => {
           };
         });
 
-        console.log("Mapped events:", window.events.length);
-
         // Re-render your week view
         if (typeof renderWeek === "function") {
-          renderWeek(true);
+          renderWeek(false);
         }
       }
     } catch (err) {
