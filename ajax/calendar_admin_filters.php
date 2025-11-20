@@ -435,14 +435,44 @@ try {
     // -------------------------------------------------
     if ($action === 'students') {
         $cohortid = optional_param('cohortid', 0, PARAM_INT);
+        $cohortidsraw = optional_param('cohortids', '', PARAM_RAW_TRIMMED);
+        $cohortids = caf_parse_ids($cohortidsraw);
 
-        if ($cohortid > 0) {
+        // Prioritize cohortids (plural) over cohortid (singular)
+        if (!empty($cohortids)) {
+            // Students in the selected cohorts with cohort info
+            // Note: Students may belong to multiple cohorts, so we create one record per cohort membership
+            list($insql, $params) = $DB->get_in_or_equal($cohortids, SQL_PARAMS_NAMED, 'cid');
+            $sql = "
+                SELECT CONCAT(u.id, '_', cm.cohortid) as uniquekey,
+                       u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                       u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename,
+                       cm.cohortid,
+                       c.name as cohortname,
+                       c.shortname as cohortsname,
+                       c.idnumber as cohortidnumber
+                  FROM {cohort_members} cm
+                  JOIN {cohort} c ON c.id = cm.cohortid
+                  JOIN {user} u ON u.id = cm.userid
+                 WHERE cm.cohortid $insql
+                   AND u.deleted = 0
+                   AND u.suspended = 0
+                 ORDER BY c.name ASC, u.firstname ASC, u.lastname ASC
+            ";
+            $students = $DB->get_records_sql($sql, $params);
+        } else if ($cohortid > 0) {
             // Students in the selected cohort.
             $sql = "
-                SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                                u.firstnamephonetic, u.lastnamephonetic,
-                                u.middlename, u.alternatename
+                SELECT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                       u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename,
+                       cm.cohortid,
+                       c.name as cohortname,
+                       c.shortname as cohortsname,
+                       c.idnumber as cohortidnumber
                   FROM {cohort_members} cm
+                  JOIN {cohort} c ON c.id = cm.cohortid
                   JOIN {user} u ON u.id = cm.userid
                  WHERE cm.cohortid = :cid
                    AND u.deleted = 0
@@ -453,9 +483,14 @@ try {
         } else {
             // All students across visible cohorts.
             $sql = "
-                SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                                u.firstnamephonetic, u.lastnamephonetic,
-                                u.middlename, u.alternatename
+                SELECT CONCAT(u.id, '_', cm.cohortid) as uniquekey,
+                       u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                       u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename,
+                       cm.cohortid,
+                       c.name as cohortname,
+                       c.shortname as cohortsname,
+                       c.idnumber as cohortidnumber
                   FROM {cohort_members} cm
                   JOIN {cohort} c ON c.id = cm.cohortid
                   JOIN {user} u   ON u.id = cm.userid
@@ -470,9 +505,13 @@ try {
         $data = [];
         foreach ($students as $s) {
             $data[] = [
-                'id'     => (int)$s->id,
-                'name'   => fullname($s, true),
-                'avatar' => caf_get_user_avatar_url($s),
+                'id'             => (int)$s->id,
+                'name'           => fullname($s, true),
+                'avatar'         => caf_get_user_avatar_url($s),
+                'cohortid'       => isset($s->cohortid) ? (int)$s->cohortid : 0,
+                'cohortname'     => isset($s->cohortname) ? (string)$s->cohortname : '',
+                'cohortsname'    => isset($s->cohortsname) ? (string)$s->cohortsname : '',
+                'cohortidnumber' => isset($s->cohortidnumber) ? (string)$s->cohortidnumber : '',
             ];
         }
 

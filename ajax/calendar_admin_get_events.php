@@ -50,10 +50,8 @@ $startraw      = required_param('start', PARAM_RAW_TRIMMED);
 $endraw        = required_param('end', PARAM_RAW_TRIMMED);
 $teacherid     = optional_param('teacherid', 0, PARAM_INT);              // legacy
 $teacheridsraw = optional_param('teacherids', '', PARAM_RAW_TRIMMED);    // new: multi
-$cohortid      = optional_param('cohortid', 0, PARAM_INT);               // legacy single
-$cohortidsraw  = optional_param('cohortids', '', PARAM_RAW_TRIMMED);     // new: multi
-$studentid     = optional_param('studentid', 0, PARAM_INT);              // legacy single
-$studentidsraw = optional_param('studentids', '', PARAM_RAW_TRIMMED);    // new: multi
+$cohortid      = optional_param('cohortid', 0, PARAM_INT);
+$studentid     = optional_param('studentid', 0, PARAM_INT);
 // specific googlemeet id filter for 1:1
 $one2onegmid   = optional_param('one2one_gmid', 0, PARAM_INT);
 
@@ -65,26 +63,6 @@ if ($teacheridsraw) {
 } elseif ($teacherid) {
     // Fallback to single teacherid for backward compatibility
     $teacherids = [$teacherid];
-}
-
-// Parse multiple cohort IDs if provided (comma-separated)
-$cohortids = [];
-if ($cohortidsraw) {
-    $ids = array_map('intval', explode(',', $cohortidsraw));
-    $cohortids = array_filter($ids);
-} elseif ($cohortid) {
-    // Fallback to single cohortid for backward compatibility
-    $cohortids = [$cohortid];
-}
-
-// Parse multiple student IDs if provided (comma-separated)
-$studentids = [];
-if ($studentidsraw) {
-    $ids = array_map('intval', explode(',', $studentidsraw));
-    $studentids = array_filter($ids);
-} elseif ($studentid) {
-    // Fallback to single studentid for backward compatibility
-    $studentids = [$studentid];
 }
 
 // Parse dates → timestamps
@@ -789,47 +767,21 @@ try {
             }
         }
 
-        // Filter by cohort IDs (multi-select support)
-        if (!empty($cohortids)) {
-            // Check if ANY selected cohort matches ANY cohort in the event
-            $hasMatchingCohort = false;
-            foreach ($cohortids as $selectedCid) {
-                if (in_array($selectedCid, $ev['cohortids'], true)) {
-                    $hasMatchingCohort = true;
-                    break;
-                }
-            }
-            
-            // Special case: 1:1 events have empty cohortids but we still want to include them
-            // if the event's students match our selected students (handled by studentid filter below)
-            if (!$hasMatchingCohort && !empty($ev['cohortids'])) {
-                // Event has cohorts but none match our selection - skip it
-                continue;
-            }
-            // If event has empty cohortids (1:1 events), let it pass through to student filtering
+        if ($cohortid && !in_array($cohortid, $ev['cohortids'], true)) {
+            continue;
         }
 
-        // Filter by student IDs (multi-select support)
-        if (!empty($studentids)) {
+        if ($studentid) {
             $ok = false;
 
-            // Check if ANY selected student matches ANY student in the event
-            foreach ($studentids as $selectedSid) {
-                if (in_array($selectedSid, $ev['studentids'], true)) {
-                    $ok = true;
-                    break;
-                }
-            }
-
-            // If event doesn't have direct student match, check cohort membership
-            if (!$ok && !empty($ev['cohortids'])) {
-                list($insqlCohort, $paramsCohort) = $DB->get_in_or_equal($ev['cohortids'], SQL_PARAMS_NAMED, 'coh');
-                list($insqlStudent, $paramsStudent) = $DB->get_in_or_equal($studentids, SQL_PARAMS_NAMED, 'stu');
-                $params = array_merge($paramsCohort, $paramsStudent);
-                
+            if (in_array($studentid, $ev['studentids'], true)) {
+                $ok = true;
+            } elseif (!empty($ev['cohortids'])) {
+                list($insql, $params) = $DB->get_in_or_equal($ev['cohortids'], SQL_PARAMS_NAMED);
+                $params['uid'] = $studentid;
                 $ok = $DB->record_exists_sql(
                     "SELECT 1 FROM {cohort_members}
-                      WHERE userid $insqlStudent AND cohortid $insqlCohort",
+                      WHERE userid = :uid AND cohortid $insql",
                     $params
                 );
             }
@@ -842,6 +794,48 @@ try {
         $filtered[] = $ev;
     }
 
+    // ------- NEW: attach statuses from {local_gm_event_status} -------
+    $eventids = [];
+    foreach ($filtered as $ev) {
+        if (!empty($ev['eventid'])) {
+            $eventids[] = (int)$ev['eventid'];
+        }
+    }
+    $eventids = array_values(array_unique($eventids));
+
+    $statusesByEvent = [];
+    if (!empty($eventids)) {
+        list($insql, $params) = $DB->get_in_or_equal($eventids, SQL_PARAMS_NAMED);
+        $statusrecs = $DB->get_records_select(
+            'local_gm_event_status',
+            "eventid $insql",
+            $params,
+            'timecreated ASC'
+        );
+
+        foreach ($statusrecs as $s) {
+            $eid = (int)$s->eventid;
+            if (!isset($statusesByEvent[$eid])) {
+                $statusesByEvent[$eid] = [];
+            }
+            $statusesByEvent[$eid][] = [
+                'code'     => $s->statuscode,
+                'isactive' => (bool)$s->isactive,
+                'details'  => $s->detailsjson ? json_decode($s->detailsjson, true) : null,
+                'time'     => (int)$s->timecreated,
+            ];
+        }
+    }
+
+    foreach ($filtered as &$ev) {
+        $eid = !empty($ev['eventid']) ? (int)$ev['eventid'] : 0;
+        $ev['statuses'] = $eid && isset($statusesByEvent[$eid])
+            ? $statusesByEvent[$eid]
+            : [];
+    }
+    unset($ev);
+    // ------- END NEW STATUS BLOCK -------
+
     usort($filtered, fn($a, $b) => $a['start_ts'] <=> $b['start_ts']);
 
     echo json_encode([
@@ -852,9 +846,7 @@ try {
             'teacherid'    => $teacherid,
             'teacherids'   => $teacherids,
             'cohortid'     => $cohortid,
-            'cohortids'    => $cohortids,
             'studentid'    => $studentid,
-            'studentids'   => $studentids,
             'one2one_gmid' => $one2onegmid,
         ],
         'events'  => array_values($filtered),

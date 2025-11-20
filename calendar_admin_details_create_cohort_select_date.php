@@ -899,6 +899,18 @@ $(function() {
         } else if (calendarTarget === 'endsOn') {
             endsOnDate = new Date(calSelectedDate.getTime());
             $('#customrec_end_date_btn').text(formatDate(endsOnDate));
+        } else if (calendarTarget === 'manageSession') {
+            // Update manage session modal date button
+            const $dateBtn = $('#session-event-date-btn');
+            const year = calSelectedDate.getFullYear();
+            const month = calSelectedDate.getMonth();
+            const day = calSelectedDate.getDate();
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const formattedDate = monthNames[month] + ' ' + day + ', ' + year;
+            const rawDate = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            
+            $dateBtn.text(formattedDate);
+            $dateBtn.data('raw-date', rawDate);
         }
         $('#monthly_cal_modal_backdrop').fadeOut(80);
     });

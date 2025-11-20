@@ -35,8 +35,8 @@
                       foreach ($rows as $r) {
                           $idn = trim((string)$r->idnumber);
                           if ($idn === '') { continue; }
-                          // data-idnumber is useful for JS; does not affect styles
-                          echo '<li data-idnumber="' . s($idn) . '">' . format_string($idn) . '</li>';
+                          // data-cohort-id and data-idnumber for JS selection
+                          echo '<li data-cohort-id="' . (int)$r->id . '" data-idnumber="' . s($idn) . '">' . format_string($idn) . '</li>';
                       }
                   } else {
                       echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';

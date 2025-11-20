@@ -142,7 +142,7 @@
                     <div class="teacher-search-trigger">
                         <span id="teacher-display-text">Select Teachers</span>
                         <div class="teacher-pill-container" id="teacher-pills"></div>
-                        <span class="dropdown-arrow"><img src="./img/dropdown-arrow-down.svg" alt=""></span>
+                        <span class="dropdown-arrow"></span>
                     </div>
                 </div>
 
@@ -151,7 +151,8 @@
                     <div class="search-widget-container" id="teacher-search-widget">
                         <div class="widget-header-with-controls">
                             <h1 class="widget-title">Search Teacher</h1>
-                            <button type="button" id="teacher-reset" class="calendar-control-btn"><img src="./img/reset-icon.svg" alt=""> Reset</button>
+                            <button type="button" id="teacher-reset" class="calendar-control-btn"><img
+                                    src="./img/reset-icon.svg" alt=""> Reset</button>
                         </div>
                         <div class="search-component">
                             <div class="search-input-wrapper">
@@ -181,7 +182,7 @@
                     <div class="cohort-search-trigger">
                         <span id="cohort-display-text">Select Cohorts</span>
                         <div class="cohort-pill-container" id="cohort-pills"></div>
-                        <span class="dropdown-arrow"><img src="./img/dropdown-arrow-down.svg" alt=""></span>
+                        <span class="dropdown-arrow"></span>
                     </div>
                 </div>
                 <input type="hidden" id="cohort-value" name="cohort" value="">
@@ -302,7 +303,7 @@
                     <div class="student-search-trigger">
                         <span id="student-display-text">Select Students</span>
                         <div class="student-pill-container" id="student-pills"></div>
-                        <span class="dropdown-arrow"><img src="./img/dropdown-arrow-down.svg" alt=""></span>
+                        <span class="dropdown-arrow"></span>
                     </div>
                 </div>
 
@@ -311,7 +312,8 @@
                     <div class="search-widget-container" id="student-search-widget">
                         <div class="widget-header-with-controls">
                             <h1 class="widget-title">Search Student</h1>
-                            <button type="button" id="student-reset" class="calendar-control-btn"><img src="./img/reset-icon.svg" alt=""> Reset</button>
+                            <button type="button" id="student-reset" class="calendar-control-btn"><img
+                                    src="./img/reset-icon.svg" alt=""> Reset</button>
                         </div>
                         <div class="search-component">
                             <div class="search-input-wrapper">
@@ -511,3 +513,4 @@ $(function() {
 <script src="js/calendar_admin_details_create_cohort.js"></script>
 <?php require_once('calendar_admin_details_time_off.php'); ?>
 <?php require_once('calendar_admin_details_lesson_information.php'); ?>
+<?php require_once('calendar_admin_details_reschedule_modals.php'); ?>

@@ -163,11 +163,21 @@ $(function () {
   //     openCreateCohortModal();
   //   });
 
-  /* ====== CLICK: event -> bring to front only ====== */
+  /* ====== CLICK: event -> bring to front + open menu ====== */
   let zSeed = 5000;
+  let currentClickedEvent = null; // Store the clicked event data
+
+  // Expose globally
+  window.getCurrentClickedEvent = function () {
+    return currentClickedEvent;
+  };
+
   $("#grid")
     .off("mousedown", ".event")
-    .on("mousedown", ".event", function () {
+    .on("mousedown", ".event", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
       const $clicked = $(this);
       const $day = $clicked.closest(".day-inner");
       const cs = +$clicked.data("start"),
@@ -183,7 +193,819 @@ $(function () {
         this.style.zIndex = "";
       });
       this.style.zIndex = (++zSeed).toString();
+
+      // Find the event data from window.events
+      const dateStr = $day.data("date");
+      const teacherId = $clicked.data("teacher-id");
+      const eventStart = $clicked.data("start");
+      const eventEnd = $clicked.data("end");
+
+      // Find matching event from window.events array
+      currentClickedEvent = window.events.find((ev) => {
+        const evDate = ev.date;
+        const evStart =
+          typeof ev.start === "string" ? minutes(ev.start) : ev.start;
+        const evEnd = typeof ev.end === "string" ? minutes(ev.end) : ev.end;
+        return (
+          evDate === dateStr && evStart === eventStart && evEnd === eventEnd
+        );
+      });
+
+      // Only open menu dropdown for group lessons (not 1:1 lessons)
+      if (currentClickedEvent) {
+        const classType = currentClickedEvent.classType;
+        // Check if it's NOT a 1:1 lesson
+        if (classType !== "one2one_weekly" && classType !== "one2one_single") {
+          // This is a group lesson, open the dropdown menu
+          openMenuOptionsDropdown(e, this);
+        }
+        // If it's a 1:1 lesson, do nothing (no dropdown)
+      }
     });
+
+  // Function to open menu options dropdown
+  function openMenuOptionsDropdown(event, eventElement) {
+    const dropdown = document.getElementById("menu-options");
+    const menuContainer = dropdown.querySelector(".menu-container");
+    if (!dropdown || !menuContainer) return;
+
+    // Close any existing dropdown
+    closeMenuOptionsDropdown();
+
+    // Show dropdown
+    dropdown.style.display = "block";
+
+    // Position the dropdown near the clicked event
+    const eventRect = eventElement.getBoundingClientRect();
+    const dropdownRect = menuContainer.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate position (try to place to the right of the event)
+    let left = eventRect.right + 10;
+    let top = eventRect.top;
+
+    // Adjust if dropdown goes off screen to the right
+    if (left + dropdownRect.width > viewportWidth) {
+      left = eventRect.left - dropdownRect.width - 10;
+    }
+
+    // Adjust if dropdown goes off screen to the left
+    if (left < 10) {
+      left = 10;
+    }
+
+    // Adjust if dropdown goes off screen at bottom
+    if (top + dropdownRect.height > viewportHeight) {
+      top = viewportHeight - dropdownRect.height - 10;
+    }
+
+    // Adjust if dropdown goes off screen at top
+    if (top < 10) {
+      top = 10;
+    }
+
+    menuContainer.style.left = left + "px";
+    menuContainer.style.top = top + "px";
+  }
+
+  // Function to close menu options dropdown
+  window.closeMenuOptionsDropdown = function () {
+    const dropdown = document.getElementById("menu-options");
+    if (dropdown) {
+      dropdown.style.display = "none";
+    }
+  };
+
+  // Close dropdown when clicking outside
+  $(document).on("click", function (e) {
+    const dropdown = document.getElementById("menu-options");
+    if (dropdown && dropdown.style.display === "block") {
+      if (!$(e.target).closest("#menu-options, .event").length) {
+        closeMenuOptionsDropdown();
+      }
+    }
+  });
+
+  // Close dropdown with ESC key
+  $(document).on("keydown", function (e) {
+    if (e.key === "Escape") {
+      closeMenuOptionsDropdown();
+    }
+  });
+
+  // Handle menu option clicks
+  $(document).on("click", "#menu-options .menu-link", function (e) {
+    e.preventDefault();
+    const href = $(this).attr("href");
+
+    if (href === "#manage-cohort" && currentClickedEvent) {
+      // Close the dropdown
+      closeMenuOptionsDropdown();
+
+      // Open manage cohort modal with the event data
+      openManageCohortModal(currentClickedEvent);
+    } else if (href === "#manage-session" && currentClickedEvent) {
+      // Close the dropdown
+      closeMenuOptionsDropdown();
+
+      // Open manage session modal with the event data
+      openManageSessionModal(currentClickedEvent);
+    } else if (href === "#cancel-reschedule" && currentClickedEvent) {
+      // Close the dropdown
+      closeMenuOptionsDropdown();
+
+      // Open cancel and reschedule modal
+      openCancelRescheduleModal(currentClickedEvent);
+    } else if (href === "#cancel" && currentClickedEvent) {
+      // Close the dropdown
+      closeMenuOptionsDropdown();
+
+      // Open cancel (no make-up) modal
+      openCancelNoMakeupModal(currentClickedEvent);
+    }
+  });
+
+  // Function to open manage cohort modal with event data
+  function openManageCohortModal(eventData) {
+    console.log("Opening Manage Cohort modal for:", eventData);
+
+    // Check if event has cohort data
+    if (
+      !eventData.cohortids ||
+      !Array.isArray(eventData.cohortids) ||
+      eventData.cohortids.length === 0
+    ) {
+      // Show alert that cohort data is not available
+      alert("Cohort data is not available for this event.");
+      return;
+    }
+
+    // Store event data globally so other scripts can access it
+    window.currentEventData = eventData;
+
+    // Trigger the existing manage cohort button click or open modal directly
+    $("#calendar_admin_details_manage_cohort").trigger("click");
+
+    // Wait for modal to open and then populate with event data
+    setTimeout(() => {
+      populateManageCohortModal(eventData);
+    }, 300);
+  }
+
+  // Function to populate manage cohort modal with event data
+  function populateManageCohortModal(eventData) {
+    if (!eventData) return;
+
+    console.log("Populating manage cohort modal with:", eventData);
+
+    // If event has cohort ID, select it in the dropdown
+    if (eventData.cohortids && eventData.cohortids.length > 0) {
+      const cohortId = eventData.cohortids[0]; // Use first cohort
+      console.log("Selecting cohort ID:", cohortId);
+
+      // Find the cohort in the dropdown list by cohort ID
+      const $cohortList = $("#cohortList");
+      const $cohortItem = $cohortList.find(`li[data-cohort-id="${cohortId}"]`);
+
+      if ($cohortItem.length) {
+        console.log("Found cohort item:", $cohortItem.text());
+
+        // Update the dropdown button text
+        const cohortText = $cohortItem.text().trim();
+        $("#cohortDropdownBtn").contents().first()[0].textContent =
+          cohortText + " ";
+
+        // Trigger the click to select it (this should trigger any existing event handlers)
+        $cohortItem.trigger("click");
+
+        // Close the dropdown
+        $("#cohortDropdownList").hide();
+      } else {
+        console.warn("Cohort not found in list:", cohortId);
+      }
+    }
+
+    // Populate teacher if available
+    if (eventData.teacherId) {
+      console.log("Event teacher ID:", eventData.teacherId);
+      // Teacher selection will be handled by the manage cohort modal's existing logic
+    }
+
+    // Populate date and time if available
+    if (eventData.date) {
+      console.log("Event date:", eventData.date);
+      console.log(
+        "Event time:",
+        fmt12(eventData.start),
+        "-",
+        fmt12(eventData.end)
+      );
+    }
+
+    // Store additional event data for later use
+    if (eventData.eventid) {
+      console.log("Event ID:", eventData.eventid);
+    }
+    if (eventData.googlemeetid) {
+      console.log("Google Meet ID:", eventData.googlemeetid);
+    }
+  }
+
+  // Function to open Cancel & Reschedule modal
+  function openCancelRescheduleModal(eventData) {
+    console.log("Opening Cancel & Reschedule modal for:", eventData);
+
+    // Format the event date and time for display
+    let dateStr = "";
+    let startTime = "";
+    let endTime = "";
+
+    // Parse date from eventData.date (YYYY-MM-DD format)
+    if (eventData.date) {
+      const dateParts = eventData.date.split("-");
+      if (dateParts.length === 3) {
+        const year = dateParts[0];
+        const month = parseInt(dateParts[1], 10);
+        const day = parseInt(dateParts[2], 10);
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+        const dateObj = new Date(year, month - 1, day);
+        const dayNames = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        dateStr = `${dayNames[dateObj.getDay()]}, ${
+          monthNames[month - 1]
+        } ${day}`;
+      }
+    }
+
+    // Parse start and end times (HH:MM format) using fmt12 function
+    if (eventData.start) {
+      const startMinutes = minutes(eventData.start);
+      startTime = fmt12(startMinutes);
+    }
+    if (eventData.end) {
+      const endMinutes = minutes(eventData.end);
+      endTime = fmt12(endMinutes);
+    }
+
+    const fullDateTime = `${dateStr}, ${startTime}-${endTime}`;
+
+    // Update modal subtitle with event details
+    $("#cancel-reschedule-modal .cr-subtitle").text(fullDateTime);
+
+    // Show the modal
+    $("#cancel-reschedule-modal").fadeIn(300);
+  }
+
+  // Function to open Cancel (No Make-Up) modal
+  function openCancelNoMakeupModal(eventData) {
+    console.log("Opening Cancel (No Make-Up) modal for:", eventData);
+
+    // Format the event date and time for display
+    let dateStr = "";
+    let startTime = "";
+    let endTime = "";
+
+    // Parse date from eventData.date (YYYY-MM-DD format)
+    if (eventData.date) {
+      const dateParts = eventData.date.split("-");
+      if (dateParts.length === 3) {
+        const year = dateParts[0];
+        const month = parseInt(dateParts[1], 10);
+        const day = parseInt(dateParts[2], 10);
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+        const dateObj = new Date(year, month - 1, day);
+        const dayNames = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        dateStr = `${dayNames[dateObj.getDay()]}, ${
+          monthNames[month - 1]
+        } ${day}`;
+      }
+    }
+
+    // Parse start and end times (HH:MM format) using fmt12 function
+    if (eventData.start) {
+      const startMinutes = minutes(eventData.start);
+      startTime = fmt12(startMinutes);
+    }
+    if (eventData.end) {
+      const endMinutes = minutes(eventData.end);
+      endTime = fmt12(endMinutes);
+    }
+
+    const fullDateTime = `${dateStr}, ${startTime}-${endTime}`;
+
+    // Update modal subtitle with event details
+    $("#cancel-nomakeup-modal .cancel-modal-subtitle").text(fullDateTime);
+
+    // Show the modal
+    $("#cancel-nomakeup-modal").fadeIn(300);
+  }
+
+  // Function to open manage session modal with event data
+  function openManageSessionModal(eventData) {
+    console.log("Opening Manage Session modal for:", eventData);
+
+    // Check if event has cohort data
+    if (
+      !eventData.cohortids ||
+      !Array.isArray(eventData.cohortids) ||
+      eventData.cohortids.length === 0
+    ) {
+      // Show alert that cohort data is not available
+      alert("Cohort data is not available for this event.");
+      return;
+    }
+
+    // Populate the modal with event data
+    populateManageSessionModal(eventData);
+
+    // Show the modal
+    $("#manage-session-modal").fadeIn(300);
+  }
+
+  // Function to populate manage session modal with event data
+  function populateManageSessionModal(eventData) {
+    if (!eventData) return;
+
+    console.log("Populating manage session modal with:", eventData);
+
+    // Store event data for form submission
+    $("#manage-session-form").data("eventData", eventData);
+
+    // === 1. Populate Cohort Dropdown from cohortList (same as manage cohort) ===
+    const $cohortList = $("#session-cohort-list");
+    const $cohortBtn = $("#session-cohort-btn");
+    $cohortList.empty();
+
+    // Get cohorts from the cohortList in manage cohort tab
+    const cohortListItems = $("#cohortList li[data-cohort-id]");
+    let selectedCohortId = null;
+
+    if (cohortListItems.length > 0) {
+      cohortListItems.each(function () {
+        const cohortId = $(this).data("cohort-id");
+        const cohortName = $(this).text().trim();
+        const $li = $(`<li data-cohort-id="${cohortId}">${cohortName}</li>`);
+        $cohortList.append($li);
+
+        // Select cohort if matches event data
+        if (
+          eventData.cohortids &&
+          eventData.cohortids.length > 0 &&
+          cohortId == eventData.cohortids[0]
+        ) {
+          selectedCohortId = cohortId;
+          $cohortBtn.text(cohortName);
+          const shortName =
+            cohortName.split("-")[0] || cohortName.split(" ")[0] || "";
+          $("#session-cohort-short-name").val(shortName);
+        }
+      });
+    } else {
+      $cohortList.append(
+        '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>'
+      );
+    }
+
+    if (!selectedCohortId) {
+      $cohortBtn.text("Select Cohort");
+      $("#session-cohort-short-name").val("");
+    }
+
+    // === 2. Populate Teacher Dropdown from teacher list (same as manage cohort) ===
+    const $teacherList = $("#session-teacher-list");
+    const $teacherBtn = $("#session-teacher-btn");
+    $teacherList.empty();
+
+    // Get teachers from teacher1DropdownList (same teacher list used in manage cohort)
+    const teacherListItems = $("#teacher1DropdownList .teacher-option");
+    let selectedTeacherId = null;
+    let selectedTeacherImg = "";
+
+    if (teacherListItems.length > 0) {
+      teacherListItems.each(function () {
+        const teacherId = $(this).data("userid");
+        const teacherName = $(this).data("name");
+        const teacherPic = $(this).data("pic") || "";
+
+        // Create list item with teacher image
+        const $li = $(`
+          <li data-teacher-id="${teacherId}" data-teacher-pic="${teacherPic}">
+            <img src="${teacherPic}" class="teacher-dropdown-avatar" alt="${teacherName}" onerror="this.src='./img/default-avatar.svg'">
+            <span>${teacherName}</span>
+          </li>
+        `);
+        $teacherList.append($li);
+
+        // Select teacher if matches event data
+        if (eventData.teacherId && teacherId == eventData.teacherId) {
+          selectedTeacherId = teacherId;
+          selectedTeacherImg = teacherPic;
+          // Update button with teacher image and name
+          $teacherBtn.html(`
+            <div class="teacher-info">
+              <img class="avatar" src="${teacherPic}" alt="${teacherName}" onerror="this.src='./img/default-avatar.svg'">
+              <span class="teacher-name">${teacherName}</span>
+            </div>
+          `);
+        }
+      });
+    } else {
+      $teacherList.append(
+        '<li style="pointer-events:none;opacity:.6;">No teachers found</li>'
+      );
+    }
+
+    if (!selectedTeacherId) {
+      $teacherBtn.text("Select Teacher");
+    }
+
+    // === 3. Populate Class Dropdown (same as manage cohort) ===
+    const $classList = $("#session-class-list");
+    const $classBtn = $("#session-class-btn");
+    $classList.empty();
+
+    const classTypes = [
+      { value: "main", label: "Main Class" },
+      { value: "tutoring", label: "Tutoring Class" },
+      { value: "conversation", label: "Conversational Class" },
+    ];
+
+    classTypes.forEach((ct) => {
+      const $li = $(`<li data-class-value="${ct.value}">${ct.label}</li>`);
+      $classList.append($li);
+
+      // Select class if matches event data
+      if (eventData.classType && ct.value === eventData.classType) {
+        $classBtn.text(ct.label);
+      }
+    });
+
+    if (!eventData.classType) {
+      $classBtn.text("Select Class");
+    }
+
+    // === 4. Set Event Date (format like manage cohort: "Feb 4, 2025") ===
+    const $dateBtn = $("#session-event-date-btn");
+    if (eventData.date) {
+      // Parse date string (YYYY-MM-DD) and format as "MMM D, YYYY"
+      const dateParts = eventData.date.split("-");
+      if (dateParts.length === 3) {
+        const year = dateParts[0];
+        const month = parseInt(dateParts[1], 10);
+        const day = parseInt(dateParts[2], 10);
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const formattedDate = `${monthNames[month - 1]} ${day}, ${year}`;
+        $dateBtn.text(formattedDate);
+        $dateBtn.data("raw-date", eventData.date); // Store raw date for form submission
+      } else {
+        $dateBtn.text("Select Date");
+        $dateBtn.data("raw-date", "");
+      }
+    } else {
+      $dateBtn.text("Select Date");
+      $dateBtn.data("raw-date", "");
+    }
+
+    // === 5. Populate Start Time Dropdown ===
+    const $startList = $("#session-start-list");
+    const $startBtn = $("#session-start-btn");
+    $startList.empty();
+
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 5) {
+        const min = h * 60 + m;
+        const label = fmt12(min);
+        const $li = $(`<li data-time-value="${min}">${label}</li>`);
+        $startList.append($li);
+      }
+    }
+
+    // Set selected start time
+    let startMin = null;
+    if (typeof eventData.start === "number" && !isNaN(eventData.start)) {
+      startMin = eventData.start;
+    } else if (typeof eventData.start === "string" && eventData.start) {
+      startMin = minutes(eventData.start);
+    }
+    if (startMin !== null) {
+      $startBtn.text(fmt12(startMin));
+    } else {
+      $startBtn.text("Select Start Time");
+    }
+
+    // === 6. Populate End Time Dropdown ===
+    const $endList = $("#session-end-list");
+    const $endBtn = $("#session-end-btn");
+    $endList.empty();
+
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 5) {
+        const min = h * 60 + m;
+        const label = fmt12(min);
+        const $li = $(`<li data-time-value="${min}">${label}</li>`);
+        $endList.append($li);
+      }
+    }
+
+    // Set selected end time
+    let endMin = null;
+    if (typeof eventData.end === "number" && !isNaN(eventData.end)) {
+      endMin = eventData.end;
+    } else if (typeof eventData.end === "string" && eventData.end) {
+      endMin = minutes(eventData.end);
+    }
+    if (endMin !== null) {
+      $endBtn.text(fmt12(endMin));
+    } else {
+      $endBtn.text("Select End Time");
+    }
+  }
+
+  // === Custom Dropdown Event Handlers for Manage Session Modal ===
+
+  // Toggle dropdown on button click
+  $(document).on("click", ".custom-dropdown .dropdown-btn", function (e) {
+    e.stopPropagation();
+    const $dropdown = $(this).closest(".custom-dropdown");
+    const $list = $dropdown.find(".dropdown-list");
+    const isOpen = $list.is(":visible");
+
+    // Close all other dropdowns
+    $(".custom-dropdown .dropdown-list").hide();
+
+    // Toggle this dropdown
+    if (isOpen) {
+      $list.hide();
+    } else {
+      $list.show();
+    }
+  });
+
+  // Cohort dropdown item click
+  $(document).on("click", "#session-cohort-list li", function (e) {
+    e.stopPropagation();
+
+    // Skip if this is a disabled "no cohorts" message
+    if ($(this).css("pointer-events") === "none") return;
+
+    const cohortId = $(this).data("cohort-id");
+    const cohortName = $(this).text().trim();
+    $("#session-cohort-btn").text(cohortName);
+    $("#session-cohort-list").hide();
+
+    // Update cohort short name (extract first part before dash or space)
+    const shortName =
+      cohortName.split("-")[0] || cohortName.split(" ")[0] || "";
+    $("#session-cohort-short-name").val(shortName);
+  });
+
+  // Teacher dropdown item click
+  $(document).on("click", "#session-teacher-list li", function (e) {
+    e.stopPropagation();
+
+    // Skip if this is a disabled "no teachers" message
+    if ($(this).css("pointer-events") === "none") return;
+
+    const teacherId = $(this).data("teacher-id");
+    const teacherPic =
+      $(this).data("teacher-pic") || "./img/default-avatar.svg";
+    const teacherName =
+      $(this).find("span").text().trim() || $(this).text().trim();
+
+    // Update button with teacher image and name
+    $("#session-teacher-btn").html(`
+      <div class="teacher-info">
+        <img class="avatar" src="${teacherPic}" alt="${teacherName}" onerror="this.src='./img/default-avatar.svg'">
+        <span class="teacher-name">${teacherName}</span>
+      </div>
+    `);
+    $("#session-teacher-list").hide();
+  });
+
+  // Class dropdown item click
+  $(document).on("click", "#session-class-list li", function (e) {
+    e.stopPropagation();
+    const classValue = $(this).data("class-value");
+    const classLabel = $(this).text();
+    $("#session-class-btn").text(classLabel);
+    $("#session-class-list").hide();
+  });
+
+  // Start time dropdown item click
+  $(document).on("click", "#session-start-list li", function (e) {
+    e.stopPropagation();
+    const timeValue = $(this).data("time-value");
+    const timeLabel = $(this).text();
+    $("#session-start-btn").text(timeLabel);
+    $("#session-start-list").hide();
+  });
+
+  // End time dropdown item click
+  $(document).on("click", "#session-end-list li", function (e) {
+    e.stopPropagation();
+    const timeValue = $(this).data("time-value");
+    const timeLabel = $(this).text();
+    $("#session-end-btn").text(timeLabel);
+    $("#session-end-list").hide();
+  });
+
+  // Date button click - open calendar modal
+  $(document).on("click", "#session-event-date-btn", function (e) {
+    e.stopPropagation();
+
+    // Set calendar target for manage session
+    window.calendarTarget = "manageSession";
+
+    // Get current date or use today
+    const rawDate = $(this).data("raw-date");
+    let selectedDate = new Date();
+
+    if (rawDate) {
+      const parts = rawDate.split("-");
+      if (parts.length === 3) {
+        selectedDate = new Date(
+          parseInt(parts[0]),
+          parseInt(parts[1]) - 1,
+          parseInt(parts[2])
+        );
+      }
+    }
+
+    // Set calendar view to selected date
+    if (typeof window.calSelectedDate !== "undefined") {
+      window.calSelectedDate = selectedDate;
+      window.calViewMonth = selectedDate.getMonth();
+      window.calViewYear = selectedDate.getFullYear();
+    }
+
+    // Render and show calendar modal
+    if (typeof window.renderMonthlyCal === "function") {
+      window.renderMonthlyCal();
+    }
+    $("#monthly_cal_modal_backdrop").fadeIn(90);
+  });
+
+  // Close all dropdowns when clicking outside
+  $(document).on("click", function (e) {
+    if (!$(e.target).closest(".custom-dropdown").length) {
+      $(".custom-dropdown .dropdown-list").hide();
+    }
+  });
+
+  // Close manage session modal
+  $(document).on("click", "#close-manage-session", function () {
+    $("#manage-session-modal").fadeOut(300);
+    // Close all dropdowns when modal closes
+    $(".custom-dropdown .dropdown-list").hide();
+  });
+
+  // Close Cancel & Reschedule modal
+  $(document).on("click", "#close-cancel-reschedule", function () {
+    $("#cancel-reschedule-modal").fadeOut(300);
+  });
+
+  // Close Cancel (No Make-Up) modal
+  $(document).on("click", "#close-cancel-nomakeup", function () {
+    $("#cancel-nomakeup-modal").fadeOut(300);
+  });
+
+  // Close modal when clicking outside
+  $(document).on("click", "#manage-session-modal", function (e) {
+    if ($(e.target).hasClass("modal-overlay")) {
+      $("#manage-session-modal").fadeOut(300);
+      // Close all dropdowns when modal closes
+      $(".custom-dropdown .dropdown-list").hide();
+    }
+  });
+
+  // Close Cancel & Reschedule modal when clicking outside
+  $(document).on("click", "#cancel-reschedule-modal", function (e) {
+    if ($(e.target).hasClass("modal-overlay")) {
+      $("#cancel-reschedule-modal").fadeOut(300);
+    }
+  });
+
+  // Close Cancel (No Make-Up) modal when clicking outside
+  $(document).on("click", "#cancel-nomakeup-modal", function (e) {
+    if ($(e.target).hasClass("modal-overlay")) {
+      $("#cancel-nomakeup-modal").fadeOut(300);
+    }
+  });
+
+  // Handle manage session form submission
+  $(document).on("submit", "#manage-session-form", function (e) {
+    e.preventDefault();
+
+    const eventData = $(this).data("eventData");
+    console.log("Updating session for event:", eventData);
+
+    // Get selected values from custom dropdowns
+    const selectedCohortId = $("#session-cohort-list li")
+      .filter(function () {
+        return $(this).text().trim() === $("#session-cohort-btn").text().trim();
+      })
+      .data("cohort-id");
+
+    const selectedTeacherId = $("#session-teacher-list li")
+      .filter(function () {
+        return (
+          $(this).text().trim() === $("#session-teacher-btn").text().trim()
+        );
+      })
+      .data("teacher-id");
+
+    const selectedClassValue = $("#session-class-list li")
+      .filter(function () {
+        return $(this).text().trim() === $("#session-class-btn").text().trim();
+      })
+      .data("class-value");
+
+    const selectedStartTime = $("#session-start-list li")
+      .filter(function () {
+        return $(this).text().trim() === $("#session-start-btn").text().trim();
+      })
+      .data("time-value");
+
+    const selectedEndTime = $("#session-end-list li")
+      .filter(function () {
+        return $(this).text().trim() === $("#session-end-btn").text().trim();
+      })
+      .data("time-value");
+
+    const selectedDate = $("#session-event-date-btn").data("raw-date") || "";
+
+    console.log("Selected values:", {
+      cohortId: selectedCohortId,
+      teacherId: selectedTeacherId,
+      classType: selectedClassValue,
+      startTime: selectedStartTime,
+      endTime: selectedEndTime,
+      date: selectedDate,
+    });
+
+    // TODO: Implement session update logic
+    alert("Session update functionality will be implemented here.");
+
+    // Close modal after submission
+    $("#manage-session-modal").fadeOut(300);
+    // Close all dropdowns
+    $(".custom-dropdown .dropdown-list").hide();
+  });
 
   /* ====== CLICK: empty slot -> open cohort modal ====== */
   $("#grid")
@@ -535,9 +1357,9 @@ $(function () {
       $grid.scrollTop(0);
     } else {
       // Scroll to first event if there are any events
-      const firstEvent = $grid.find('.event').first();
+      const firstEvent = $grid.find(".event").first();
       if (firstEvent.length) {
-        const firstEventTop = parseInt(firstEvent.css('top')) || 0;
+        const firstEventTop = parseInt(firstEvent.css("top")) || 0;
         // Scroll to position the first event near the top, with some padding
         $grid.scrollTop(Math.max(0, firstEventTop - 50));
       }
@@ -743,7 +1565,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       updateTeacherPills();
-      onTeacherFilterChange();
+
+      // Reload teachers list to re-sort (selected items to top)
+      loadTeachers().then(() => {
+        onTeacherFilterChange();
+      });
     });
 
     return wrap;
@@ -872,31 +1698,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return [];
     }
 
-    list.forEach((t) => {
-      teacherFieldset.appendChild(createTeacherOption(t));
+    // Sort teachers: selected ones first, then unselected
+    const sortedList = list.sort((a, b) => {
+      const aSelected = selectedTeacherIds.includes(a.id);
+      const bSelected = selectedTeacherIds.includes(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return 0;
+    });
+
+    sortedList.forEach((t) => {
+      const option = createTeacherOption(t);
+      teacherFieldset.appendChild(option);
+
+      // Restore selection state if previously selected
+      if (selectedTeacherIds.includes(t.id)) {
+        const checkbox = option.querySelector(".teacher-checkbox");
+        const colorDot = option.querySelector(".teacher-color-dot");
+        if (checkbox) checkbox.checked = true;
+        option.classList.add("selected");
+        if (colorDot) colorDot.style.display = "inline-block";
+      }
     });
 
     return list;
-  }
-
-  function autoSelectFirstTeacher() {
-    const first = teacherFieldset.querySelector(".teacher-option");
-    if (!first) return null;
-
-    const id = parseInt(first.dataset.teacherId, 10);
-    const checkbox = first.querySelector(".teacher-checkbox");
-
-    if (checkbox && !checkbox.checked) {
-      checkbox.checked = true;
-    }
-    first.classList.add("selected");
-
-    if (!selectedTeacherIds.includes(id)) {
-      selectedTeacherIds.push(id);
-    }
-
-    updateTeacherPills();
-    return id;
   }
 
   // ---------- Cohorts ----------
@@ -943,9 +1768,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Use student name for one1one cohorts, otherwise use cohort name
       const cohortType = opt.dataset.cohortType;
-      const name = (cohortType === "one1one" && opt.dataset.studentName) 
-        ? opt.dataset.studentName 
-        : (opt.dataset.cohortName || "");
+      const name =
+        cohortType === "one1one" && opt.dataset.studentName
+          ? opt.dataset.studentName
+          : opt.dataset.cohortName || "";
 
       // Determine which container to use based on cohort type
       const targetContainer = isOneOnOne
@@ -1011,9 +1837,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (!opt) return "";
           // Use student name for one1one cohorts, otherwise use cohort name
           const cohortType = opt.dataset.cohortType;
-          return (cohortType === "one1one" && opt.dataset.studentName) 
-            ? opt.dataset.studentName 
-            : (opt.dataset.cohortName || "");
+          return cohortType === "one1one" && opt.dataset.studentName
+            ? opt.dataset.studentName
+            : opt.dataset.cohortName || "";
         })
         .filter(Boolean);
 
@@ -1040,7 +1866,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Display student name for one1one cohorts, otherwise show cohort name
-    const displayName = (c.cohorttype === "one1one" && c.studentname) ? c.studentname : c.name;
+    const displayName =
+      c.cohorttype === "one1one" && c.studentname ? c.studentname : c.name;
 
     wrap.innerHTML = `
             <label class="cohort-label">
@@ -1077,8 +1904,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
       updateCohortPills();
 
-      // Load students and auto-select based on events
-      updateStudentsForCohortChange();
+      // Reload cohort lists to re-sort (selected items to top)
+      if (selectedTeacherIds.length > 0) {
+        loadCohortsForTeachers(selectedTeacherIds, false).then(() => {
+          // Load students and auto-select based on events
+          updateStudentsForCohortChange();
+        });
+      } else {
+        loadAllCohorts().then(() => {
+          // Load students and auto-select based on events
+          updateStudentsForCohortChange();
+        });
+      }
 
       // Trigger immediate calendar reload
       setTimeout(() => {
@@ -1109,8 +1946,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
       updateCohortPills();
 
-      // Load students and auto-select based on events
-      updateStudentsForCohortChange();
+      // Reload cohort lists to re-sort (selected items to top)
+      if (selectedTeacherIds.length > 0) {
+        loadCohortsForTeachers(selectedTeacherIds, false).then(() => {
+          // Load students and auto-select based on events
+          updateStudentsForCohortChange();
+        });
+      } else {
+        loadAllCohorts().then(() => {
+          // Load students and auto-select based on events
+          updateStudentsForCohortChange();
+        });
+      }
 
       // Trigger immediate calendar reload
       setTimeout(() => {
@@ -1141,9 +1988,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return [];
     }
 
+    // Remove duplicates based on cohort ID
+    const uniqueList = Array.from(new Map(list.map((c) => [c.id, c])).values());
+
     // Separate cohorts by type
-    const groupCohorts = list.filter((c) => c.cohorttype !== "one1one");
-    const oneOnOneCohorts = list.filter((c) => c.cohorttype === "one1one");
+    const groupCohorts = uniqueList.filter((c) => c.cohorttype !== "one1one");
+    const oneOnOneCohorts = uniqueList.filter(
+      (c) => c.cohorttype === "one1one"
+    );
+
+    // For 1:1 cohorts, also deduplicate by student name to avoid showing same student multiple times
+    const uniqueOneOnOne = Array.from(
+      new Map(oneOnOneCohorts.map((c) => [c.studentname || c.name, c])).values()
+    );
 
     // Add group cohorts to Cohorts tab
     if (groupCohorts.length > 0) {
@@ -1163,8 +2020,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Add 1:1 cohorts to 1:1 Class tab
-    if (oneOnOneCohorts.length > 0) {
-      oneOnOneCohorts.forEach((c) => {
+    if (uniqueOneOnOne.length > 0) {
+      uniqueOneOnOne.forEach((c) => {
         const option = createCohortOption(c);
         oneOnOneFieldset.appendChild(option);
 
@@ -1179,7 +2036,7 @@ document.addEventListener("DOMContentLoaded", () => {
       oneOnOneNoResults.style.display = "block";
     }
 
-    return list;
+    return uniqueList;
   }
 
   async function loadCohortsForTeachers(teacherIds, returnList = false) {
@@ -1206,13 +2063,32 @@ document.addEventListener("DOMContentLoaded", () => {
       return [];
     }
 
+    // Remove duplicates based on cohort ID
+    const uniqueList = Array.from(new Map(list.map((c) => [c.id, c])).values());
+
     // Separate cohorts by type
-    const groupCohorts = list.filter((c) => c.cohorttype !== "one1one");
-    const oneOnOneCohorts = list.filter((c) => c.cohorttype === "one1one");
+    const groupCohorts = uniqueList.filter((c) => c.cohorttype !== "one1one");
+    const oneOnOneCohorts = uniqueList.filter(
+      (c) => c.cohorttype === "one1one"
+    );
+
+    // For 1:1 cohorts, also deduplicate by student name to avoid showing same student multiple times
+    const uniqueOneOnOne = Array.from(
+      new Map(oneOnOneCohorts.map((c) => [c.studentname || c.name, c])).values()
+    );
 
     // Add group cohorts to Cohorts tab
     if (groupCohorts.length > 0) {
-      groupCohorts.forEach((c) => {
+      // Sort cohorts: selected ones first, then unselected
+      const sortedGroupCohorts = groupCohorts.sort((a, b) => {
+        const aSelected = selectedCohortIds.includes(a.id);
+        const bSelected = selectedCohortIds.includes(b.id);
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        return 0;
+      });
+
+      sortedGroupCohorts.forEach((c) => {
         const option = createCohortOption(c);
         cohortFieldset.appendChild(option);
 
@@ -1228,8 +2104,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Add 1:1 cohorts to 1:1 Class tab
-    if (oneOnOneCohorts.length > 0) {
-      oneOnOneCohorts.forEach((c) => {
+    if (uniqueOneOnOne.length > 0) {
+      // Sort cohorts: selected ones first, then unselected
+      const sortedOneOnOne = uniqueOneOnOne.sort((a, b) => {
+        const aSelected = selectedCohortIds.includes(a.id);
+        const bSelected = selectedCohortIds.includes(b.id);
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        return 0;
+      });
+
+      sortedOneOnOne.forEach((c) => {
         const option = createCohortOption(c);
         oneOnOneFieldset.appendChild(option);
 
@@ -1244,7 +2129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       oneOnOneNoResults.style.display = "block";
     }
 
-    return returnList ? list : [];
+    return returnList ? uniqueList : [];
   }
 
   cohortSearchInput.addEventListener("input", () => {
@@ -1268,6 +2153,13 @@ document.addEventListener("DOMContentLoaded", () => {
     wrap.dataset.studentName = s.name;
     wrap.dataset.studentImg = s.avatar || "";
 
+    // Get cohort short name (first 4 characters of cohort idnumber or cohortname)
+    const cohortShortName = s.cohortsname
+      ? s.cohortsname.substring(0, 4)
+      : s.cohortname
+      ? s.cohortname.substring(0, 4)
+      : "";
+
     wrap.innerHTML = `
             <label class="student-label">
                 <div class="student-details">
@@ -1276,7 +2168,14 @@ document.addEventListener("DOMContentLoaded", () => {
                           s.avatar || ""
                         }" alt="${s.name}">
                     </div>
-                    <span class="student-name">${s.name}</span>
+                    <div class="student-name-wrapper">
+                        ${
+                          cohortShortName
+                            ? `<span class="student-cohort-badge">${cohortShortName}</span>`
+                            : ""
+                        }
+                        <span class="student-name">${s.name}</span>
+                    </div>
                 </div>
                 <div class="radio-custom">
                     <div class="radio-custom-dot"></div>
@@ -1300,6 +2199,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       updateStudentPills();
+
+      // Reload students list to re-sort (selected items to top)
+      if (selectedCohortIds.length > 0) {
+        loadStudentsForCohorts(selectedCohortIds, false);
+      } else {
+        loadAllStudents();
+      }
 
       // Trigger immediate calendar reload
       setTimeout(() => {
@@ -1445,34 +2351,18 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    list.forEach((s) => studentFieldset.appendChild(createStudentOption(s)));
-  }
+    // Sort students: selected ones first, then unselected
+    const sortedList = list.sort((a, b) => {
+      const aSelected = selectedStudentIds.includes(a.id);
+      const bSelected = selectedStudentIds.includes(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return 0;
+    });
 
-  async function loadStudentsForSingleCohort(cohortId) {
-    clear(studentFieldset);
-    selectedStudentIds = [];
-    updateStudentPills();
-
-    if (!cohortId) {
-      await loadAllStudents();
-      return;
-    }
-
-    const data = await fetchJSON(
-      `${API_BASE}?action=students&cohortid=${encodeURIComponent(cohortId)}`
+    sortedList.forEach((s) =>
+      studentFieldset.appendChild(createStudentOption(s))
     );
-    if (!data.ok) return;
-
-    const list = data.data || [];
-    if (!list.length) {
-      const div = document.createElement("div");
-      div.style.padding = "8px";
-      div.textContent = "No students found in this cohort";
-      studentFieldset.appendChild(div);
-      return;
-    }
-
-    list.forEach((s) => studentFieldset.appendChild(createStudentOption(s)));
   }
 
   async function loadStudentsForCohorts(cohortIds, clearSelection = true) {
@@ -1533,13 +2423,24 @@ document.addEventListener("DOMContentLoaded", () => {
       cohortHeader.textContent = cohortGroup.name;
       studentFieldset.appendChild(cohortHeader);
 
+      // Sort students in this cohort: selected ones first, then unselected
+      const sortedStudents = cohortGroup.students.sort((a, b) => {
+        const aSelected = selectedStudentIds.includes(a.id);
+        const bSelected = selectedStudentIds.includes(b.id);
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        return 0;
+      });
+
       // Add students under this cohort
-      cohortGroup.students.forEach((s) => {
+      sortedStudents.forEach((s) => {
         const option = createStudentOption(s);
         studentFieldset.appendChild(option);
 
         // Restore selection state if previously selected
-        if (selectedStudentIds.includes(s.id)) {
+        // Convert s.id to number to ensure proper comparison
+        const studentId = parseInt(s.id, 10);
+        if (selectedStudentIds.includes(studentId)) {
           const checkbox = option.querySelector(".student-checkbox");
           if (checkbox) checkbox.checked = true;
           option.classList.add("selected");
@@ -1575,7 +2476,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!selectedTeacherIds.length) {
       const allCohorts = await loadAllCohorts();
-    
+
       await loadAllStudents();
       // No teacher selected → clear events and re-render blank calendar
       window.events = [];
@@ -1591,12 +2492,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const eventsData = await fetchEventsForTeachers(selectedTeacherIds);
 
       if (eventsData && eventsData.length > 0) {
-
         // Extract unique cohort IDs and student IDs from events
         const eventCohortIds = new Set();
         const eventStudentIds = new Set();
-
-     
 
         eventsData.forEach((ev, idx) => {
           if (
@@ -1606,18 +2504,30 @@ document.addEventListener("DOMContentLoaded", () => {
           ) {
             ev.cohortids.forEach((cid) => eventCohortIds.add(cid));
           }
-          
+
           // Check for studentids in multiple possible formats
-          if (ev.studentids && Array.isArray(ev.studentids) && ev.studentids.length > 0) {
+          if (
+            ev.studentids &&
+            Array.isArray(ev.studentids) &&
+            ev.studentids.length > 0
+          ) {
             ev.studentids.forEach((sid) => eventStudentIds.add(sid));
-          } else if (ev.studentIds && Array.isArray(ev.studentIds) && ev.studentIds.length > 0) {
+          } else if (
+            ev.studentIds &&
+            Array.isArray(ev.studentIds) &&
+            ev.studentIds.length > 0
+          ) {
             // Try camelCase variant
             ev.studentIds.forEach((sid) => eventStudentIds.add(sid));
-          } else if (ev.students && Array.isArray(ev.students) && ev.students.length > 0) {
+          } else if (
+            ev.students &&
+            Array.isArray(ev.students) &&
+            ev.students.length > 0
+          ) {
             // Try students array
             ev.students.forEach((s) => {
               if (s.id) eventStudentIds.add(s.id);
-              else if (typeof s === 'number') eventStudentIds.add(s);
+              else if (typeof s === "number") eventStudentIds.add(s);
             });
           }
         });
@@ -1632,7 +2542,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // For 1:1 events (no cohortids but have studentids), we need to find which specific 1:1 cohorts contain those students
         // We'll do this by loading students for each 1:1 cohort and checking if any event students are in it
         if (eventStudentIds.size > 0) {
-          const oneOnOneCohorts = cohorts.filter((c) => c.cohorttype === "one1one");
+          const oneOnOneCohorts = cohorts.filter(
+            (c) => c.cohorttype === "one1one"
+          );
           // For now, we'll select all 1:1 cohorts and let the student filtering handle it
           // A better approach would be to fetch students for each 1:1 cohort first, but that would be too many API calls
           // Instead, we'll select all 1:1 cohorts and the loadStudentsForCohorts will fetch all their students
@@ -1648,87 +2560,21 @@ document.addEventListener("DOMContentLoaded", () => {
               if (!selectedCohortIds.includes(c.id)) {
                 selectedCohortIds.push(c.id);
               }
-              // Update UI for selected cohort
-              const fieldset =
-                c.cohorttype === "one1one" ? oneOnOneFieldset : cohortFieldset;
-              const option = fieldset?.querySelector(
-                `.cohort-option[data-cohort-id="${c.id}"]`
-              );
-              if (option) {
-                const checkbox = option.querySelector(".cohort-checkbox");
-                if (checkbox) checkbox.checked = true;
-                option.classList.add("selected");
-              }
             }
           });
 
           cohortDisplayText.textContent = "";
           updateCohortPills();
+
+          // Reload cohorts with sorting applied (selected items to top)
+          await loadCohortsForTeachers(selectedTeacherIds, false);
         }
 
         // Load students for selected cohorts
         // Don't clear selection yet - we'll rebuild it after loading
         if (selectedCohortIds.length > 0) {
-          // Load students for all selected teachers (not just selected cohorts)
-          // This ensures we get students from 1:1 cohorts even if those cohorts weren't explicitly selected
-          const url = `${API_BASE}?action=students&teacherids=${encodeURIComponent(
-            selectedTeacherIds.join(",")
-          )}`;
-          const data = await fetchJSON(url);
-          
-          if (data.ok) {
-            const list = data.data || [];
-            
-            // Clear and render all students
-            clear(studentFieldset);
-            if (list.length > 0) {
-              // Group students by cohort
-              const studentsByCohort = {};
-              list.forEach((s) => {
-                const cohortKey = s.cohortid || 0;
-                const cohortName = s.cohortname || "Unknown Cohort";
-
-                if (!studentsByCohort[cohortKey]) {
-                  studentsByCohort[cohortKey] = {
-                    name: cohortName,
-                    students: [],
-                  };
-                }
-                studentsByCohort[cohortKey].students.push(s);
-              });
-
-              // Render grouped students
-              Object.keys(studentsByCohort).forEach((cohortKey) => {
-                const cohortGroup = studentsByCohort[cohortKey];
-
-                // Add cohort header
-                const cohortHeader = document.createElement("div");
-                cohortHeader.className = "student-cohort-header";
-                cohortHeader.textContent = cohortGroup.name;
-                studentFieldset.appendChild(cohortHeader);
-
-                // Add students under this cohort
-                cohortGroup.students.forEach((s) => {
-                  const option = createStudentOption(s);
-                  studentFieldset.appendChild(option);
-                });
-              });
-            }
-          }
-          
-          // Check if any students from events are missing from the loaded student list
-          if (eventStudentIds.size > 0) {
-            const loadedStudentIds = new Set();
-            studentFieldset.querySelectorAll(".student-option").forEach((opt) => {
-              loadedStudentIds.add(parseInt(opt.dataset.studentId, 10));
-            });
-
-            const missingStudentIds = Array.from(eventStudentIds).filter(
-              (sid) => !loadedStudentIds.has(sid)
-            );
-
-            // Silent check - students loaded
-          }
+          // Use loadStudentsForCohorts to get proper cohort information with headers
+          await loadStudentsForCohorts(selectedCohortIds, false);
         } else {
           // If no cohorts selected but we have student IDs from events (1:1 classes),
           // load all students so we can select the ones with events
@@ -1741,21 +2587,19 @@ document.addEventListener("DOMContentLoaded", () => {
         // Auto-select only students that have events
         if (eventStudentIds.size > 0) {
           eventStudentIds.forEach((sid) => {
-            const option = studentFieldset.querySelector(
-              `.student-option[data-student-id="${sid}"]`
-            );
-            if (option) {
-              // Only add to selectedStudentIds if the option exists
-              if (!selectedStudentIds.includes(sid)) {
-                selectedStudentIds.push(sid);
-              }
-              const checkbox = option.querySelector(".student-checkbox");
-              if (checkbox) checkbox.checked = true;
-              option.classList.add("selected");
+            if (!selectedStudentIds.includes(sid)) {
+              selectedStudentIds.push(sid);
             }
           });
 
           updateStudentPills();
+
+          // Reload students with sorting applied (selected items to top)
+          if (selectedCohortIds.length > 0) {
+            await loadStudentsForCohorts(selectedCohortIds, false);
+          } else {
+            await loadAllStudents();
+          }
         }
       }
 
@@ -2225,35 +3069,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------------- Selected filter helpers ----------------
 
-  function getSelectedTeacherId() {
-    // Use the exposed state if available
-    if (window.calendarFilterState) {
-      const teachers = window.calendarFilterState.getSelectedTeachers();
-      return teachers && teachers.length > 0 ? teachers[0] : 0;
-    }
-
-    // Fallback: pill priority
-    const pill = document.querySelector("#teacher-pills .teacher-pill");
-    if (pill && pill.dataset.userid) {
-      return parseInt(pill.dataset.userid, 10) || 0;
-    }
-
-    // fallback: selected list item
-    const opt = document.querySelector(
-      ".teacher-option.selected, .teacher-option input.teacher-checkbox:checked"
-    );
-    if (opt) {
-      const li = opt.classList.contains("teacher-option")
-        ? opt
-        : opt.closest(".teacher-option");
-      if (li && li.dataset.teacherId) {
-        return parseInt(li.dataset.teacherId, 10) || 0;
-      }
-    }
-
-    return 0;
-  }
-
   function getSelectedTeacherIds() {
     // Use the exposed state if available - returns ALL selected teachers
     if (window.calendarFilterState) {
@@ -2306,32 +3121,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter((id) => id !== null);
 
     return selected;
-  }
-
-  function getSelectedStudentId() {
-    // Use the exposed state if available
-    if (window.calendarFilterState) {
-      const students = window.calendarFilterState.getSelectedStudents();
-      return students && students.length > 0 ? students[0] : 0;
-    }
-
-    // multi-select: just send first selected for now
-    const checked = document.querySelector(
-      ".student-option input.student-checkbox:checked"
-    );
-    if (checked) {
-      const li = checked.closest(".student-option");
-      if (li && li.dataset.studentId) {
-        return parseInt(li.dataset.studentId, 10) || 0;
-      }
-    }
-
-    const pill = document.querySelector("#student-pills .student-pill");
-    if (pill && pill.dataset.studentId) {
-      return parseInt(pill.dataset.studentId, 10) || 0;
-    }
-
-    return 0;
   }
 
   function getSelectedStudentIds() {
@@ -2450,6 +3239,10 @@ document.addEventListener("DOMContentLoaded", () => {
             classType: ev.class_type,
             studentnames: ev.studentnames || [],
             studentids: ev.studentids || [],
+            cohortids: ev.cohortids || [],
+            eventid: ev.eventid,
+            cmid: ev.cmid,
+            googlemeetid: ev.googlemeetid,
           };
         });
 
