@@ -7,8 +7,8 @@
 
         <!-- Repeat + Date -->
         <div class="conference_modal_repeat_row">
-            <div style="width:100%;">
-                <div class="conference_modal_repeat_btn" style="border-bottom:2.5px solid #fe2e0c;">
+            <div style="width:50%;">
+                <div class="conference_modal_repeat_btn peertalk_repeat_btn" style="border-bottom:2.5px solid #fe2e0c;">
 
                     Does not repeat
                     <span style="float:right; font-size:1rem;">
@@ -130,23 +130,43 @@ $(document).ready(function() {
     // ✅ Extract and validate repeat buttons
     function extractSchedules() {
         const scheduleArray = [];
-        $parent.find('.conference_modal_repeat_btn').each(function() {
+        $parent.find('.peertalk_repeat_btn').each(function() {
             const $this = $(this);
             const text = $this.text().trim();
 
-            // Match "Weekly on Mon (09:00 AM - 10:00 AM)"
-            const dayMatch = text.match(/on\s+([A-Za-z]{3})/);
+            // Match time first: "09:00 AM - 10:00 AM"
             const timeMatch = text.match(
                 /(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(\d{1,2}:\d{2}\s?[APMapm]{2})/);
 
-            if (dayMatch && timeMatch) {
-                scheduleArray.push({
-                    day: dayMatch[1],
-                    startTime: timeMatch[1],
-                    endTime: timeMatch[2]
+            if (!timeMatch) {
+                // No time found, mark as error
+                $this.addClass('field-error');
+                return; // continue to next iteration
+            }
+
+            const startTime = timeMatch[1];
+            const endTime = timeMatch[2];
+
+            // Extract all days from text
+            // Match patterns like:
+            // "Weekly on Mon (09:00 AM - 10:00 AM)"
+            // "Weekly on Mon, Wed, Fri (09:00 AM - 10:00 AM)"
+            // "on Mon, Wed, Fri (09:00 AM - 10:00 AM)"
+            const dayPattern = /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g;
+            const dayMatches = text.match(dayPattern);
+
+            if (dayMatches && dayMatches.length > 0) {
+                // Found one or more days - create schedule entry for each
+                dayMatches.forEach(function(day) {
+                    scheduleArray.push({
+                        day: day,
+                        startTime: startTime,
+                        endTime: endTime
+                    });
                 });
                 $this.removeClass('field-error');
             } else {
+                // No days found, mark as error
                 $this.addClass('field-error');
             }
         });
@@ -309,23 +329,201 @@ $(document).ready(function() {
             return;
         }
 
+        // ✅ Build timestamps from startDate and first schedule
+        const firstSchedule = scheduleArray[0];
+        let startTs = null;
+        let endTs = null;
+
+        if (startDate && startDate !== 'Select Date' && firstSchedule) {
+            // Parse date (assuming format like "Nov 21, 2025")
+            const dateObj = new Date(startDate);
+
+            // Parse start time (e.g., "09:00 AM")
+            const startTimeParts = firstSchedule.startTime.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+            if (startTimeParts) {
+                let hours = parseInt(startTimeParts[1], 10);
+                const minutes = parseInt(startTimeParts[2], 10);
+                const meridiem = startTimeParts[3].toUpperCase();
+
+                if (meridiem === 'PM' && hours !== 12) hours += 12;
+                if (meridiem === 'AM' && hours === 12) hours = 0;
+
+                dateObj.setHours(hours, minutes, 0, 0);
+                startTs = Math.floor(dateObj.getTime() / 1000);
+            }
+
+            // Parse end time (e.g., "10:00 AM")
+            const endTimeParts = firstSchedule.endTime.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+            if (endTimeParts) {
+                let hours = parseInt(endTimeParts[1], 10);
+                const minutes = parseInt(endTimeParts[2], 10);
+                const meridiem = endTimeParts[3].toUpperCase();
+
+                if (meridiem === 'PM' && hours !== 12) hours += 12;
+                if (meridiem === 'AM' && hours === 12) hours = 0;
+
+                const endDateObj = new Date(startDate);
+                endDateObj.setHours(hours, minutes, 0, 0);
+                endTs = Math.floor(endDateObj.getTime() / 1000);
+            }
+        }
+
+        // Convert timestamps to ISO strings
+        const startISO = startTs ? new Date(startTs * 1000).toISOString() : new Date().toISOString();
+        const finishISO = endTs ? new Date(endTs * 1000).toISOString() : new Date().toISOString();
+
+        // ✅ Parse repeat information
+        const repeatText = $parent.find('.peertalk_repeat_btn').text().trim();
+        let repeatActive = false;
+        let repeatType = 'day';
+        let repeatEvery = 1;
+        let weekDays = [];
+        let repeatEnd = 'never';
+        let repeatOn = null;
+
+        if (repeatText.toLowerCase().includes('weekly')) {
+            repeatActive = true;
+            repeatType = 'week';
+            repeatEvery = 1;
+
+            // Extract day from "Weekly on Mon"
+            const dayMatch = repeatText.match(/on\s+([A-Za-z]{3})/i);
+            if (dayMatch) {
+                const dayMap = {
+                    'mon': 1,
+                    'tue': 2,
+                    'wed': 3,
+                    'thu': 4,
+                    'fri': 5,
+                    'sat': 6,
+                    'sun': 0
+                };
+                const dayKey = dayMatch[1].toLowerCase();
+                if (dayMap.hasOwnProperty(dayKey)) {
+                    weekDays = [dayMap[dayKey]];
+                }
+            }
+        } else if (!repeatText.toLowerCase().includes('does not repeat')) {
+            repeatActive = true;
+            repeatType = 'day';
+            repeatEvery = 1;
+        }
+
+        // ✅ Build cohorts array (convert cohort names to IDs if needed)
+        const cohortsArray = cohorts.map(function() {
+            const cohortName = $(this).data('cohort');
+            // TODO: Map cohort name to cohort ID from your data source
+            // For now, returning cohort name - you may need to fetch the actual ID
+            return cohortName;
+        }).get();
+
+        // ✅ Build teachers array with iduser and fullname
+        const teachersArray = teachers.map(function() {
+            const teacherText = $(this).text().trim();
+            const teacherImg = $(this).find('img');
+            // TODO: Extract actual teacher ID from data attribute
+            // For now, using placeholder structure
+            return {
+                iduser: 0, // TODO: Get actual teacher ID from data-teacher-id or similar
+                fullname: teacherText
+            };
+        }).get();
+
+        // ✅ Build confData object
+        const confData = {
+            title: 'Peer Talk', // TODO: Add title field to form if needed
+            description: '',
+            startTimeEvent: startISO,
+            finishTimeEvent: finishISO,
+            color: $colorToggle.find('.color-circle').css('background-color') || '#007bff',
+            typecall: 'videocalling',
+            maxstudents: 0,
+            cohorts: cohortsArray,
+            teachers: teachersArray,
+            repeat: {
+                active: repeatActive,
+                type: repeatType,
+                repeatEvery: repeatEvery,
+                weekDays: weekDays,
+                end: repeatEnd,
+                repeatOn: repeatOn
+            }
+        };
+
+        // ✅ Final payload matching the required structure
         const payload = {
-            repeat: $parent.find('.conference_modal_repeat_btn').text().trim(),
-            startDate,
-            timezone,
-            color,
-            scheduleArray,
-            cohorts: cohorts.map(function() {
-                return $(this).data('cohort');
-            }).get(),
-            teachers: teachers.map(function() {
-                return $(this).text().trim();
-            }).get(),
-            submittedAt: new Date().toISOString()
+            id: null,
+            idcurrentprofile: 0,
+            data: confData
         };
 
         console.log('✅ Peer Talk payload:', payload);
+        console.log('📅 Start timestamp:', startTs, '→', startISO);
+        console.log('📅 End timestamp:', endTs, '→', finishISO);
+        console.log('🔁 Repeat config:', confData.repeat);
+
+        // ✅ Send to API
+        savePeerTalkToAPI(payload);
     });
+
+    // ✅ Function to save Peer Talk via API
+    async function savePeerTalkToAPI(payload) {
+        try {
+            showGlobalLoader();
+
+            const response = await fetch(M.cfg.wwwroot + '/local/videocalling/api/saveclass.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error('videocalling API error: ' + errorText);
+            }
+
+            const result = await response.json();
+            console.log('✅ Peer Talk created successfully:', result);
+
+            hideGlobalLoader();
+
+            // Close modal and reload calendar
+            $('#calendar_admin_details_create_cohort_modal_backdrop').fadeOut();
+            if (typeof window.fetchCalendarEvents === 'function') {
+                window.fetchCalendarEvents();
+            }
+
+            // Reset form
+            $form[0].reset();
+            $parent.find('.conference_modal_cohort_list, .conference_modal_attendees_list').empty();
+
+        } catch (error) {
+            console.error('❌ Failed to create Peer Talk:', error);
+            hideGlobalLoader();
+            alert('Failed to create Peer Talk: ' + error.message);
+        }
+    }
+
+    // ✅ Loader helpers (if not already defined globally)
+    function showGlobalLoader() {
+        if (typeof window.showGlobalLoader === 'function') {
+            window.showGlobalLoader();
+        } else if (window.$) {
+            window.$('#loader').css('display', 'flex');
+        }
+    }
+
+    function hideGlobalLoader() {
+        if (typeof window.hideGlobalLoader === 'function') {
+            window.hideGlobalLoader();
+        } else if (window.$) {
+            window.$('#loader').css('display', 'none');
+        }
+    }
 });
 </script>
 

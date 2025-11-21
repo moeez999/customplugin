@@ -622,6 +622,7 @@ $(function () {
     const teacherListItems = $("#teacher1DropdownList .teacher-option");
     let selectedTeacherId = null;
     let selectedTeacherImg = "";
+    let selectedTeacherName = "";
 
     if (teacherListItems.length > 0) {
       teacherListItems.each(function () {
@@ -631,7 +632,7 @@ $(function () {
 
         // Create list item with teacher image
         const $li = $(`
-          <li data-teacher-id="${teacherId}" data-teacher-pic="${teacherPic}">
+          <li data-teacher-id="${teacherId}" data-teacher-pic="${teacherPic}" data-teacher-name="${teacherName}">
             <img src="${teacherPic}" class="teacher-dropdown-avatar" alt="${teacherName}" onerror="this.src='./img/default-avatar.svg'">
             <span>${teacherName}</span>
           </li>
@@ -642,6 +643,7 @@ $(function () {
         if (eventData.teacherId && teacherId == eventData.teacherId) {
           selectedTeacherId = teacherId;
           selectedTeacherImg = teacherPic;
+          selectedTeacherName = teacherName;
           // Update button with teacher image and name
           $teacherBtn.html(`
             <div class="teacher-info">
@@ -660,6 +662,8 @@ $(function () {
     if (!selectedTeacherId) {
       $teacherBtn.text("Select Teacher");
     }
+
+    console.log("Selected teacher:", selectedTeacherId, selectedTeacherName);
 
     // === 3. Populate Class Dropdown (same as manage cohort) ===
     const $classList = $("#session-class-list");
@@ -686,7 +690,111 @@ $(function () {
       $classBtn.text("Select Class");
     }
 
-    // === 4. Set Event Date (format like manage cohort: "Feb 4, 2025") ===
+    // === 4. Populate Student Dropdown ===
+    const $studentList = $("#session-student-list");
+    const $studentBtn = $("#session-student-btn");
+    $studentList.empty();
+
+    // Check if this is a 1:1 class with student data
+    if (eventData.studentids && eventData.studentids.length > 0) {
+      // Fetch all students from the student search widget if available
+      const allStudentItems = $("#search-student .student-option");
+      let selectedStudentId = eventData.studentids[0]; // Get first student ID
+      let selectedStudentName =
+        eventData.studentnames && eventData.studentnames.length > 0
+          ? eventData.studentnames[0]
+          : "";
+
+      if (allStudentItems.length > 0) {
+        allStudentItems.each(function () {
+          const studentId = $(this).data("student-id");
+          const studentName =
+            $(this).data("student-name") ||
+            $(this).find(".student-name").text().trim();
+          const studentAvatar =
+            $(this).data("student-avatar") ||
+            $(this).find(".student-avatar").attr("src") ||
+            "";
+
+          // Create list item with student image
+          const $li = $(`
+            <li data-student-id="${studentId}" data-student-name="${studentName}" data-student-avatar="${studentAvatar}">
+              <img src="${studentAvatar}" class="teacher-dropdown-avatar" alt="${studentName}" onerror="this.src='./img/default-avatar.svg'">
+              <span>${studentName}</span>
+            </li>
+          `);
+          $studentList.append($li);
+
+          // Select student if matches event data
+          if (studentId == selectedStudentId) {
+            selectedStudentName = studentName;
+            $studentBtn.html(`
+              <div class="teacher-info">
+                <img class="avatar" src="${studentAvatar}" alt="${studentName}" onerror="this.src='./img/default-avatar.svg'">
+                <span class="teacher-name">${studentName}</span>
+              </div>
+            `);
+          }
+        });
+      } else if (selectedStudentName) {
+        // If student widget not loaded yet, just show the student from event data
+        const studentAvatar = eventData.avatar || "./img/default-avatar.svg";
+        const $li = $(`
+          <li data-student-id="${selectedStudentId}" data-student-name="${selectedStudentName}" data-student-avatar="${studentAvatar}">
+            <img src="${studentAvatar}" class="teacher-dropdown-avatar" alt="${selectedStudentName}" onerror="this.src='./img/default-avatar.svg'">
+            <span>${selectedStudentName}</span>
+          </li>
+        `);
+        $studentList.append($li);
+
+        $studentBtn.html(`
+          <div class="teacher-info">
+            <img class="avatar" src="${studentAvatar}" alt="${selectedStudentName}" onerror="this.src='./img/default-avatar.svg'">
+            <span class="teacher-name">${selectedStudentName}</span>
+          </div>
+        `);
+      }
+
+      console.log("Selected student:", selectedStudentId, selectedStudentName);
+    } else {
+      $studentList.append(
+        '<li style="pointer-events:none;opacity:.6;">No students available</li>'
+      );
+      $studentBtn.text("Select Student");
+    }
+
+    // === 5. Set Lesson Type based on classType and googlemeetid ===
+    const $lessonTypeBtn = $("#session-lesson-type-btn");
+
+    // Determine if it's single or weekly based on classType
+    let lessonType = "";
+    if (eventData.classType === "one2one_single") {
+      lessonType = "single";
+      $lessonTypeBtn.text("Single Lesson");
+    } else if (eventData.classType === "one2one_weekly") {
+      lessonType = "weekly";
+      $lessonTypeBtn.text("Weekly Lesson");
+    } else if (eventData.googlemeetid) {
+      // If googlemeetid exists, it's a recurring (weekly) lesson
+      lessonType = "weekly";
+      $lessonTypeBtn.text("Weekly Lesson");
+    } else {
+      // Default to single lesson if no googlemeetid
+      lessonType = "single";
+      $lessonTypeBtn.text("Single Lesson");
+    }
+
+    console.log(
+      "Selected lesson type:",
+      lessonType,
+      "(googlemeetid:",
+      eventData.googlemeetid,
+      ", classType:",
+      eventData.classType,
+      ")"
+    );
+
+    // === 6. Set Event Date (format like manage cohort: "Feb 4, 2025") ===
     const $dateBtn = $("#session-event-date-btn");
     if (eventData.date) {
       // Parse date string (YYYY-MM-DD) and format as "MMM D, YYYY"
@@ -721,7 +829,7 @@ $(function () {
       $dateBtn.data("raw-date", "");
     }
 
-    // === 5. Populate Start Time Dropdown ===
+    // === 7. Populate Start Time Dropdown ===
     const $startList = $("#session-start-list");
     const $startBtn = $("#session-start-btn");
     $startList.empty();
@@ -748,7 +856,7 @@ $(function () {
       $startBtn.text("Select Start Time");
     }
 
-    // === 6. Populate End Time Dropdown ===
+    // === 8. Populate End Time Dropdown ===
     const $endList = $("#session-end-list");
     const $endBtn = $("#session-end-btn");
     $endList.empty();
@@ -775,6 +883,9 @@ $(function () {
       $endBtn.text("Select End Time");
     }
   }
+
+  // Make openManageSessionModal globally accessible
+  window.openManageSessionModal = openManageSessionModal;
 
   // === Custom Dropdown Event Handlers for Manage Session Modal ===
 
@@ -844,6 +955,38 @@ $(function () {
     const classLabel = $(this).text();
     $("#session-class-btn").text(classLabel);
     $("#session-class-list").hide();
+  });
+
+  // Student dropdown item click
+  $(document).on("click", "#session-student-list li", function (e) {
+    e.stopPropagation();
+
+    // Skip if this is a disabled "no students" message
+    if ($(this).css("pointer-events") === "none") return;
+
+    const studentId = $(this).data("student-id");
+    const studentName =
+      $(this).data("student-name") || $(this).find("span").text().trim();
+    const studentAvatar =
+      $(this).data("student-avatar") || "./img/default-avatar.svg";
+
+    // Update button with student image and name
+    $("#session-student-btn").html(`
+      <div class="teacher-info">
+        <img class="avatar" src="${studentAvatar}" alt="${studentName}" onerror="this.src='./img/default-avatar.svg'">
+        <span class="teacher-name">${studentName}</span>
+      </div>
+    `);
+    $("#session-student-list").hide();
+  });
+
+  // Lesson Type dropdown item click
+  $(document).on("click", "#session-lesson-type-list li", function (e) {
+    e.stopPropagation();
+    const lessonType = $(this).data("lesson-type");
+    const lessonLabel = $(this).text();
+    $("#session-lesson-type-btn").text(lessonLabel);
+    $("#session-lesson-type-list").hide();
   });
 
   // Start time dropdown item click
@@ -1224,9 +1367,28 @@ $(function () {
           isShortEvent ? " short-event" : ""
         }" style="${combinedStyle}" data-start="${ev.start}" data-end="${
           ev.end
-        }" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}${
+        }" data-date="${ev.date || ""}" data-title="${(ev.title || "").replace(
+          /"/g,
+          "&quot;"
+        )}" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}${
           ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""
-        }${ev.part ? ` data-part="${ev.part}"` : ""}>
+        }${ev.part ? ` data-part="${ev.part}"` : ""}${
+          ev.studentids && ev.studentids.length > 0
+            ? ` data-student-ids="${ev.studentids.join(",")}"`
+            : ""
+        }${
+          ev.studentnames && ev.studentnames.length > 0
+            ? ` data-student-names="${ev.studentnames.join(",")}"`
+            : ""
+        }${ev.avatar ? ` data-avatar="${ev.avatar}"` : ""}${
+          ev.cohortids && ev.cohortids.length > 0
+            ? ` data-cohort-ids="${ev.cohortids.join(",")}"`
+            : ""
+        }${ev.eventid ? ` data-event-id="${ev.eventid}"` : ""}${
+          ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
+        }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${
+          ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""
+        }>
             ${
               !isShortEvent
                 ? `<div class="ev-top">

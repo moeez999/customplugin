@@ -27,54 +27,48 @@
 <!-- ===== Backdrop (shared by center modal + right drawer + cancel + reschedule step2 + reschedule step3) ===== -->
 <div id="calendar_admin_details_lesson_information_backdrop" class="calendar_admin_details_lesson_information_scope">
     <!-- ===== CENTER MODAL: Lesson information ===== -->
-    <div class="calendar_admin_details_lesson_information_modal" role="dialog" aria-modal="true"
+    <section class="calendar_admin_details_lesson_information_modal" role="dialog" aria-modal="true"
         aria-labelledby="cali_title">
-        <div class="calendar_admin_details_lesson_information_header">
-            <h5 id="cali_title" class="calendar_admin_details_lesson_information_title">Lesson information</h5>
+        <header class="calendar_admin_details_lesson_information_header">
+            <h2 id="cali_title" class="calendar_admin_details_lesson_information_title">Lesson information</h2>
             <button type="button" class="calendar_admin_details_lesson_information_close" aria-label="Close">
-                <svg width="22" height="22" viewBox="0 0 24 24">
-                    <path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2" stroke-linecap="round" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                 </svg>
             </button>
-        </div>
+        </header>
 
         <div class="calendar_admin_details_lesson_information_body">
             <div class="calendar_admin_details_lesson_information_card">
                 <div class="calendar_admin_details_lesson_information_row">
                     <img class="calendar_admin_details_lesson_information_avatar"
-                        src="https://randomuser.me/api/portraits/men/32.jpg" alt="Student">
+                        src="https://randomuser.me/api/portraits/men/32.jpg" alt="User avatar">
 
                     <div class="calendar_admin_details_lesson_information_main">
-                        <div class="calendar_admin_details_lesson_information_day">Tuesday , Sep 03</div>
-                        <div class="calendar_admin_details_lesson_information_time">7:00 – 7:25 PM</div>
+                        <p class="calendar_admin_details_lesson_information_day">Friday , Sep 06</p>
+                        <p class="calendar_admin_details_lesson_information_time">09:00 - 10:00 AM</p>
                     </div>
-
-
                 </div>
                 <hr class="calendar_admin_details_lesson_information_divider">
                 <div class="calendar_admin_details_lesson_information_meta_row">
-                    <div class="calendar_admin_details_lesson_information_meta">Jonas | Subscription</div>
+                    <p class="calendar_admin_details_lesson_information_meta">Mary Janes | Subscription</p>
                     <div class="calendar_admin_details_lesson_information_wallet">
-                        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M21 7H5a2 2 0 0 1 0-4h12" fill="none" stroke="#444" stroke-width="1.6"
-                                stroke-linecap="round" />
-                            <rect x="3" y="5" width="18" height="14" rx="2" ry="2" fill="none" stroke="#444"
-                                stroke-width="1.6" />
-                            <circle cx="17" cy="12" r="1.2" fill="#444" />
-                        </svg>
-                        <span class="calendar_admin_details_lesson_information_lessons">2 Lessons</span>
+                        <img src="./img/lesson_icon.svg" alt="Lessons icon">
+                        <span class="calendar_admin_details_lesson_information_lessons">3 lessons</span>
                     </div>
                 </div>
             </div>
 
-            <button type="button" class="calendar_admin_details_lesson_information_action"
-                id="calendar_admin_details_lesson_information_open_chat">Message</button>
-            <button type="button" class="calendar_admin_details_lesson_information_action"
-                id="calendar_admin_details_1_1_class">View Or Reschedule Lesson</button>
-            <button type="button" class="calendar_admin_details_lesson_information_danger"
-                id="calendar_admin_details_lesson_information_cancel_trigger">Cancel Lesson</button>
+            <div class="calendar_admin_details_lesson_information_action_buttons">
+                <button type="button" class="calendar_admin_details_lesson_information_action"
+                    id="calendar_admin_details_lesson_information_open_chat">Message</button>
+                <button type="button" class="calendar_admin_details_lesson_information_action"
+                    id="calendar_admin_details_1_1_class">View or Reschedule lesson</button>
+                <button type="button" class="calendar_admin_details_lesson_information_danger"
+                    id="calendar_admin_details_lesson_information_cancel_trigger">Cancel lesson</button>
+            </div>
         </div>
-    </div>
+    </section>
 
     <!-- ===== CENTER MODAL: Cancel Lesson ===== -->
     <div class="calendar_admin_cancel_modal" role="dialog" aria-modal="true" aria-labelledby="cancel_title">
@@ -526,122 +520,183 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     background: rgba(0, 0, 0, .45);
 }
 
+/* ===== CSS Variables ===== */
+:root {
+    --color-text-primary: #121117;
+    --color-text-secondary: #4d4c5c;
+    --color-text-white: #ffffff;
+    --color-background: #ffffff;
+    --color-danger-bg: #ff2500;
+    --color-danger-border: #63110d;
+    --color-border-light: #dcdce5;
+    --color-border-medium: rgba(18, 17, 23, 0.12);
+    --color-border-faint: #f4f4f8;
+}
+
 /* ===== Center Modal: Lesson Info ===== */
 .calendar_admin_details_lesson_information_modal {
-    width: 100%;
-    max-width: 520px;
-    background: #fff;
-    border: 1px solid #e9e9f0;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border-faint);
     border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, .12);
+    box-shadow: 0px 8px 32px 0px rgba(18, 17, 23, 0.15), 0px 16px 48px 0px rgba(18, 17, 23, 0.15);
+    max-width: 464px;
+    width: 100%;
+    padding: 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
 }
 
 .calendar_admin_details_lesson_information_header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding: 18px 20px 6px;
+    align-items: center;
 }
 
 .calendar_admin_details_lesson_information_title {
+    color: var(--color-text-primary);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 27.875px;
+    line-height: 41.81px;
     margin: 0;
-    font-weight: 800;
-    font-size: 1.65rem;
-    letter-spacing: .2px;
-    color: #111;
 }
 
 .calendar_admin_details_lesson_information_close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
     background: transparent;
-    border: 0;
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
+    border: none;
+    padding: 8px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.calendar_admin_details_lesson_information_close svg {
+    width: 24px;
+    height: 24px;
 }
 
 .calendar_admin_details_lesson_information_body {
-    padding: 12px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
 }
 
 .calendar_admin_details_lesson_information_card {
-    border: 1px solid #e9e9f0;
-    border-radius: 12px;
-    padding: 14px;
-    background: #fff;
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 19px 17px;
 }
 
 .calendar_admin_details_lesson_information_row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
 }
 
 .calendar_admin_details_lesson_information_avatar {
     width: 48px;
     height: 48px;
-    border-radius: 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(18, 17, 23, 0.06);
     object-fit: cover;
 }
 
+.calendar_admin_details_lesson_information_main {
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar_admin_details_lesson_information_main p {
+    margin: 0;
+}
+
 .calendar_admin_details_lesson_information_day {
-    font-weight: 800;
-    font-size: 1.22rem;
-    color: #111;
-    line-height: 1.1;
+    color: var(--color-text-primary);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 28px;
+    letter-spacing: -0.1px;
 }
 
 .calendar_admin_details_lesson_information_time {
-    color: #6b7280;
-    font-weight: 600;
-    margin-top: 2px;
-    line-height: 1.1;
+    color: var(--color-text-secondary);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
 }
 
 .calendar_admin_details_lesson_information_divider {
-    margin: 12px 0;
-    border: 0;
+    border: none;
     height: 1px;
-    background: #ececf3;
+    background-color: var(--color-border-light);
+    margin: 14px 0 12px;
 }
 
 .calendar_admin_details_lesson_information_meta_row {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
+    align-items: center;
 }
 
 .calendar_admin_details_lesson_information_meta {
-    color: #2f323a;
-    font-weight: 600;
+    color: var(--color-text-primary);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 24px;
+    margin: 0;
 }
 
 .calendar_admin_details_lesson_information_wallet {
     display: flex;
     align-items: center;
     gap: 8px;
+    opacity: 0.7;
+}
+
+.calendar_admin_details_lesson_information_wallet img {
+    width: 24px;
+    height: 23px;
 }
 
 .calendar_admin_details_lesson_information_lessons {
-    color: #4b4f5c;
-    font-weight: 700;
+    color: var(--color-text-primary);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 24px;
+}
+
+.calendar_admin_details_lesson_information_action_buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 21px;
 }
 
 .calendar_admin_details_lesson_information_action {
     width: 100%;
-    margin-top: 12px;
-    background: #fff;
-    color: #1e1f25;
-    font-weight: 700;
-    border: 1.25px solid #e7e7ef;
-    border-radius: 10px;
-    padding: 12px 16px;
-    transition: box-shadow .15s ease;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.6;
+    cursor: pointer;
+    text-align: center;
+    background-color: transparent;
+    border: 2px solid var(--color-border-medium);
+    color: var(--color-text-primary);
 }
 
 .calendar_admin_details_lesson_information_action:hover {
@@ -650,14 +705,17 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .calendar_admin_details_lesson_information_danger {
     width: 100%;
-    margin-top: 14px;
-    background: #ef2d17;
-    color: #fff;
-    font-weight: 800;
-    border: 0;
-    border-radius: 10px;
-    padding: 12px 16px;
-    box-shadow: 0 10px 26px rgba(239, 45, 23, .25);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.6;
+    cursor: pointer;
+    text-align: center;
+    background-color: var(--color-danger-bg);
+    border: 2px solid var(--color-danger-border);
+    color: var(--color-text-white);
 }
 
 /* ===== Right Drawer (Chat) ===== */
@@ -910,7 +968,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .calendar_admin_cancel_body .form-label {
     font-weight: 700;
-    color: #1e1f25;
+    color: #232323;
     margin-bottom: 8px;
 }
 
@@ -1317,7 +1375,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .ca_dd_value {
-    color: #1e1f25;
+    color: #232323;
     font-weight: 700;
 }
 
@@ -1350,7 +1408,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     padding: 16px 18px;
     font-size: 1.02rem;
     line-height: 1.5;
-    color: #1e1f25;
+    color: #232323;
     font-weight: 700;
     cursor: pointer;
 }
@@ -1493,14 +1551,146 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     }
     $('.calendar_admin_toast_close').on('click', hideToast);
 
+    // Store current event data
+    let currentEventData = null;
+
+    // Helper function to format date for display
+    function formatEventDate(dateStr) {
+        const date = new Date(dateStr);
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${days[date.getDay()]} , ${months[date.getMonth()]} ${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    // Helper function to format time from HH:MM to 12-hour format
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
+    }
+
+    // Function to populate modal with event data
+    function populateModalWithEventData(eventData) {
+        currentEventData = eventData;
+
+        // Update date
+        $('.calendar_admin_details_lesson_information_day').text(formatEventDate(eventData.date));
+
+        // Update time
+        const startTime = formatTime(eventData.start);
+        const endTime = formatTime(eventData.end);
+        $('.calendar_admin_details_lesson_information_time').text(`${startTime} - ${endTime}`);
+
+        // Update student name
+        if (eventData.studentnames && eventData.studentnames.length > 0) {
+            const studentName = eventData.studentnames[0];
+            $('.calendar_admin_details_lesson_information_meta').text(`${studentName} | Subscription`);
+        } else if (eventData.title) {
+            $('.calendar_admin_details_lesson_information_meta').text(eventData.title);
+        }
+
+        // Update avatar
+        if (eventData.avatar) {
+            $('.calendar_admin_details_lesson_information_avatar').attr('src', eventData.avatar);
+        }
+
+        // Fetch and update lesson count if student ID is available
+        if (eventData.studentids && eventData.studentids.length > 0) {
+            const studentId = eventData.studentids[0];
+            // Try to get lesson count from student data (if available in window)
+            if (typeof window.studentLessonCounts !== 'undefined' && window.studentLessonCounts[studentId]) {
+                $('.calendar_admin_details_lesson_information_lessons').text(window.studentLessonCounts[studentId] +
+                    ' lessons');
+            } else {
+                // Fetch lesson count via AJAX
+                fetchStudentLessonCount(studentId);
+            }
+        } else {
+            // Default fallback
+            $('.calendar_admin_details_lesson_information_lessons').text('3 lessons');
+        }
+    }
+
+    // Function to fetch student lesson count
+    function fetchStudentLessonCount(studentId) {
+        $.ajax({
+            url: 'ajax/calendar_admin_filters.php',
+            method: 'GET',
+            data: {
+                action: 'student_lesson_count',
+                studentid: studentId
+            },
+            success: function(response) {
+                if (response && response.count !== undefined) {
+                    $('.calendar_admin_details_lesson_information_lessons').text(response.count +
+                        ' lessons');
+                    // Store in cache
+                    if (typeof window.studentLessonCounts === 'undefined') {
+                        window.studentLessonCounts = {};
+                    }
+                    window.studentLessonCounts[studentId] = response.count;
+                } else {
+                    $('.calendar_admin_details_lesson_information_lessons').text('3 lessons');
+                }
+            },
+            error: function() {
+                // Default fallback
+                $('.calendar_admin_details_lesson_information_lessons').text('3 lessons');
+            }
+        });
+    }
+
     // Openers
     //$('.calendar_admin_details_lesson_information_btn').on('click', openLessonInfo);
 
     $(document).on('click', '.event.e-green', function() {
+        const $event = $(this);
+
+        // Extract event data from data attributes
+        const studentIds = $event.data('student-ids') ? String($event.data('student-ids')).split(',') : [];
+        const studentNames = $event.data('student-names') ? String($event.data('student-names')).split(
+            ',') : [];
+        const cohortIds = $event.data('cohort-ids') ? String($event.data('cohort-ids')).split(',').map(id =>
+            parseInt(id)) : [];
+        const avatar = $event.data('avatar') || 'https://randomuser.me/api/portraits/men/32.jpg';
+
+        const eventData = {
+            date: $event.data('date') || new Date().toISOString().split('T')[0],
+            start: String($event.data('start') || '540').padStart(4, '0'), // minutes from midnight
+            end: String($event.data('end') || '600').padStart(4, '0'),
+            title: $event.data('title') || '',
+            teacherId: $event.data('teacher-id') || '',
+            studentids: studentIds,
+            studentnames: studentNames,
+            cohortids: cohortIds,
+            avatar: avatar,
+            eventid: $event.data('event-id') || '',
+            cmid: $event.data('cm-id') || '',
+            classType: $event.data('class-type') || '',
+            repeat: $event.data('repeat') || false
+        };
+
+        // Convert minutes to HH:MM format
+        function minutesToTime(mins) {
+            const hours = Math.floor(mins / 60);
+            const minutes = mins % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+
+        eventData.start = minutesToTime(parseInt(eventData.start));
+        eventData.end = minutesToTime(parseInt(eventData.end));
+
+        // Extract student name from the event title element
+        const studentName = $event.find('.ev-title').text().trim() || eventData.title;
+        if (studentName) {
+            eventData.studentnames = [studentName];
+        }
+
+        populateModalWithEventData(eventData);
         openLessonInfo();
     });
-
-
     $('#calendar_admin_details_lesson_information_open_chat').on('click', openChatDrawer);
     $('#calendar_admin_details_lesson_information_cancel_trigger').on('click', openCancelModal);
 
@@ -1575,19 +1765,21 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
     // ===== 1_1_CLASS Tab (existing behavior for main "View Or Reschedule Lesson" button) =====
     $('#calendar_admin_details_1_1_class').on('click', function() {
-        const $mgmt = $('#calendar_admin_details_create_cohort_modal_backdrop');
-        const $lesson = $('#calendar_admin_details_lesson_information_backdrop');
+        // Close lesson info modal
+        closeAll();
 
-        $mgmt.find('.calendar_admin_details_create_cohort_tab').removeClass('active');
-        $mgmt.find('.calendar_admin_details_create_cohort_tab[data-tab="class"]').addClass('active');
+        // Check if we have current event data
+        if (!currentEventData) {
+            console.error('No event data available');
+            return;
+        }
 
-        $lesson.hide();
-        $mgmt.css('z-index', 1065).fadeIn(120);
-
-        $('#calendar_admin_details_create_cohort_content').html('');
-        $('#mergeTabContent, #conferenceTabContent, #peerTalkTabContent, #addTimeTabContent, #addExtraSlotsTabContent, #mainModalContent')
-            .hide();
-        $('#classTabContent').show();
+        // Call the openManageSessionModal function with actual event data
+        if (typeof openManageSessionModal === 'function') {
+            openManageSessionModal(currentEventData);
+        } else {
+            console.error('openManageSessionModal function not found');
+        }
     });
 
     // ===== Cancel modal action (demo) =====

@@ -218,13 +218,100 @@
 <script>
   // ===== Custom Recurrence Modal JS =====
 $(document).ready(function () {
+  // Track which button/tab triggered the modal
+  let currentTriggerButton = null;
+  
+  // Storage for each tab's state
+  const tabStates = new Map();
+  
+  // Function to get unique identifier for a button
+  function getButtonContext(btn) {
+    const $btn = $(btn);
+    // Check which parent tab the button belongs to
+    if ($btn.closest('#peerTalkTabContent').length) {
+      return 'peertalk';
+    } else if ($btn.closest('#conferenceTabContent').length) {
+      return 'conference';
+    } else {
+      // For cohort tab buttons, use data attribute or other identifier
+      const teacherBlock = $btn.closest('[data-teacher]');
+      if (teacherBlock.length) {
+        return 'cohort-teacher-' + teacherBlock.attr('data-teacher');
+      }
+      return 'default';
+    }
+  }
+  
+  // Function to save current modal state
+  function saveModalState(context) {
+    const selectedDays = [];
+    $('#customrec_days .customrec-repeat-day.selected').each(function() {
+      selectedDays.push($(this).attr('data-day'));
+    });
+    
+    tabStates.set(context, {
+      interval: parseInt($('#customrec_interval').val()) || 1,
+      period: $('#customrec_period').val(),
+      selectedDays: selectedDays,
+      endType: $('input[name="customrec_end"]:checked').attr('id'),
+      endDate: $('#customrec_end_on_date').val(),
+      occurrences: parseInt($('#customrec_occur_value').val()) || 13
+    });
+  }
+  
+  // Function to restore modal state
+  function restoreModalState(context) {
+    const state = tabStates.get(context);
+    
+    if (state) {
+      // Restore values
+      $('#customrec_interval').val(state.interval);
+      $('#customrec_period').val(state.period);
+      $('#customrec_occur_value').val(state.occurrences);
+      $('#customrec_end_on_date').val(state.endDate || '');
+      
+      // Restore selected days
+      $('#customrec_days .customrec-repeat-day').removeClass('selected');
+      state.selectedDays.forEach(function(day) {
+        $('#customrec_days .customrec-repeat-day[data-day="' + day + '"]').addClass('selected');
+      });
+      
+      // Restore end type
+      if (state.endType) {
+        $('#' + state.endType).prop('checked', true).trigger('change');
+      }
+    } else {
+      // Reset to defaults for new context
+      resetModalToDefaults();
+    }
+  }
+  
+  // Function to reset modal to default state
+  function resetModalToDefaults() {
+    $('#customrec_interval').val(1);
+    $('#customrec_period').val('week');
+    $('#customrec_days .customrec-repeat-day').removeClass('selected');
+    $('#customrec_end_never').prop('checked', true).trigger('change');
+    $('#customrec_end_on_date').val('');
+    $('#customrec_occur_value').val(13);
+  }
+  
   // Show/Hide modal
   $('.cohort_schedule_btn').on('click', function(){
+    currentTriggerButton = this;
+    const context = getButtonContext(this);
+    
+    // Restore state for this context
+    restoreModalState(context);
+    
     $('#customRecurrenceModalBackdrop').fadeIn();
   });
+  
   $('.customrec-close, #customrec_cancel, #customRecurrenceModalBackdrop').on('click', function(e){
     if(e.target === this || $(e.target).hasClass('customrec-close') || e.target.id === 'customrec_cancel') {
+      // Don't save state on cancel
       $('#customRecurrenceModalBackdrop').fadeOut();
+      currentTriggerButton = null;
     }
   });
 
@@ -267,9 +354,15 @@ $(document).ready(function () {
     }
   });
 
-  // Done/Cancel buttons: just closes modal for now
+  // Done/Cancel buttons: save state and close modal
   $('#customrec_done').on('click', function(){
+    if (currentTriggerButton) {
+      const context = getButtonContext(currentTriggerButton);
+      saveModalState(context);
+    }
+    
     $('#customRecurrenceModalBackdrop').fadeOut();
+    currentTriggerButton = null;
     // Here you can trigger your actual recurrence data logic!
   });
 
