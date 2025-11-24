@@ -479,6 +479,56 @@ $(document).ready(function() {
         };
 
         console.log('✅ Conference Payload:', payload);
+
+        // ================================
+        //  🔥 SHOW LOADER & MAKE API CALL
+        // ================================
+        const loader = document.getElementById('loader');
+        if (loader) loader.style.display = 'flex';
+
+        const apiUrl = M.cfg.wwwroot + '/local/customplugin/ajax/create_conference.php';
+        fetch(apiUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(async (response) => {
+            const res = await response.json();
+            console.log("📌 Conference API Response:", res);
+
+            if (!response.ok || !res.success) {
+                if (typeof showToast === 'function') {
+                    showToast("Failed to create conference: " + (res.message || "Unknown error"), 'error');
+                } else {
+                    alert("❌ Failed to create conference: " + (res.message || "Unknown error"));
+                }
+                return;
+            }
+
+            // Success: show toast and reset form
+            if (typeof showToast === 'function') {
+                showToast('Conference created successfully!', 'success');
+            } else {
+                alert("🎉 Conference created successfully!");
+            }
+            
+            // Reset conference form
+            resetConferenceForm();
+        })
+        .catch(err => {
+            console.error("❌ Conference API Error:", err);
+            if (typeof showToast === 'function') {
+                showToast('Server error while creating conference', 'error');
+            } else {
+                alert("Server error while creating conference.");
+            }
+        })
+        .finally(() => {
+            if (loader) loader.style.display = 'none';
+        });
     });
 
     // Auto clear errors - scoped to parent
@@ -487,6 +537,35 @@ $(document).ready(function() {
         function() {
             $(this).removeClass('field-error');
         });
+
+    // Reset Conference Form
+    function resetConferenceForm() {
+        // Reset title
+        $parent.find('.addtime-title-input').val('Conference Title');
+        
+        // Reset date button
+        $parent.find('.conference_modal_date_btn').text('Select Date');
+        
+        // Reset timezone to default
+        $('#eventTimezoneDropdown_conference_tab_selected').text('(GMT-05:00) Eastern Time (US & Canada)');
+        
+        // Reset color to default (blue)
+        $colorToggle.find('.color-circle').css('background', '#1649c7');
+        
+        // Clear cohorts list
+        $parent.find('.conference_modal_cohort_list').empty();
+        
+        // Clear teachers list
+        $parent.find('.conference_modal_attendees_list').empty();
+        
+        // Clear schedule rows
+        $parent.find('.conference_modal_time_row').remove();
+        
+        // Reset repeat button
+        $parent.find('.conference_modal_repeat_btn').html('Does not repeat <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg" alt=""></span>');
+        
+        console.log('✅ Conference form reset');
+    }
 });
 </script>
 

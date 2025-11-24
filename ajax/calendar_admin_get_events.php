@@ -160,8 +160,21 @@ $availability_collect_cohorts = function (?string $json) use ($json_to_array): a
 };
 
 $fmt_iso = static function(int $ts) {
-    // Produces "YYYY-MM-DDTHH:MM:SS+00:00"
-    return gmdate('c', $ts);
+    // 1. Detect server timezone
+    $serverTz = date_default_timezone_get();
+
+    // Fallback if not set
+    if (empty($serverTz)) {
+        $serverTz = 'UTC';
+    }
+
+    // 2. Convert timestamp to server timezone
+    $tz = new DateTimeZone($serverTz);
+    $dt = new DateTime('@' . $ts);   // timestamp in UTC
+    $dt->setTimezone($tz);           // convert to server timezone
+
+    // 3. Return ISO-8601 with proper timezone offset
+    return $dt->format('Y-m-d\TH:i:sP');
 };
 
 /**
@@ -1044,7 +1057,15 @@ try {
                             }
 
                             // Do not create sessions before original schedule start
-                            if ($dayTs < $record->startdate) {
+                            // if ($dayTs < $record->startdate) {
+                            //     continue;
+                            // }
+
+
+                            $originalDate = (int)strtotime(date('Y-m-d', $record->startdate));
+                            $currentDate  = (int)strtotime(date('Y-m-d', $dayTs));
+
+                            if ($currentDate < $originalDate) {
                                 continue;
                             }
 
