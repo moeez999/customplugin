@@ -80,9 +80,29 @@
             </div>
         </div>
 
-        <!-- Cohorts & Teachers -->
-        <div class="conference_modal_fieldrow">
-            <?php
+        <!-- Peer Talk Participants Navigation -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px 0;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Peer Talk Participants</h3>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="peertalk-nav-prev"
+                    style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <button type="button" class="peertalk-nav-next"
+                    style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- View 1: Teachers & Cohorts -->
+        <div class="peertalk-view-1" style="display: block;">
+            <div class="conference_modal_fieldrow">
+                <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
 
@@ -97,22 +117,22 @@ $sql = "SELECT id, name, idnumber
 $cohorts = $DB->get_records_sql($sql);
 ?>
 
-            <div>
-                <span class="conference_modal_label">Attending Cohorts</span>
+                <div>
+                    <span class="conference_modal_label">Attending Cohorts</span>
 
-                <div class="conference_modal_dropdown_btn" id="peertalkCohortsDropdown">
-                    Select Cohort
-                    <span style="float:right; font-size:1rem;">
-                        <img src="./img/dropdown-arrow-down.svg" alt="">
-                    </span>
-                </div>
+                    <div class="conference_modal_dropdown_btn" id="peertalkCohortsDropdown">
+                        Select Cohort
+                        <span style="float:right; font-size:1rem;">
+                            <img src="./img/dropdown-arrow-down.svg" alt="">
+                        </span>
+                    </div>
 
-                <div class="conference_modal_dropdown_list" id="peertalkCohortsDropdownList">
-                    <input type="text" id="searchCohorts_peertalk" class="dropdown-search"
-                        placeholder="Search cohorts...">
+                    <div class="conference_modal_dropdown_list" id="peertalkCohortsDropdownList">
+                        <input type="text" id="searchCohorts_peertalk" class="dropdown-search"
+                            placeholder="Search cohorts...">
 
-                    <ul id="peertalkCohortsList">
-                        <?php
+                        <ul id="peertalkCohortsList">
+                            <?php
             if ($cohorts) {
                 foreach ($cohorts as $c) {
                     $shortname = format_string($c->name);   // SHOW THIS
@@ -129,11 +149,11 @@ $cohorts = $DB->get_records_sql($sql);
                 echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';
             }
             ?>
-                    </ul>
+                        </ul>
+                    </div>
                 </div>
-            </div>
 
-            <?php
+                <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
 
@@ -168,22 +188,22 @@ if ($userIds) {
 
 ?>
 
-            <div>
-                <span class="conference_modal_label">Teachers</span>
+                <div>
+                    <span class="conference_modal_label">Teachers</span>
 
-                <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown">
-                    Select Teacher
-                    <span style="float:right; font-size:1rem;">
-                        <img src="./img/dropdown-arrow-down.svg" alt="">
-                    </span>
-                </div>
+                    <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown">
+                        Select Teacher
+                        <span style="float:right; font-size:1rem;">
+                            <img src="./img/dropdown-arrow-down.svg" alt="">
+                        </span>
+                    </div>
 
-                <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList">
-                    <input type="text" id="searchTeachers_peertalk" class="dropdown-search"
-                        placeholder="Search teachers...">
+                    <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList">
+                        <input type="text" id="searchTeachers_peertalk" class="dropdown-search"
+                            placeholder="Search teachers...">
 
-                    <ul id="peertalkTeachersList">
-                        <?php
+                        <ul id="peertalkTeachersList">
+                            <?php
             if (!empty($teachers)) {
                 foreach ($teachers as $teacher) {
                     $picture = new user_picture($teacher);
@@ -208,7 +228,144 @@ if ($userIds) {
                 echo '<li aria-disabled="true">No teachers found</li>';
             }
             ?>
-                    </ul>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View 2: Students & Teachers -->
+        <div class="peertalk-view-2" style="display: none;">
+            <div class="conference_modal_fieldrow">
+                <!-- Students Dropdown -->
+                <div>
+                    <span class="conference_modal_label">Select Students</span>
+                    <div class="conference_modal_dropdown_btn" id="peertalkStudentsDropdown">
+                        Select Students
+                        <span style="float:right; font-size:1rem;">
+                            <img src="./img/dropdown-arrow-down.svg" alt="">
+                        </span>
+                    </div>
+                    <div class="conference_modal_dropdown_list" id="peertalkStudentsDropdownList">
+                        <input type="text" id="searchStudents_peertalk" class="dropdown-search"
+                            placeholder="Search students...">
+                        <ul id="peertalkStudentsList">
+                            <?php
+                            // Get all students (users with student role)
+                            $studentRole = $DB->get_record('role', ['shortname' => 'student'], 'id');
+                            $students = [];
+                            
+                            if ($studentRole) {
+                                // Get users with student role assignments
+                                $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                               u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
+                                        FROM {user} u
+                                        JOIN {role_assignments} ra ON ra.userid = u.id
+                                        WHERE ra.roleid = :roleid
+                                          AND u.deleted = 0
+                                          AND u.suspended = 0
+                                        ORDER BY u.firstname ASC, u.lastname ASC
+                                        LIMIT 500";
+                                
+                                $students = $DB->get_records_sql($sql, ['roleid' => $studentRole->id]);
+                            }
+                            
+                            if (!empty($students)) {
+                                foreach ($students as $student) {
+                                    $picture = new user_picture($student);
+                                    $picture->size = 40;
+                                    $imageurl = $picture->get_url($PAGE)->out(false);
+                                    $fullname = fullname($student, true);
+
+                                    echo '<li class="peertalk_student_item" 
+                                            data-userid="'.(int)$student->id.'" 
+                                            data-name="'.s($fullname).'" 
+                                            data-img="'.s($imageurl).'">';
+
+                                    echo '<img src="'.s($imageurl).'" 
+                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
+                                            alt="'.s($fullname).'" /> ';
+
+                                    echo format_string($fullname);
+
+                                    echo '</li>';
+                                }
+                            } else {
+                                echo '<li style="pointer-events:none;opacity:.6;">No students found</li>';
+                            }
+                            ?>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Teachers Dropdown (duplicate from view 1) -->
+                <?php
+                // Get teachers again for view 2
+                $userIds2 = $DB->get_fieldset_sql("
+                    SELECT DISTINCT uid
+                    FROM (
+                            SELECT cohortmainteacher AS uid FROM {cohort}
+                            WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
+                            UNION
+                            SELECT cohortguideteacher AS uid FROM {cohort}
+                            WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
+                    ) t
+                ");
+
+                $teachers2 = [];
+                if ($userIds2) {
+                    list($inSql2, $params2) = $DB->get_in_or_equal($userIds2, SQL_PARAMS_NAMED);
+                    $fields2 = "id, firstname, lastname, picture, imagealt,
+                            firstnamephonetic, lastnamephonetic, middlename, alternatename";
+                    $teachers2 = $DB->get_records_select(
+                        'user',
+                        "id $inSql2 AND deleted = 0 AND suspended = 0",
+                        $params2,
+                        'firstname ASC, lastname ASC',
+                        $fields2
+                    );
+                }
+                ?>
+
+                <div>
+                    <span class="conference_modal_label">Teachers</span>
+                    <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown2">
+                        Select Teacher
+                        <span style="float:right; font-size:1rem;">
+                            <img src="./img/dropdown-arrow-down.svg" alt="">
+                        </span>
+                    </div>
+                    <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList2">
+                        <input type="text" id="searchTeachers_peertalk2" class="dropdown-search"
+                            placeholder="Search teachers...">
+                        <ul id="peertalkTeachersList2">
+                            <?php
+                            if (!empty($teachers2)) {
+                                foreach ($teachers2 as $teacher) {
+                                    $picture = new user_picture($teacher);
+                                    $picture->size = 40;
+                                    $imageurl = $picture->get_url($PAGE)->out(false);
+                                    $fullname = fullname($teacher, true);
+
+                                    echo '<li class="peertalk_teacher_item" 
+                                            data-userid="'.(int)$teacher->id.'" 
+                                            data-name="'.s($fullname).'" 
+                                            data-img="'.s($imageurl).'">';
+
+                                    echo '<img src="'.s($imageurl).'" 
+                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
+                                            alt="'.s($fullname).'" /> ';
+
+                                    echo format_string($fullname);
+
+                                    echo '</li>';
+                                }
+                            } else {
+                                echo '<li aria-disabled="true">No teachers found</li>';
+                            }
+                            ?>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -217,9 +374,15 @@ if ($userIds) {
             <div class="conference_modal_attendees_section">
                 <ul class="conference_modal_cohort_list"></ul>
             </div>
+            <div class="conference_modal_attendees_section" style="display: none;">
+                <ul class="conference_modal_students_list"></ul>
+            </div>
             <div class="conference_modal_attendees_section">
                 <ul class="conference_modal_attendees_list"></ul>
             </div>
+
+
+
         </div>
 
         <button type="submit" class="peertalk_modal_btn">Schedule Peer Talk</button>
@@ -236,6 +399,30 @@ if ($userIds) {
     const $tzSelected = $parent.find('#eventTimezoneDropdown_peertalk_selected');
     const $colorToggle = $parent.find('#colorDropdownToggle_peertalk');
     const $colorList = $parent.find('#colorDropdownList_peertalk');
+
+    // View navigation
+    const $view1 = $parent.find('.peertalk-view-1');
+    const $view2 = $parent.find('.peertalk-view-2');
+    const $navNext = $parent.find('.peertalk-nav-next');
+    const $navPrev = $parent.find('.peertalk-nav-prev');
+    const $studentlist = $parent.find('.conference_modal_attendees_section').eq(1);
+    const $cohortlist = $parent.find('.conference_modal_attendees_section').first();
+
+    // Navigation click handlers
+    $navNext.on('click', function() {
+
+        $view1.hide();
+        $view2.show();
+        $cohortlist.hide();
+        $studentlist.show();
+    });
+
+    $navPrev.on('click', function() {
+        $view2.hide();
+        $view1.show();
+        $cohortlist.show();
+        $studentlist.hide();
+    });
 
     // These two are for the "End" options in the repeat UI.
     // Add data attributes in your HTML:
@@ -270,9 +457,9 @@ if ($userIds) {
     function parseOffsetMinutes(tzLabel) {
         const m = tzLabel.match(/\(GMT([+-]\d{2}):(\d{2})\)/);
         if (!m) return 0;
-        const sign = m[1][0];             // + or -
+        const sign = m[1][0]; // + or -
         const hours = parseInt(m[1].slice(1), 10);
-        const mins  = parseInt(m[2], 10);
+        const mins = parseInt(m[2], 10);
         let total = hours * 60 + mins;
         if (sign === '-') total = -total;
         return total;
@@ -347,16 +534,38 @@ if ($userIds) {
 
     // Build weekDays map from schedule
     function buildWeekDaysMap(scheduleArray) {
-        const map = { mon:false, tue:false, wed:false, thu:false, fri:false, sat:false, sun:false };
+        const map = {
+            mon: false,
+            tue: false,
+            wed: false,
+            thu: false,
+            fri: false,
+            sat: false,
+            sun: false
+        };
         scheduleArray.forEach(s => {
             switch (s.day) {
-                case 'Mon': map.mon = true; break;
-                case 'Tue': map.tue = true; break;
-                case 'Wed': map.wed = true; break;
-                case 'Thu': map.thu = true; break;
-                case 'Fri': map.fri = true; break;
-                case 'Sat': map.sat = true; break;
-                case 'Sun': map.sun = true; break;
+                case 'Mon':
+                    map.mon = true;
+                    break;
+                case 'Tue':
+                    map.tue = true;
+                    break;
+                case 'Wed':
+                    map.wed = true;
+                    break;
+                case 'Thu':
+                    map.thu = true;
+                    break;
+                case 'Fri':
+                    map.fri = true;
+                    break;
+                case 'Sat':
+                    map.sat = true;
+                    break;
+                case 'Sun':
+                    map.sun = true;
+                    break;
             }
         });
         return map;
@@ -460,7 +669,8 @@ if ($userIds) {
         }
         $parent.find('#peertalkCohortsDropdownList').hide();
 
-        if ($parent.find('.conference_modal_cohort_list li[data-cohort-id="' + cohortId + '"]').length === 0) {
+        if ($parent.find('.conference_modal_cohort_list li[data-cohort-id="' + cohortId + '"]').length ===
+            0) {
             $parent.find('.conference_modal_cohort_list').append(`
                 <li data-cohort-id="${cohortId}" data-cohort-name="${cohortName}" data-cohort-idnumber="${cohortIdnumber}">
                     <span class="conference_modal_attendee_name">
@@ -502,7 +712,8 @@ if ($userIds) {
         }
         $parent.find('#peertalkTeachersDropdownList').hide();
 
-        if ($parent.find('.conference_modal_attendees_list li[data-teacher-id="' + teacherId + '"]').length === 0) {
+        if ($parent.find('.conference_modal_attendees_list li[data-teacher-id="' + teacherId + '"]')
+            .length === 0) {
             $parent.find('.conference_modal_attendees_list').append(`
                 <li data-teacher-id="${teacherId}" data-teacher-name="${teacherName}">
                     <span class="conference_modal_attendee_name">
@@ -533,6 +744,95 @@ if ($userIds) {
     $parent.find('#searchTeachers_peertalk').on('keyup', function() {
         const filter = $(this).val().toLowerCase();
         $parent.find('.peertalk_teacher_item').each(function() {
+            $(this).toggle($(this).text().toLowerCase().includes(filter));
+        });
+    });
+
+    // View 2 dropdowns: Students
+    $parent.find('#peertalkStudentsDropdown').click(function(e) {
+        e.stopPropagation();
+        $parent.find('#peertalkStudentsDropdownList').toggle();
+        $parent.find(
+            '#peertalkTeachersDropdownList2, #colorDropdownList_peertalk, #eventTimezoneDropdown_peertalk_list'
+        ).hide();
+    });
+
+    $parent.find('#peertalkStudentsDropdownList').on('click', 'li.peertalk_student_item', function(e) {
+        e.stopPropagation();
+        const $item = $(this);
+        const studentName = $item.data('name') || $item.text().trim();
+        const studentId = $item.data('userid');
+        const studentImg = $item.data('img') || $item.find('img').attr('src');
+
+        const $dropdown = $parent.find('#peertalkStudentsDropdown');
+        const firstNode = $dropdown.contents().first()[0];
+        if (firstNode) {
+            firstNode.textContent = studentName + " ";
+        }
+        $parent.find('#peertalkStudentsDropdownList').hide();
+
+        if ($parent.find('.conference_modal_attendees_list li[data-student-id="' + studentId + '"]')
+            .length === 0) {
+            $parent.find('.conference_modal_students_list').append(`
+                <li data-student-id="${studentId}" data-student-name="${studentName}">
+                    <span class="conference_modal_attendee_name">
+                        <img src="${studentImg}" class="calendar_admin_details_create_cohort_teacher_avatar" alt="${studentName}"> ${studentName}
+                    </span>
+                    <span class="conference_modal_remove"><img src="./img/delete.svg" alt=""></span>
+                </li>
+            `);
+        }
+        $parent.find('#peertalkStudentsDropdown').removeClass('field-error');
+    });
+
+    // View 2 dropdowns: Teachers2
+    $parent.find('#peertalkTeachersDropdown2').click(function(e) {
+        e.stopPropagation();
+        $parent.find('#peertalkTeachersDropdownList2').toggle();
+        $parent.find(
+            '#peertalkStudentsDropdownList, #colorDropdownList_peertalk, #eventTimezoneDropdown_peertalk_list'
+        ).hide();
+    });
+
+    $parent.find('#peertalkTeachersDropdownList2').on('click', 'li.peertalk_teacher_item', function(e) {
+        e.stopPropagation();
+        const $item = $(this);
+        const teacherName = $item.data('name') || $item.text().trim();
+        const teacherId = $item.data('userid');
+        const teacherImg = $item.data('img') || $item.find('img').attr('src');
+
+        const $dropdown = $parent.find('#peertalkTeachersDropdown2');
+        const firstNode = $dropdown.contents().first()[0];
+        if (firstNode) {
+            firstNode.textContent = teacherName + " ";
+        }
+        $parent.find('#peertalkTeachersDropdownList2').hide();
+
+        if ($parent.find('.conference_modal_attendees_list li[data-teacher-id="' + teacherId + '"]')
+            .length === 0) {
+            $parent.find('.conference_modal_attendees_list').append(`
+                <li data-teacher-id="${teacherId}" data-teacher-name="${teacherName}">
+                    <span class="conference_modal_attendee_name">
+                        <img src="${teacherImg}" class="calendar_admin_details_create_cohort_teacher_avatar" alt="${teacherName}"> ${teacherName}
+                    </span>
+                    <span class="conference_modal_remove"><img src="./img/delete.svg" alt=""></span>
+                </li>
+            `);
+        }
+        $parent.find('#peertalkTeachersDropdown2').removeClass('field-error');
+    });
+
+    // View 2 search filters
+    $parent.find('#searchStudents_peertalk').on('keyup', function() {
+        const filter = $(this).val().toLowerCase();
+        $parent.find('#peertalkStudentsList li').each(function() {
+            $(this).toggle($(this).text().toLowerCase().includes(filter));
+        });
+    });
+
+    $parent.find('#searchTeachers_peertalk2').on('keyup', function() {
+        const filter = $(this).val().toLowerCase();
+        $parent.find('#peertalkTeachersList2 .peertalk_teacher_item').each(function() {
             $(this).toggle($(this).text().toLowerCase().includes(filter));
         });
     });
@@ -622,10 +922,18 @@ if ($userIds) {
         const offsetMinutes = parseOffsetMinutes(timezoneLabel);
         const timezoneId = TIMEZONE_MAP[timezoneLabel] || null;
 
-        // Cohort/teacher IDs as STRINGS
-        const cohortIds = cohorts.map(function() {
-            return String($(this).data('cohort-id'));
-        }).get();
+        // Cohort/teacher/student IDs as STRINGS
+        const cohortIds = [];
+        const studentIds = [];
+
+        cohorts.each(function() {
+            const $this = $(this);
+            if ($this.data('cohort-id')) {
+                cohortIds.push(String($this.data('cohort-id')));
+            } else if ($this.data('student-id')) {
+                studentIds.push(String($this.data('student-id')));
+            }
+        });
 
         const teacherIds = teachers.map(function() {
             return String($(this).data('teacher-id'));
@@ -648,8 +956,8 @@ if ($userIds) {
         }
 
         // 🔹 Compute "end" and "repeatOn" from your repeat UI
-        let endValue = 'Never';      // default
-        let repeatOnISO = null;      // null unless 'date'
+        let endValue = 'Never'; // default
+        let repeatOnISO = null; // null unless 'date'
 
         if ($repeatEndType.length) {
             let rawEndType = ($repeatEndType.val() || $repeatEndType.text() || '').trim().toLowerCase();
@@ -687,6 +995,7 @@ if ($userIds) {
                 color: color,
                 cohorts: cohortIds,
                 teachers: teacherIds,
+                students: studentIds,
                 timezone: timezoneId,
                 repeat: {
                     active: false
@@ -720,6 +1029,7 @@ if ($userIds) {
                 color: color,
                 cohorts: cohortIds,
                 teachers: teacherIds,
+                students: studentIds,
                 timezone: timezoneId,
                 repeat: repeatData
             };
@@ -739,6 +1049,7 @@ if ($userIds) {
                     color: color,
                     cohorts: cohortIds,
                     teachers: teacherIds,
+                    students: studentIds,
                     timezone: timezoneId,
                     repeat: {
                         active: false
@@ -769,25 +1080,26 @@ if ($userIds) {
         Promise.all(requests)
             .then(results => {
                 console.log('📦 Responses from saveclass.php:', results);
-                
+
                 // Check if all requests were successful
                 // API returns objects with various success indicators
                 const allSuccess = results.every(r => {
                     if (!r) return false;
                     // Check for common success indicators in the API response
-                    return r.success === true || r.ok === true || r.status === 'success' || 
-                           (r.error === false || r.error === undefined || r.error === null);
+                    return r.success === true || r.ok === true || r.status === 'success' ||
+                        (r.error === false || r.error === undefined || r.error === null);
                 });
-                
+
                 // Count successful requests for better feedback
                 const successCount = results.filter(r => {
                     if (!r) return false;
-                    return r.success === true || r.ok === true || r.status === 'success' || 
-                           (r.error === false || r.error === undefined || r.error === null);
+                    return r.success === true || r.ok === true || r.status === 'success' ||
+                        (r.error === false || r.error === undefined || r.error === null);
                 }).length;
-                
-                console.log(`✅ Successfully created ${successCount}/${results.length} Peer Talk events`);
-                
+
+                console.log(
+                    `✅ Successfully created ${successCount}/${results.length} Peer Talk events`);
+
                 if (allSuccess) {
                     // Success: show toast and reset form
                     if (typeof showToast === 'function') {
@@ -795,13 +1107,14 @@ if ($userIds) {
                     } else {
                         alert('🎉 Peer Talk created successfully!');
                     }
-                    
+
                     // Reset peer talk form
                     resetPeerTalkForm();
                 } else if (successCount > 0) {
                     // Partial success
                     if (typeof showToast === 'function') {
-                        showToast(`${successCount} of ${results.length} Peer Talk events created`, 'warning');
+                        showToast(`${successCount} of ${results.length} Peer Talk events created`,
+                            'warning');
                     } else {
                         alert(`⚠️ ${successCount} of ${results.length} Peer Talk events created`);
                     }
@@ -836,25 +1149,27 @@ if ($userIds) {
     function resetPeerTalkForm() {
         // Reset date button
         $parent.find('.peertalk_modal_date_btn').text('Select Date');
-        
+
         // Reset timezone to default
         $('#eventTimezoneDropdown_peertalk_selected').text('(GMT-05:00) Eastern Time (US & Canada)');
-        
+
         // Reset color to default (blue)
         $('#colorDropdownToggle_peertalk').find('.color-circle').css('background', '#1649c7');
-        
+
         // Clear cohorts list
         $parent.find('.conference_modal_cohort_list').empty();
-        
+
         // Clear teachers list
         $parent.find('.conference_modal_attendees_list').empty();
-        
+
         // Clear schedule rows
         $parent.find('.conference_modal_time_row').remove();
-        
+
         // Reset repeat button
-        $parent.find('.peertalk_repeat_btn').html('Does not repeat <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg" alt=""></span>');
-        
+        $parent.find('.peertalk_repeat_btn').html(
+            'Does not repeat <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg" alt=""></span>'
+        );
+
         console.log('✅ PeerTalk form reset');
     }
 })();

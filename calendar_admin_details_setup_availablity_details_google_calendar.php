@@ -328,13 +328,16 @@ $('.calendar_admin_details_setup_availability_google_calendar_disconnect').on('c
 
 // Save button (demo)
 $('#calendar_admin_details_setup_availability_google_calendar_savebtn').on('click', function() {
-    const state = calendar_admin_details_setup_availability_google_calendar_state;
-    alert(
-        'Saved:\n' +
-        `Connected: ${state.connectedEmail}\n` +
-        `Primary: ${state.calendars.primary}\n` +
-        `On Latingles: ${state.calendars.on_latingles} (disabled)\n` +
-        `Block availability: ${state.blockAvailability}`
-    );
+    // Get teacher info from main page
+    const $userBtn = window.parent ? $(window.parent.document).find('#calendar_admin_details_setup_availablity_userbtn') : $('#calendar_admin_details_setup_availablity_userbtn');
+    const teacherPayload = {
+        name: $userBtn.data('teacher-name') || $userBtn.find('#calendar_admin_details_setup_availablity_username').text(),
+        img: $userBtn.data('teacher-img') || $userBtn.find('#calendar_admin_details_setup_availablity_avatar').attr('src'),
+        id: $userBtn.data('teacher-id') || null
+    };
+    console.log('Google calendar save payload:', {
+        teacher: teacherPayload,
+        settings: calendar_admin_details_setup_availability_google_calendar_state
+    });
 });
 </script>

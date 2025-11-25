@@ -361,7 +361,7 @@
         opacity: .70;
     }
 
-    /* “Night time” divider + chip at END (05:00) */
+    /* "Night time" divider + chip at END (05:00) */
     .calendar_admin_details_setup_availablity_nightline {
         position: absolute;
         left: var(--cal-setup-timecol);
@@ -617,10 +617,8 @@
 
                 <!-- AVAILABILITY TAB -->
                 <div id="contentAvailability" class="calendar-content" style="display:block;">
-                    <h1 class="calendar_admin_details_setup_availablity_title">Select time slots when you’re available
-                        for
-                        booking
-                    </h1>
+                    <h1 class="calendar_admin_details_setup_availablity_title">Select time slots when you're available
+                        for booking</h1>
                     <section class="calendar_admin_details_setup_availablity_calendar">
                         <div class="calendar_admin_details_setup_availablity_head">
                             <div class="calendar_admin_details_setup_availablity_timehead">&nbsp;</div>
@@ -693,14 +691,16 @@
 
                                 <div class="calendar_admin_details_setup_availablity_blocklayer"
                                     id="calendar_admin_details_setup_availablity_blocks">
-                                    <div class="calendar_admin_details_setup_availablity_block"
+                                    <div class="calendar_admin_details_setup_availablity_block" data-day="3"
+                                        data-slot="16"
                                         style="top:calc(var(--cal-setup-hour)*8); height:calc(var(--cal-setup-hour)*3);
                           left:calc((100% - var(--cal-setup-timecol))/7*3 + var(--cal-setup-timecol));
                           right:calc((100% - var(--cal-setup-timecol)) - ((100% - var(--cal-setup-timecol))/7*4 + var(--cal-setup-timecol)));">
                                         <div class="calendar_admin_details_setup_availablity_timelabel"></div>
                                         <div class="calendar_admin_details_setup_availablity_resize">v</div>
                                     </div>
-                                    <div class="calendar_admin_details_setup_availablity_block"
+                                    <div class="calendar_admin_details_setup_availablity_block" data-day="4"
+                                        data-slot="22"
                                         style="top:calc(var(--cal-setup-hour)*11); height:calc(var(--cal-setup-hour)*3);
                           left:calc((100% - var(--cal-setup-timecol))/7*4 + var(--cal-setup-timecol));
                           right:calc((100% - var(--cal-setup-timecol)) - ((100% - var(--cal-setup-timecol))/7*5 + var(--cal-setup-timecol)));">
@@ -710,6 +710,8 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Save Button -->
+                        <!-- Save button removed as per request -->
                     </section>
                 </div>
 
@@ -729,6 +731,62 @@
     </div>
 
     <script>
+    // Function to convert day index to day name
+    function getDayName(dayIndex) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        return days[parseInt(dayIndex)] || 'Unknown';
+    }
+
+    // When a slot is created by clicking the table, console its payload immediately
+    $(document).on('click', '.calendar_admin_details_setup_availablity_halfbox', function(e) {
+        const $day = $(this).closest('.calendar_admin_details_setup_availablity_day');
+        const dayIndex = $day.data('day');
+        const slotIndex = $(this).index();
+
+        // Don't create if slot already exists
+        if ($day.find(`.calendar_admin_details_setup_availablity_block[data-slot='${slotIndex}']`).length)
+            return;
+
+        // Wait a moment for the block to be created, then log the payload
+        setTimeout(() => {
+            // Get teacher info from data attributes
+            const $userBtn = $('#calendar_admin_details_setup_availablity_userbtn');
+            const teacherPayload = {
+                name: $userBtn.data('teacher-name') || $(
+                    '#calendar_admin_details_setup_availablity_username').text(),
+                img: $userBtn.data('teacher-img') || $(
+                    '#calendar_admin_details_setup_availablity_avatar').attr('src'),
+                id: $userBtn.data('teacher-id') || null
+            };
+
+            // Find all blocks in all days
+            const slots = [];
+            $('.calendar_admin_details_setup_availablity_day .calendar_admin_details_setup_availablity_block')
+                .each(function() {
+                    const $block = $(this);
+                    const dayIndex = $block.attr('data-day');
+                    const label = $block.find('.calendar_admin_details_setup_availablity_timelabel')
+                        .text();
+
+                    const timeParts = label.split('–').map(t => t.trim());
+                    const startTime = timeParts[0] || '';
+                    const endTime = timeParts[1] || '';
+
+                    slots.push({
+                        day: getDayName(dayIndex), // Use day name instead of number
+                        startTime: startTime,
+                        endTime: endTime
+                    });
+                });
+
+            console.log('Created slot payload:', {
+                teacher: teacherPayload,
+                slots: slots,
+                action: 'create'
+            });
+        }, 10);
+    });
+
     /* Build hour labels + 30-min boxes; color the middle gray band between START and END hours */
     (function() {
         const $timeCol = $('#calendar_admin_details_setup_availablity_timecol');
@@ -854,35 +912,60 @@
                 dragging.y0 = pageY;
             }
             updateLabel($el);
+
+            // Log when dragging to new day
+            const teacher = (typeof teachers !== 'undefined') ? teachers.find(t =>
+                t.name === $('#calendar_admin_details_setup_availablity_username').text() &&
+                t.img === $('#calendar_admin_details_setup_availablity_avatar').attr('src')
+            ) : null;
+            const teacherPayload = teacher || {
+                name: $('#calendar_admin_details_setup_availablity_username').text(),
+                img: $('#calendar_admin_details_setup_availablity_avatar').attr('src'),
+                id: null
+            };
+            const slots = [];
+            $('#calendar_admin_details_setup_availablity_blocks .calendar_admin_details_setup_availablity_block')
+                .each(function() {
+                    const $block = $(this);
+                    const dayIndex = $block.attr('data-day');
+                    const label = $block.find('.calendar_admin_details_setup_availablity_timelabel').text();
+
+                    const timeParts = label.split('–').map(t => t.trim());
+                    const startTime = timeParts[0] || '';
+                    const endTime = timeParts[1] || '';
+
+                    slots.push({
+                        day: getDayName(dayIndex),
+                        startTime: startTime,
+                        endTime: endTime
+                    });
+                });
+            console.log('Dragged slot payload:', {
+                teacher: teacherPayload,
+                slots: slots,
+                action: 'drag'
+            });
         }
 
         // Start DRAG
         $(document).on('mousedown touchstart', '.calendar_admin_details_setup_availablity_block', function(e) {
             if ($(e.target).closest('.calendar_admin_details_setup_availablity_resize').length) return;
             const $el = $(this);
-
-            // Promote compact pill to resizable block on first drag
             if ($el.hasClass('is-compact')) {
                 $el.removeClass('is-compact');
                 if ($el.outerHeight() < MIN_H) $el.css('height', MIN_H + 'px');
             }
-
-            const pageY = e.pageY || e.originalEvent.touches?. [0]?.pageY;
-            const pageX = e.pageX || e.originalEvent.touches?. [0]?.pageX;
-
-            // If it lives on week layer, reparent immediately to the day under pointer
-            const $parent = $container($el);
-            if ($parent.is('#calendar_admin_details_setup_availablity_blocks')) {
-                const col = columnAt(pageX);
-                if (col) moveBlockToDay($el, col, pageY);
-            }
-
+            const y = e.pageY || e.originalEvent.touches?. [0]?.pageY;
+            const x = e.pageX || e.originalEvent.touches?. [0]?.pageX;
             dragging = {
                 $el,
-                y0: pageY,
+                y0: y,
+                x0: x,
                 top0: parseFloat($el.css('top')) || 0,
-                $host: $container($el)
+                $host: $container($el),
+                moved: 0
             };
+            e.stopPropagation();
             $('body').addClass('user-select-none');
         });
 
@@ -898,7 +981,8 @@
                 $el,
                 y0: y,
                 h0: $el.outerHeight(),
-                $host: $container($el)
+                $host: $container($el),
+                moved: 0
             };
             e.stopPropagation();
             $('body').addClass('user-select-none');
@@ -910,11 +994,13 @@
             const pageX = e.pageX || e.originalEvent.touches?. [0]?.pageX;
 
             if (dragging) {
-                // Horizontal → if pointer enters another column, reparent
+                const deltaY = Math.abs(pageY - dragging.y0);
+                const deltaX = Math.abs(pageX - (dragging.x0 || pageX));
+                dragging.moved = Math.max(deltaY, deltaX);
+
                 const col = columnAt(pageX);
                 if (col && !dragging.$host.is(col.$el)) moveBlockToDay(dragging.$el, col, pageY);
 
-                // Vertical inside host
                 const hostH = dragging.$host.height();
                 let top = dragging.top0 + (pageY - dragging.y0);
                 const maxTop = hostH - dragging.$el.outerHeight();
@@ -922,6 +1008,8 @@
                 dragging.$el.css('top', top + 'px');
                 updateLabel(dragging.$el);
             } else if (resizing) {
+                resizing.moved = Math.abs(pageY - resizing.y0);
+
                 const hostH = resizing.$host.height();
                 const curTop = parseFloat(resizing.$el.css('top')) || 0;
                 let h = resizing.h0 + (pageY - resizing.y0);
@@ -934,6 +1022,43 @@
 
         // End
         $(document).on('mouseup touchend', function() {
+            // Only log if actually dragged or resized (not just clicked)
+            if ((dragging && Math.abs(dragging.moved || 0) > 5) || (resizing && Math.abs(resizing.moved ||
+                    0) > 5)) {
+                // Use teacher info from data attributes for reliability
+                const $userBtn = $('#calendar_admin_details_setup_availablity_userbtn');
+                const teacherPayload = {
+                    name: $userBtn.data('teacher-name') || $(
+                        '#calendar_admin_details_setup_availablity_username').text(),
+                    img: $userBtn.data('teacher-img') || $(
+                        '#calendar_admin_details_setup_availablity_avatar').attr('src'),
+                    id: $userBtn.data('teacher-id') || null
+                };
+                const slots = [];
+                $('.calendar_admin_details_setup_availablity_day .calendar_admin_details_setup_availablity_block')
+                    .each(function() {
+                        const $block = $(this);
+                        const dayIndex = $block.attr('data-day');
+                        const label = $block.find('.calendar_admin_details_setup_availablity_timelabel')
+                            .text();
+
+                        const timeParts = label.split('–').map(t => t.trim());
+                        const startTime = timeParts[0] || '';
+                        const endTime = timeParts[1] || '';
+
+                        slots.push({
+                            day: getDayName(dayIndex),
+                            startTime: startTime,
+                            endTime: endTime
+                        });
+                    });
+                console.log('Modified slots payload:', {
+                    teacher: teacherPayload,
+                    slots: slots,
+                    action: dragging ? 'drag' : 'resize'
+                });
+            }
+
             dragging = null;
             resizing = null;
             $('body').removeClass('user-select-none');
@@ -944,36 +1069,48 @@
     </script>
 
     <script>
-    /* Tutor dropdown */
-    (function() {
-        const people = [{
-                name: 'Edwards',
-                img: 'https://randomuser.me/api/portraits/men/32.jpg'
-            },
-            {
-                name: 'Daniela',
-                img: 'https://randomuser.me/api/portraits/women/65.jpg'
-            },
-            {
-                name: 'Hawkins',
-                img: 'https://randomuser.me/api/portraits/men/15.jpg'
-            },
-            {
-                name: 'Lane',
-                img: 'https://randomuser.me/api/portraits/men/41.jpg'
-            },
-            {
-                name: 'Warren',
-                img: 'https://randomuser.me/api/portraits/men/72.jpg'
-            },
-            {
-                name: 'Fox',
-                img: 'https://randomuser.me/api/portraits/men/11.jpg'
-            }
-        ];
-
-        const $btn = $('#calendar_admin_details_setup_availablity_userbtn');
-        const $menu = $(`
+    /* Tutor dropdown - uses actual teacher data from cohorts */
+    <?php
+    require_once(__DIR__ . '/../../config.php');
+    require_login();
+    global $DB, $PAGE;
+    $userIds = $DB->get_fieldset_sql("
+        SELECT DISTINCT uid
+          FROM (
+                SELECT cohortmainteacher AS uid FROM {cohort}
+                 WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
+                UNION
+                SELECT cohortguideteacher AS uid FROM {cohort}
+                 WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
+          ) t
+    ");
+    $teachers = [];
+    if ($userIds) {
+        list($inSql, $params) = $DB->get_in_or_equal($userIds, SQL_PARAMS_NAMED);
+        $fields = "id, firstname, lastname, picture, imagealt, firstnamephonetic, lastnamephonetic, middlename, alternatename";
+        $teachers = $DB->get_records_select('user', "id $inSql AND deleted = 0 AND suspended = 0", $params, 'firstname ASC, lastname ASC', $fields);
+    }
+    $teacherJsArray = [];
+    if (!empty($teachers)) {
+        foreach ($teachers as $teacher) {
+            $picture = new user_picture($teacher);
+            $picture->size = 50;
+            $imageUrl = $picture->get_url($PAGE)->out(false);
+            $name   = fullname($teacher, true);
+            $teacherJsArray[] = [
+                'id' => (int)$teacher->id,
+                'name' => $name,
+                'img' => $imageUrl
+            ];
+        }
+    }
+    ?>
+        (function() {
+            // Use PHP-generated teacher array
+            const teachers =
+                <?php echo json_encode($teacherJsArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+            const $btn = $('#calendar_admin_details_setup_availablity_userbtn');
+            const $menu = $(`
   <div id="calendar_admin_details_setup_availablity_menu" class="calendar_admin_details_setup_availablity_menu" role="menu" aria-hidden="true">
     <div class="p-2 border-bottom">
       <input type="text" id="teacherSearch" class="form-control" placeholder="Enter Teacher Name" />
@@ -981,73 +1118,92 @@
   </div>
 `);
 
-        people.forEach(p => {
-            $menu.append(
-                `<div class="calendar_admin_details_setup_availablity_menu_item" role="menuitem" tabindex="0" data-name="${p.name}" data-img="${p.img}">
-         <img class="calendar_admin_details_setup_availablity_menu_avatar" src="${p.img}" alt="">
-         <div class="calendar_admin_details_setup_availablity_menu_name">${p.name}</div>
+            teachers.forEach(t => {
+                $menu.append(
+                    `<div class="calendar_admin_details_setup_availablity_menu_item" role="menuitem" tabindex="0" data-name="${t.name}" data-img="${t.img}" data-userid="${t.id}">
+         <img class="calendar_admin_details_setup_availablity_menu_avatar" src="${t.img}" alt="">
+         <div class="calendar_admin_details_setup_availablity_menu_name">${t.name}</div>
        </div>`
-            );
-        });
-        // Live search filter
-        $menu.on('input', '#teacherSearch', function() {
-            const val = $(this).val().toLowerCase();
-            $menu.find('.calendar_admin_details_setup_availablity_menu_item').each(function() {
-                const name = $(this).data('name').toLowerCase();
-                $(this).toggle(name.includes(val));
+                );
             });
-        });
-
-        $('body').append($menu);
-
-        function pos() {
-            const r = $btn[0].getBoundingClientRect(),
-                gap = 8;
-            let l = r.left,
-                t = r.bottom + gap,
-                w = $menu.outerWidth(),
-                vw = innerWidth;
-            if (l + w > vw - 12) l = vw - w - 12;
-            $menu.css({
-                left: l + scrollX,
-                top: t + scrollY
+            // Live search filter
+            $menu.on('input', '#teacherSearch', function() {
+                const val = $(this).val().toLowerCase();
+                $menu.find('.calendar_admin_details_setup_availablity_menu_item').each(function() {
+                    const name = $(this).data('name').toLowerCase();
+                    $(this).toggle(name.includes(val));
+                });
             });
-        }
 
-        function open() {
-            pos();
-            $menu.show();
-            $btn.addClass('open').attr('aria-expanded', 'true');
-            $(document).on('click._m', dcl);
-            $(document).on('keydown._m', k);
-        }
+            $('body').append($menu);
 
-        function close() {
-            $menu.hide();
-            $btn.removeClass('open').attr('aria-expanded', 'false');
-            $(document).off('click._m keydown._m');
-        }
+            // Select the first real teacher by default
+            if (teachers.length > 0) {
+                $('#calendar_admin_details_setup_availablity_username').text(teachers[0].name);
+                $('#calendar_admin_details_setup_availablity_avatar').attr('src', teachers[0].img);
+            }
 
-        function dcl(e) {
-            if (!$(e.target).closest(
-                    '#calendar_admin_details_setup_availablity_menu,#calendar_admin_details_setup_availablity_userbtn'
-                ).length) close();
-        }
+            function pos() {
+                const r = $btn[0].getBoundingClientRect(),
+                    gap = 8;
+                let l = r.left,
+                    t = r.bottom + gap,
+                    w = $menu.outerWidth(),
+                    vw = innerWidth;
+                if (l + w > vw - 12) l = vw - w - 12;
+                $menu.css({
+                    left: l + scrollX,
+                    top: t + scrollY
+                });
+            }
 
-        function k(e) {
-            if (e.key === 'Escape') close();
-        }
-        $btn.on('click', () => $menu.is(':visible') ? close() : open());
-        $(window).on('resize scroll', () => {
-            if ($menu.is(':visible')) pos();
-        });
-        $menu.on('click keydown', '.calendar_admin_details_setup_availablity_menu_item', function(e) {
-            if (e.type === 'keydown' && e.key !== 'Enter') return;
-            $('#calendar_admin_details_setup_availablity_username').text($(this).data('name'));
-            $('#calendar_admin_details_setup_availablity_avatar').attr('src', $(this).data('img'));
-            close();
-        });
-    })();
+            function open() {
+                pos();
+                $menu.show();
+                $btn.addClass('open').attr('aria-expanded', 'true');
+                $(document).on('click._m', dcl);
+                $(document).on('keydown._m', k);
+            }
+
+            function close() {
+                $menu.hide();
+                $btn.removeClass('open').attr('aria-expanded', 'false');
+                $(document).off('click._m keydown._m');
+            }
+
+            function dcl(e) {
+                if (!$(e.target).closest(
+                        '#calendar_admin_details_setup_availablity_menu,#calendar_admin_details_setup_availablity_userbtn'
+                    ).length) close();
+            }
+
+            function k(e) {
+                if (e.key === 'Escape') close();
+            }
+            $btn.on('click', () => $menu.is(':visible') ? close() : open());
+            $(window).on('resize scroll', () => {
+                if ($menu.is(':visible')) pos();
+            });
+            $menu.on('click keydown', '.calendar_admin_details_setup_availablity_menu_item', function(e) {
+                if (e.type === 'keydown' && e.key !== 'Enter') return;
+                const payload = {
+                    name: $(this).data('name'),
+                    id: $(this).data('userid'),
+                    img: $(this).data('img')
+                };
+                console.log('Selected teacher payload:', payload);
+                $('#calendar_admin_details_setup_availablity_username').text(payload.name);
+                $('#calendar_admin_details_setup_availablity_avatar').attr('src', payload.img);
+
+                // Store the teacher ID, name, and img in data attributes (for reliable payload)
+                const $userBtn = $('#calendar_admin_details_setup_availablity_userbtn');
+                $userBtn.data('teacher-id', payload.id);
+                $userBtn.data('teacher-name', payload.name);
+                $userBtn.data('teacher-img', payload.img);
+
+                close();
+            });
+        })();
 
     /* ===== Sidebar navigation toggle ===== */
     (function() {
@@ -1232,9 +1388,39 @@
             show: showDeleteUI
         };
 
+        // Click handler for selecting blocks
         $(document).on('click', '.calendar_admin_details_setup_availablity_block', function(e) {
-            if ($(e.target).closest('.calendar_admin_details_setup_availablity_resize').length) return;
-            showDeleteUI($(this));
+            // Skip if clicking resize handle or delete button
+            if ($(e.target).closest(
+                    '.calendar_admin_details_setup_availablity_resize, .calendar_admin_details_setup_availablity_deletebtn'
+                ).length) return;
+
+            const $block = $(this);
+            const teacher = (typeof teachers !== 'undefined') ? teachers.find(t =>
+                t.name === $('#calendar_admin_details_setup_availablity_username').text() &&
+                t.img === $('#calendar_admin_details_setup_availablity_avatar').attr('src')
+            ) : null;
+            const teacherPayload = teacher || {
+                name: $('#calendar_admin_details_setup_availablity_username').text(),
+                img: $('#calendar_admin_details_setup_availablity_avatar').attr('src'),
+                id: null
+            };
+
+            const dayIndex = $block.attr('data-day');
+            const label = $block.find('.calendar_admin_details_setup_availablity_timelabel').text();
+            const timeParts = label.split('–').map(t => t.trim());
+            const startTime = timeParts[0] || '';
+            const endTime = timeParts[1] || '';
+
+            console.log('Selected single slot:', {
+                teacher: teacherPayload,
+                slot: {
+                    day: getDayName(dayIndex),
+                    startTime: startTime,
+                    endTime: endTime
+                },
+                action: 'select'
+            });
         });
 
         $(document).on('click', function(e) {

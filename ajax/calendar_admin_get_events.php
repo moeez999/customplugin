@@ -1277,6 +1277,132 @@ try {
     // END Peer Talk section
     // ----------------------------------------------------------
 
+
+
+    // ----------------------------------------------------------
+// CONFERENCE EVENTS (Course ID = 25)
+// ----------------------------------------------------------
+try {
+    $conferenceCourseId = 25;
+    $conferenceEvents = [];
+
+    // Verify course 25 exists
+    $confCourse = $DB->get_record('course', ['id' => $conferenceCourseId], '*', IGNORE_MISSING);
+
+    if ($confCourse) {
+
+        // Get googlemeet module ID
+        $gmMod = $DB->get_record('modules', ['name' => 'googlemeet'], 'id', IGNORE_MISSING);
+
+        if ($gmMod) {
+
+            // Get all conference googlemeet instances
+            $confCms = $DB->get_records('course_modules', [
+                'course'             => $conferenceCourseId,
+                'module'             => $gmMod->id,
+                'deletioninprogress' => 0
+            ], 'id ASC', 'id,instance,section,availability');
+
+            if ($confCms) {
+
+                // Load all instances
+                $instanceIds = array_map(fn($c) => (int)$c->instance, $confCms);
+                $confInstances = [];
+
+                if ($instanceIds) {
+                    list($insql, $inparams) = $DB->get_in_or_equal($instanceIds, SQL_PARAMS_NAMED);
+                    $confInstances = $DB->get_records_select('googlemeet', "id $insql", $inparams);
+                }
+
+                // Loop through conference activities
+                foreach ($confCms as $cmid => $cm) {
+                    $gm = $confInstances[$cm->instance] ?? null;
+                    if (!$gm) continue;
+
+                    // Find occurrences in date window
+                    $evs = $DB->get_records_select(
+                        'googlemeet_events',
+                        'googlemeetid = :gid
+                         AND eventdate <= :endts
+                         AND (eventdate + (duration * 60)) >= :startts',
+                        [
+                            'gid'    => (int)$gm->id,
+                            'startts'=> $startts,
+                            'endts'  => $endts
+                        ],
+                        'eventdate ASC, id ASC'
+                    );
+
+                    if (!$evs) continue;
+
+                    $ids = array_map(fn($o) => (int)$o->id, $evs);
+                    $mainId = $ids ? min($ids) : 0;
+                    $isRecurring = count($evs) > 1;
+
+                    // Find meet URL
+                    $meetingurl = '';
+                    foreach (['meetingurl','meeting_url','meeturl','joinurl','join_url','url','link'] as $f) {
+                        if (!empty($gm->$f)) { $meetingurl = (string)$gm->$f; break; }
+                    }
+
+                    $viewurl = (new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]))->out(false);
+
+                    $seq = 1;
+                    foreach ($evs as $ev) {
+
+                        $eventdate_ts = (int)$ev->eventdate;
+
+                        // combine date + gm time
+                        $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+                        if ($gmTimes) {
+                            [$eventStart, $eventEnd] = $gmTimes;
+                        } else {
+                            $eventStart = $eventdate_ts;
+                            $eventEnd   = $eventStart + max(60, (int)$ev->duration * 60);
+                        }
+
+                        $conferenceEvents[] = [
+                            'id'            => 'conference-' . $ev->id,
+                            'eventid'       => (int)$ev->id,
+                            'main_event_id' => (int)$mainId,
+                            'is_parent'     => ((int)$ev->id === $mainId),
+                            'sequence'      => $seq++,
+
+                            'source'        => 'conference',
+                            'courseid'      => $conferenceCourseId,
+                            'cmid'          => (int)$cm->id,
+                            'googlemeetid'  => (int)$gm->id,
+                            'title'         => (string)$gm->name,
+
+                            'start_ts'      => $eventStart,
+                            'end_ts'        => $eventEnd,
+                            'start'         => $fmt_iso($eventStart),
+                            'end'           => $fmt_iso($eventEnd),
+
+                            'teacherids'    => [],
+                            'teachernames'  => [],
+                            'studentids'    => [],
+                            'studentnames'  => [],
+                            'cohortids'     => [],
+
+                            'class_type'    => 'conference',
+                            'is_recurring'  => $isRecurring,
+
+                            'meetingurl'    => $meetingurl,
+                            'viewurl'       => $viewurl,
+                        ];
+                    }
+                }
+            }
+        }
+
+    }
+
+} catch (Throwable $e) {
+    $conferenceEvents = [];
+}
+
+
     echo json_encode([
         'ok'      => true,
         'filters' => [
@@ -1290,6 +1416,7 @@ try {
         ],
         'events'   => array_values($filtered),
         'peertalk' => array_values($peertalkEvents),
+        'conference' => array_values($conferenceEvents),
     ]);
 
 } catch (Exception $e) {

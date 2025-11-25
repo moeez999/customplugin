@@ -31,6 +31,25 @@ function getTeacherColorIndex(teacherId) {
 // Helper function to generate unique vibrant color for any teacher ID
 function getTeacherColor(teacherId) {
   if (!teacherId) return "#FF1744"; // Default vibrant red
+  
+  // === Step-by-step reveal for PeerTalk and Conference modals ===
+  // Assumes: .cohort-column, .teacher-column, .student-column, .modal-next-btn selectors
+  function setupStepReveal(modalSelector) {
+    const $modal = $(modalSelector);
+    $modal.find('.student-column').hide();
+    $modal.find('.cohort-column, .teacher-column').show();
+    $modal.find('.modal-next-btn').off('click').on('click', function() {
+      $modal.find('.student-column').slideDown();
+      $(this).prop('disabled', true); // Optionally disable after click
+    });
+  }
+  
+  // Call this after modal is opened/populated
+  // For PeerTalk modal:
+  setupStepReveal('#peerTalkModal');
+  // For Conference modal:
+  setupStepReveal('#conferenceModal');
+  // ...existing code...
 
   // Generate unique hue based on teacher ID using golden angle for optimal color distribution
   const hue = Math.round((Math.abs(teacherId) * 137.508) % 360); // Golden angle: 137.508°
@@ -668,6 +687,309 @@ $(function () {
   // Expose globally
   window.populateCustomRecurrenceModal = populateCustomRecurrenceModal;
 
+  /* ========= Open Conference Modal With Event Data ========= */
+  function openConferenceModalWithData(eventData) {
+    console.log("Opening Conference modal with data:", eventData);
+
+    // Collect all events with the same eventid for recurrence
+    let recurrenceEvents = [];
+    if (eventData.eventid && window.events) {
+      recurrenceEvents = window.events.filter(function (ev) {
+        return (
+          ev.eventid === eventData.eventid &&
+          (ev.classType === "conference" || ev.source === "conference")
+        );
+      });
+
+      console.log(
+        `Found ${recurrenceEvents.length} conference events with eventid ${eventData.eventid}`
+      );
+    }
+
+    // Show modal backdrop
+    $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
+
+    const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
+
+    // Activate conference tab
+    $bd.find(".calendar_admin_details_create_cohort_tab").removeClass("active");
+    $bd
+      .find('.calendar_admin_details_create_cohort_tab[data-tab="conference"]')
+      .addClass("active");
+
+    // Hide other tab contents and show conference tab
+    $("#calendar_admin_details_create_cohort_content").html("");
+    $("#mergeTabContent").css("display", "none");
+    $("#peerTalkTabContent").css("display", "none");
+    $("#addTimeTabContent").css("display", "none");
+    $("#addExtraSlotsTabContent").css("display", "none");
+    $("#mainModalContent").css("display", "none");
+    $("#classTabContent").css("display", "none");
+    $("#conferenceTabContent").css("display", "block");
+
+    // Populate the conference form with event data and recurrence info
+    populateConferenceForm(eventData, recurrenceEvents);
+  }
+
+  /* ========= Populate Conference Form With Event Data ========= */
+  function populateConferenceForm(eventData, recurrenceEvents) {
+    console.log("Populating Conference form with:", eventData);
+    console.log("Recurrence events:", recurrenceEvents);
+
+    // Clear existing selections first
+    setTimeout(function () {
+      $(".conference_modal_cohort_list").empty();
+      $(".conference_modal_students_list").empty();
+      $(".conference_modal_attendees_list").empty();
+    }, 50);
+
+    // Populate date if available
+    if (eventData.date) {
+      const dateBtn = $(".conference_modal_date_btn");
+
+      // Parse date properly to avoid timezone issues
+      // eventData.date is in format "YYYY-MM-DD"
+      const dateParts = eventData.date.split("-");
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed
+      const day = parseInt(dateParts[2], 10);
+      const dateObj = new Date(year, month, day);
+
+      const formattedDate = dateObj.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      dateBtn.text(formattedDate);
+      dateBtn.data("raw-date", eventData.date);
+
+      console.log(`Set date button: ${formattedDate} (raw: ${eventData.date})`);
+    }
+
+    // Populate cohorts if available - trigger clicks on the actual items
+    if (eventData.cohortids && eventData.cohortids.length > 0) {
+      console.log("Populating conference cohorts:", eventData.cohortids);
+      // Wait a bit for the modal to be fully loaded
+      setTimeout(function () {
+        // Click each cohort item to trigger the existing selection logic
+        eventData.cohortids.forEach(function (cohortId, index) {
+          setTimeout(function () {
+            const $cohortItem = $(
+              `#conferenceCohortsList li.conference_cohort_item[data-id="${cohortId}"]`
+            );
+            if ($cohortItem.length > 0) {
+              console.log(
+                "Clicking conference cohort:",
+                cohortId,
+                $cohortItem.text().trim()
+              );
+              $cohortItem.trigger("click");
+            } else {
+              console.warn("Conference cohort not found:", cohortId);
+            }
+          }, index * 50); // Stagger clicks
+        });
+      }, 200);
+    }
+
+    // Populate students if available
+    if (eventData.studentids && eventData.studentids.length > 0) {
+      console.log("Populating conference students:", eventData.studentids);
+      // Wait a bit for the modal to be fully loaded
+      setTimeout(function () {
+        // Click each student item to trigger the existing selection logic
+        eventData.studentids.forEach(function (studentId, index) {
+          setTimeout(function () {
+            const $studentItem = $(
+              `#conferenceStudentsList li.conference_student_item[data-userid="${studentId}"]`
+            );
+            if ($studentItem.length > 0) {
+              console.log(
+                "Clicking conference student:",
+                studentId,
+                $studentItem.text().trim()
+              );
+              $studentItem.trigger("click");
+            } else {
+              console.warn("Conference student not found:", studentId);
+            }
+          }, index * 50); // Stagger clicks
+        });
+      }, 400);
+    }
+
+    // Populate teachers if available - trigger click on the actual item
+    if (eventData.teacherId) {
+      console.log("Populating conference teacher:", eventData.teacherId);
+      // Wait a bit for the modal to be fully loaded
+      setTimeout(function () {
+        // Try both teacher lists (view 1 and view 2)
+        const $teacherItem1 = $(
+          `#conferenceTeachersList li.conference_teacher_item[data-userid="${eventData.teacherId}"]`
+        );
+        const $teacherItem2 = $(
+          `#conferenceTeachersList2 li.conference_teacher_item[data-userid="${eventData.teacherId}"]`
+        );
+
+        if ($teacherItem1.length > 0) {
+          console.log(
+            "Clicking conference teacher (view 1):",
+            eventData.teacherId,
+            $teacherItem1.text().trim()
+          );
+          $teacherItem1.trigger("click");
+        } else if ($teacherItem2.length > 0) {
+          console.log(
+            "Clicking conference teacher (view 2):",
+            eventData.teacherId,
+            $teacherItem2.text().trim()
+          );
+          $teacherItem2.trigger("click");
+        } else {
+          console.warn("Conference teacher not found:", eventData.teacherId);
+        }
+      }, 600);
+    }
+
+    // Populate time if available
+    if (eventData.start && eventData.end) {
+      const startMins =
+        typeof eventData.start === "number"
+          ? eventData.start
+          : parseInt(eventData.start);
+      const endMins =
+        typeof eventData.end === "number"
+          ? eventData.end
+          : parseInt(eventData.end);
+
+      console.log(
+        "Converted times - Start mins:",
+        startMins,
+        "End mins:",
+        endMins
+      );
+    }
+
+    // Populate title if available
+    if (eventData.title) {
+      const $titleInput = $("#conferenceForm .addtime-title-input");
+      if ($titleInput.length > 0) {
+        $titleInput.val(eventData.title);
+        console.log("Set conference title to:", eventData.title);
+      }
+    }
+
+    // Populate color if available
+    if (eventData.color) {
+      const $colorCircle = $("#conferenceForm .color-circle");
+      const $colorToggle = $("#colorDropdownToggle");
+      if ($colorCircle.length > 0) {
+        $colorCircle.css("background", eventData.color);
+        console.log("Set conference color to:", eventData.color);
+      }
+    }
+
+    // Populate timezone if available
+    if (eventData.timezone) {
+      const $timezoneSelected = $(
+        "#eventTimezoneDropdown_conference_tab_selected"
+      );
+      if ($timezoneSelected.length > 0) {
+        $timezoneSelected.text(eventData.timezone);
+        console.log("Set conference timezone to:", eventData.timezone);
+      }
+    }
+
+    // Build custom recurrence array from events with same eventid
+    if (recurrenceEvents && recurrenceEvents.length > 0) {
+      const customRecurrenceArray = recurrenceEvents.map(function (ev) {
+        const eventDate = ev.date;
+        const dateObj = new Date(eventDate);
+        const dayNames = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        const dayName = dayNames[dateObj.getDay()];
+
+        function minutesToTime(mins) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          const hh = h.toString().padStart(2, "0");
+          const mm = m.toString().padStart(2, "0");
+          return `${hh}:${mm}`;
+        }
+
+        const startMins =
+          typeof ev.start === "number" ? ev.start : parseInt(ev.start);
+        const endMins = typeof ev.end === "number" ? ev.end : parseInt(ev.end);
+
+        const startTime = minutesToTime(startMins);
+        const endTime = minutesToTime(endMins);
+
+        return {
+          date: eventDate,
+          day: dayName,
+          start_time: startTime,
+          end_time: endTime,
+          start_ts: ev.start_ts,
+          end_ts: ev.end_ts,
+        };
+      });
+
+      console.log(
+        "Conference custom recurrence array built:",
+        customRecurrenceArray
+      );
+
+      // Store the recurrence array globally for form submission
+      window.conferenceRecurrenceData = customRecurrenceArray;
+
+      // Update the repeat button text
+      const $repeatBtn = $(".conference_repeat_btn");
+      if ($repeatBtn.length > 0) {
+        function formatTime12h(time24) {
+          const [hours, minutes] = time24.split(":");
+          let h = parseInt(hours, 10);
+          const ampm = h >= 12 ? "PM" : "AM";
+          h = h % 12 || 12;
+          return `${h < 10 ? "0" + h : h}:${minutes} ${ampm}`;
+        }
+
+        const shortDays = {
+          Sunday: "Sun",
+          Monday: "Mon",
+          Tuesday: "Tue",
+          Wednesday: "Wed",
+          Thursday: "Thu",
+          Friday: "Fri",
+          Saturday: "Sat",
+        };
+
+        const dayTimeParts = customRecurrenceArray.map(function (item) {
+          const shortDay = shortDays[item.day] || item.day.substring(0, 3);
+          const time = formatTime12h(item.start_time);
+          return `${shortDay}(${time})`;
+        });
+
+        const repeatText = "Weekly on " + dayTimeParts.join(", ");
+
+        $repeatBtn.html(
+          repeatText + '<span style="float:right; font-size:1rem;">▼</span>'
+        );
+
+        console.log("Updated conference repeat button to:", repeatText);
+      }
+    }
+  }
+
+  // Expose function globally for testing
+  window.openConferenceModalWithData = openConferenceModalWithData;
+
   // // Button → open same modal (kept your trigger class)
   // $(".calendar_admin_details_create_cohort_open")
   //   .off("click.openCohort")
@@ -729,10 +1051,28 @@ $(function () {
         const classType = currentClickedEvent.classType;
         const source = currentClickedEvent.source;
 
+        console.log(
+          "Event clicked - classType:",
+          classType,
+          "source:",
+          source,
+          "Full event:",
+          currentClickedEvent
+        );
+
         // Check if it's a peertalk event
         if (classType === "peertalk" || source === "peertalk") {
           // Open peertalk modal with event data
           openPeerTalkModalWithData(currentClickedEvent);
+        }
+        // Check if it's a conference event
+        else if (classType === "conference" || source === "conference") {
+          console.log(
+            "Opening conference modal for event:",
+            currentClickedEvent
+          );
+          // Open conference modal with event data
+          openConferenceModalWithData(currentClickedEvent);
         }
         // Check if it's NOT a 1:1 lesson (for regular group lessons)
         else if (
@@ -3914,7 +4254,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       console.log("Fetched calendar events:", data);
 
-      // Merge regular events and peertalk events
+      // Merge regular events, peertalk events, and conference events
       let allEvents = [];
       if (data.ok && Array.isArray(data.events)) {
         allEvents = [...data.events];
@@ -3922,6 +4262,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.ok && Array.isArray(data.peertalk)) {
         console.log("Adding peertalk events:", data.peertalk);
         allEvents = [...allEvents, ...data.peertalk];
+      }
+      if (data.ok && Array.isArray(data.conference)) {
+        console.log("Adding conference events:", data.conference);
+        allEvents = [...allEvents, ...data.conference];
       }
 
       if (allEvents.length > 0) {
@@ -3962,6 +4306,11 @@ document.addEventListener("DOMContentLoaded", () => {
             eventColor = "e-green";
           } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
             eventColor = "e-purple"; // Purple for peertalk events
+          } else if (
+            ev.class_type === "conference" ||
+            ev.source === "conference"
+          ) {
+            eventColor = "e-orange"; // Orange for conference events
           }
 
           return {

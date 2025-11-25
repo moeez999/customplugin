@@ -588,7 +588,17 @@ h2 {
   height: 190px;
   overflow-y: auto;
 }
-
+.conference_modal_students_list li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 16px;
+  justify-content: space-between;
+  border: 2px solid #dadada;
+  border-radius: 8px;
+  font-size: 1.02rem;
+  background: #fff;
+}
 .conference_modal_attendees_section::-webkit-scrollbar {
   width: 4px;
   background: transparent;
@@ -600,6 +610,14 @@ h2 {
 }
 
 .conference_modal_attendees_list {
+  border-radius: 12px;
+  box-shadow: 0 2px 11px #0002;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.conference_modal_students_list {
   border-radius: 12px;
   box-shadow: 0 2px 11px #0002;
   padding: 0;
@@ -1390,7 +1408,8 @@ input[type="date"] {
 }
 
 .conference_modal_cohort_list li,
-.conference_modal_attendees_list li {
+.conference_modal_attendees_list li,
+.conference_modal_students_list li {
   background: #fff;
   border-radius: 12px;
 
@@ -1401,7 +1420,8 @@ input[type="date"] {
 }
 
 .conference_modal_cohort_list li,
-.conference_modal_attendees_list li {
+.conference_modal_attendees_list li,
+.conference_modal_students_list li {
   display: flex;
   align-items: center;
   gap: 13px;

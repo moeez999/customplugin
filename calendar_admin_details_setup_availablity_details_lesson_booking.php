@@ -374,15 +374,21 @@ $(function() {
     );
 
     $('.calendar_admin_details_lesson_availability_lesson_booking_savebtn').on('click', function() {
-        alert(
-            "Saved settings:\n" +
-            "Trial: " + calendar_admin_details_lesson_availability_lesson_booking_state
-            .trialNotice + "\n" +
-            "Regular: " + calendar_admin_details_lesson_availability_lesson_booking_state
-            .regularNotice + "\n" +
-            "Window: " + calendar_admin_details_lesson_availability_lesson_booking_state
-            .bookingWindow
-        );
+        // Get teacher info from main page
+        const $userBtn = window.parent ? $(window.parent.document).find(
+            '#calendar_admin_details_setup_availablity_userbtn') : $(
+            '#calendar_admin_details_setup_availablity_userbtn');
+        const teacherPayload = {
+            name: $userBtn.data('teacher-name') || $userBtn.find(
+                '#calendar_admin_details_setup_availablity_username').text(),
+            img: $userBtn.data('teacher-img') || $userBtn.find(
+                '#calendar_admin_details_setup_availablity_avatar').attr('src'),
+            id: $userBtn.data('teacher-id') || null
+        };
+        console.log('Lesson booking save payload:', {
+            teacher: teacherPayload,
+            settings: calendar_admin_details_lesson_availability_lesson_booking_state
+        });
     });
 });
 </script>

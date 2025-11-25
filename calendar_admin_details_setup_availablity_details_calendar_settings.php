@@ -230,8 +230,17 @@ $(function() {
     });
 
     $('.calendar_admin_details_setup_availability_calendar_settings_savebtn').on('click', function() {
-        alert("Saved timezone: " + calendar_admin_details_setup_availability_calendar_settings_state
-            .timezone);
+        // Get teacher info from main page
+        const $userBtn = window.parent ? $(window.parent.document).find('#calendar_admin_details_setup_availablity_userbtn') : $('#calendar_admin_details_setup_availablity_userbtn');
+        const teacherPayload = {
+            name: $userBtn.data('teacher-name') || $userBtn.find('#calendar_admin_details_setup_availablity_username').text(),
+            img: $userBtn.data('teacher-img') || $userBtn.find('#calendar_admin_details_setup_availablity_avatar').attr('src'),
+            id: $userBtn.data('teacher-id') || null
+        };
+        console.log('Calendar settings save payload:', {
+            teacher: teacherPayload,
+            settings: calendar_admin_details_setup_availability_calendar_settings_state
+        });
     });
 });
 </script>
