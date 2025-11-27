@@ -842,12 +842,102 @@ try {
     }
 
     foreach ($filtered as &$ev) {
-        $eid = !empty($ev['eventid']) ? (int)$ev['eventid'] : 0;
-        $ev['statuses'] = $eid && isset($statusesByEvent[$eid])
-            ? $statusesByEvent[$eid]
-            : [];
+    $eid = !empty($ev['eventid']) ? (int)$ev['eventid'] : 0;
+    $ev['statuses'] = $eid && isset($statusesByEvent[$eid])
+        ? $statusesByEvent[$eid]
+        : [];
+
+    // ---------------------------------------------------
+    // RESCHEDULE PATCH (ONLY FOR GROUP CLASSES)
+    // ---------------------------------------------------
+    if ($ev['source'] === 'group' && !empty($ev['statuses'])) {
+
+        // Find active reschedule entry
+        foreach ($ev['statuses'] as $s) {
+
+    if (
+        isset($s['details']['current']) ||
+        isset($s['details']['previous'])
+    ) {
+
+                $curr = $s['details']['current'];
+
+                // Build timestamp from: newDate + newStart
+                $ts_start = strtotime($curr['date'] . ' ' . $curr['start']);
+                $ts_end   = strtotime($curr['date'] . ' ' . $curr['end']);
+
+                // Fetch teacher details
+                $teacherid = (int)$curr['teacher'];
+                $teachername = '';
+                if ($teacherid) {
+                    $tuser = $DB->get_record('user', 
+                        ['id' => $teacherid, 'deleted' => 0, 'suspended' => 0],
+                        'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename',
+                        IGNORE_MISSING
+                    );
+                    if ($tuser) {
+                        $teachername = fullname($tuser, true);
+                    }
+                }
+
+                // Build date-only timestamp
+                $ts_date = strtotime($curr['date']);
+
+                // Fetch teacher profile URL
+                $teacherProfileUrl = $teacherid
+                    ? (new moodle_url('/user/profile.php', ['id' => $teacherid]))->out(false)
+                    : '';
+
+                // Build previous teacher picture
+                $prev = $s['details']['previous'] ?? [];
+                $prevTeacherId = isset($prev['teacher']) ? (int)$prev['teacher'] : 0;
+
+                $prevTeacherPic = '';
+                if ($prevTeacherId) {
+                    $prevTeacherUser = $DB->get_record('user', ['id' => $prevTeacherId], '*', IGNORE_MISSING);
+                    if ($prevTeacherUser) {
+                        $prevTeacherPic = (new user_picture($prevTeacherUser))->get_url($PAGE)->out(false);
+                    }
+                }
+
+                // Build new teacher picture
+                $newTeacherPic = '';
+                if ((int)$teacheridsraw) {
+                    $newTeacherUser = $DB->get_record('user', ['id' => (int)$teacheridsraw], '*', IGNORE_MISSING);
+                    if ($newTeacherUser) {
+                        $newTeacherPic = (new user_picture($newTeacherUser))->get_url($PAGE)->out(false);
+                    }
+                }
+                // Attach reschedule data
+                $ev['rescheduled'] = [
+                    // FULL PREVIOUS DATA (from DB)
+                    'previous' => $s['details']['previous'] ?? null,
+
+                    // previous teacher fields
+                    'previous_teacherid'       => $prevTeacherId,
+                    'previous_teacher_picture' => $prevTeacherPic,
+
+                    // FULL CURRENT DATA (from DB)
+                    'current' => $curr,
+
+                    // new teacher / new timing fields
+                    'new_date_ts'         => $ts_date,
+                    'new_start_ts'        => $ts_start,
+                    'new_end_ts'          => $ts_end,
+                    'new_start_iso'       => $fmt_iso($ts_start),
+                    'new_end_iso'         => $fmt_iso($ts_end),
+                    'new_teacherid'       => (int)$teacheridsraw,
+                    'new_teachername'     => $teachername,
+                    'new_teacher_picture' => $newTeacherPic
+                ];
+
+
+                break;
+            }
+        }
     }
-    unset($ev);
+}
+unset($ev);
     // ------- END STATUS BLOCK -------
 
     usort($filtered, fn($a, $b) => $a['start_ts'] <=> $b['start_ts']);

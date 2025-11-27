@@ -1637,72 +1637,6 @@ $(document).ready(function() {
         }
     });
 
-    // Manage Session form submit with validation
-    $('#manage-session-form').on('submit', function(e) {
-        e.preventDefault();
-
-        // Remove all error borders first
-        $('#session-cohort-btn, #session-teacher-btn, #session-class-btn, #session-event-date-btn, #session-start-btn, #session-end-btn')
-            .css('border', '');
-
-        // Get form values
-        const cohortText = $('#session-cohort-btn').text().trim();
-        const cohortShortName = $('#session-cohort-short-name').val().trim();
-        const teacherText = $('#session-teacher-btn').text().trim();
-        const classText = $('#session-class-btn').text().trim();
-        const eventDate = $('#session-event-date-btn').text().trim();
-        const startTime = $('#session-start-btn').text().trim();
-        const endTime = $('#session-end-btn').text().trim();
-
-        // Validation
-        let hasError = false;
-        if (cohortText === 'Select Cohort') {
-            $('#session-cohort-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-        if (teacherText === 'Select Teacher') {
-            $('#session-teacher-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-        if (classText === 'Select Class') {
-            $('#session-class-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-        if (eventDate === 'Select Date') {
-            $('#session-event-date-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-        if (startTime === 'Select Start Time') {
-            $('#session-start-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-        if (endTime === 'Select End Time') {
-            $('#session-end-btn').css('border', '2px solid #DC2626');
-            hasError = true;
-        }
-
-        if (hasError) {
-            return;
-        }
-
-        // Build payload
-        const payload = {
-            status: 'reschedule',
-            cohort: cohortText,
-            cohortShortName: cohortShortName,
-            teacher: teacherText,
-            className: classText,
-            eventDate: eventDate,
-            startTime: startTime,
-            endTime: endTime
-        };
-
-        console.log('Manage Session Payload:', payload);
-
-        // TODO: Add AJAX call here
-        // Close modal after successful submission
-        $('#manage-session-modal').fadeOut(300);
-    });
 
     // Cancel & Reschedule modal - Cancel button closes modal
     $('.cr-btn-secondary').on('click', function(e) {
@@ -1721,7 +1655,6 @@ $(document).ready(function() {
         const reasonValue = $('#cr-reason').data('selected-value');
         const reasonText = $('#cr-reason .cr-select-placeholder').text().trim();
         const notes = $('#cr-notes').val().trim();
-        const subtitle = $('#cancel-reschedule-modal .cr-subtitle').text();
 
         // Validation
         if (!reasonValue || reasonText === 'Select Reason') {
@@ -1729,18 +1662,40 @@ $(document).ready(function() {
             return;
         }
 
-        // Build payload
+        // Get event data (assuming it's stored when modal opens)
+        const eventData = $('#cancel-reschedule-modal').data('eventData');
+
+        // Build payload matching your format
         const payload = {
-            status: 'cancel and reschedule later',
-            sessionInfo: subtitle,
+            status: 'cancel_reschedule_later',
+            eventid: eventData ? eventData.eventid : undefined,
+            googlemeetid: eventData ? eventData.googlemeetid : undefined,
             reason: reasonValue,
             reasonText: reasonText,
             notes: notes
         };
 
-        console.log('Cancel and Reschedule Payload:', payload);
+        console.log('Cancel and Reschedule Later Payload:', payload);
 
         // TODO: Add AJAX call here
+        /*
+        $.ajax({
+            url: 'your-api-endpoint',
+            method: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json',
+            success: function(response) {
+                console.log('Session cancelled successfully:', response);
+                $('#cancel-reschedule-modal').fadeOut(300);
+                // Optionally refresh the calendar or show success message
+            },
+            error: function(xhr, status, error) {
+                console.error('Error cancelling session:', error);
+                // Show error message to user
+            }
+        });
+        */
+
         // Close modal after successful submission
         $('#cancel-reschedule-modal').fadeOut(300);
     });
@@ -1769,14 +1724,16 @@ $(document).ready(function() {
             return;
         }
 
-        // Get the subtitle from cancel-nomakeup-modal and copy to confirmation modal
+        // Get event data
+        const eventData = $('#cancel-nomakeup-modal').data('eventData');
         const subtitle = $('#cancel-nomakeup-modal .cancel-modal-subtitle').text();
         $('#cancel-confirmation-modal .cancel-confirmation-subtitle').text(subtitle);
 
         // Store form data for later use
         $('#cancel-confirmation-modal').data('cancel-data', {
-            status: 'cancel and no make up',
-            sessionInfo: subtitle,
+            status: 'cancel_no_makeup',
+            eventid: eventData ? eventData.eventid : undefined,
+            googlemeetid: eventData ? eventData.googlemeetid : undefined,
             reason: reasonValue,
             reasonText: reasonText,
             notes: notes
@@ -1799,9 +1756,55 @@ $(document).ready(function() {
         // Get stored cancel data
         const payload = $('#cancel-confirmation-modal').data('cancel-data');
 
-        console.log('Cancel and No Make-Up Payload:', payload);
+        console.log('Cancel (No Make-Up) Payload:', payload);
+
+            $.ajax({
+        url: M.cfg.wwwroot + "/local/customplugin/ajax/calendar_admin_cancel_event.php",
+        type: "POST",
+        data: JSON.stringify(payload),
+        contentType: "application/json",
+        success: function (response) {
+            console.log("Cancel Response:", response);
+
+            if (response.status === "success") {
+                alert("Class cancelled successfully!");
+            } else {
+                alert("Error: " + response.error);
+            }
+
+            // Close modal if you have one
+            $("#manage-session-modal").fadeOut(300);
+
+            // Reload calendar (optional)
+            if (typeof loadCalendarEvents === "function") {
+                loadCalendarEvents();
+            }
+        },
+        error: function (xhr) {
+            console.error("Cancel Error:", xhr.responseText);
+            alert("Something went wrong while cancelling the class.");
+        }
+    });
 
         // TODO: Add AJAX call here to actually cancel the session
+        /*
+        $.ajax({
+            url: 'your-api-endpoint',
+            method: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json',
+            success: function(response) {
+                console.log('Session cancelled (no make-up) successfully:', response);
+                $('#cancel-confirmation-modal').fadeOut(300);
+                $('#cancel-nomakeup-modal').fadeOut(300);
+                // Optionally refresh the calendar or show success message
+            },
+            error: function(xhr, status, error) {
+                console.error('Error cancelling session:', error);
+                // Show error message to user
+            }
+        });
+        */
 
         // Close both modals
         $('#cancel-confirmation-modal').fadeOut(300);

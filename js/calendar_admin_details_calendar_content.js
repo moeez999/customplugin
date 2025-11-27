@@ -1281,7 +1281,7 @@ $(function () {
   // Function to open Cancel & Reschedule modal
   function openCancelRescheduleModal(eventData) {
     console.log("Opening Cancel & Reschedule modal for:", eventData);
-
+    $("#cancel-reschedule-modal").data("eventData", eventData);
     // Format the event date and time for display
     let dateStr = "";
     let startTime = "";
@@ -1347,6 +1347,7 @@ $(function () {
   function openCancelNoMakeupModal(eventData) {
     console.log("Opening Cancel (No Make-Up) modal for:", eventData);
 
+    $("#cancel-nomakeup-modal").data("eventData", eventData);
     // Format the event date and time for display
     let dateStr = "";
     let startTime = "";
@@ -1961,7 +1962,6 @@ $(function () {
     e.preventDefault();
 
     const eventData = $(this).data("eventData");
-    console.log("Updating session for event:", eventData);
 
     // ============================
     // GET SELECTED COHORT
@@ -2004,56 +2004,89 @@ $(function () {
 
     const selectedDate = $("#session-event-date-btn").data("raw-date") || "";
 
-    console.log("Selected values:", {
-      cohortId: selectedCohortId,
-      teacherId: selectedTeacherId,
-      classType: selectedClassValue,
-      startTime: selectedStartTime,
-      endTime: selectedEndTime,
-      date: selectedDate,
-    });
-
     // ============================================================
-    // OLD SESSION DATA (CORRECTED FOR YOUR REAL eventData)
+    // OLD SESSION DATA - FIXED PROPERTY NAMES
     // ============================================================
-    const oldTeacherId = eventData.teacherId; // <-- FIXED
+    const eventId = eventData.eventid;
+    const googleMeetId = eventData.googlemeetid;
+    const oldTeacherId = eventData.teacherId;
     const oldDate = eventData.date;
     const oldStart = eventData.start;
     const oldEnd = eventData.end;
 
+    // ============================
+    // FORMAT TIME FUNCTION
+    // ============================
+    function formatTime(minutes) {
+      if (typeof minutes === "string" && minutes.includes(":")) {
+        // Already formatted, return as is
+        return minutes;
+      }
+
+      const mins = parseInt(minutes);
+      if (isNaN(mins)) return "0:00";
+
+      const hours = Math.floor(mins / 60);
+      const remainingMinutes = mins % 60;
+
+      // Format as "h:mm" - e.g., "1:30", "2:00", "0:45"
+      return `${hours}:${remainingMinutes.toString().padStart(2, "0")}`;
+    }
+
     // ============================================================
-    // BUILD PAYLOAD
+    // BUILD PAYLOAD WITH FORMATTED TIMES
     // ============================================================
-    let payload = {
+    const payload = {
       status: "reschedule",
-      cohortId: selectedCohortId,
-      classType: selectedClassValue,
+      eventid: eventId,
+      googlemeetid: googleMeetId,
+      oldTeacherId: oldTeacherId,
+      newTeacherId: selectedTeacherId,
+      oldDate: oldDate,
+      newDate: selectedDate,
+      oldStart: formatTime(oldStart),
+      oldEnd: formatTime(oldEnd),
+      newStart: formatTime(selectedStartTime),
+      newEnd: formatTime(selectedEndTime),
     };
 
-    // ============================================================
-    // TEACHER CHANGE CHECK (ONLY IDS)
-    // ============================================================
-    if (oldTeacherId && oldTeacherId !== selectedTeacherId) {
-      payload.previousTeacherId = oldTeacherId;
-      payload.newTeacherId = selectedTeacherId;
-    } else {
-      payload.teacherId = selectedTeacherId;
-    }
-
-    // ============================================================
-    // DATE / TIME CHANGE CHECK
-    // ============================================================
-    if (
-      oldDate !== selectedDate ||
-      oldStart !== selectedStartTime ||
-      oldEnd !== selectedEndTime
-    ) {
-      payload.date = selectedDate;
-      payload.startTime = selectedStartTime;
-      payload.endTime = selectedEndTime;
-    }
-
     console.log("Final Reschedule Payload:", payload);
+
+    // TODO: Add AJAX call here
+    /*
+    $.ajax({
+        url: 'your-api-endpoint',
+        method: 'POST',
+        data: JSON.stringify(payload),
+        contentType: 'application/json',
+        success: function(response) {
+            console.log('Session rescheduled successfully:', response);
+            $('#manage-session-modal').fadeOut(300);
+            $(".custom-dropdown .dropdown-list").hide();
+            // Optionally refresh the calendar or show success message
+        },
+        error: function(xhr, status, error) {
+            console.error('Error rescheduling session:', error);
+            // Show error message to user
+        }
+    });
+    */
+
+    $.ajax({
+      url: M.cfg.wwwroot + "/local/customplugin/ajax/reschedule_groupclass.php",
+      type: "POST",
+      data: JSON.stringify(payload),
+      contentType: "application/json",
+      success: function (response) {
+        console.log("Reschedule Response:", response);
+        alert("Session updated successfully!");
+        $("#manage-session-modal").fadeOut(300);
+      },
+      error: function (xhr) {
+        console.error("Reschedule Error:", xhr.responseText);
+        alert("Something went wrong while updating session.");
+      },
+    });
 
     // Close modal
     $("#manage-session-modal").fadeOut(300);
@@ -2065,7 +2098,7 @@ $(function () {
     .off("mousedown.emptySlot", ".day-inner")
     .on("mousedown.emptySlot", ".day-inner", function (e) {
       if ($(e.target).closest(".event").length) return;
-      // openCreateCohortModal();
+      openCreateCohortModal();
     });
 
   // First render

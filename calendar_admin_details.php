@@ -356,22 +356,64 @@
         <?php require_once('calendar_admin_details_agenda_tab.php'); ?>
     </main>
 </div>
-
 <script>
 $(function() {
+    // Tab switching between Semana (Calendar) and Agenda
     $('#calendar_admin_semana_btn').on('click', function() {
+        console.log('Semana tab clicked');
+
+        // Update tab active states
         $('#calendar_admin_semana_btn').addClass('active');
         $('#calendar_admin_agenda_btn').removeClass('active');
+
+        // Show calendar, hide agenda
         $('#calendar_admin_calendar_flexrow').show();
         $('#calendar_admin_agenda_content').hide();
+
+        // Re-render calendar view
+        if (typeof renderWeek === 'function') {
+            renderWeek(false);
+        }
     });
 
     $('#calendar_admin_agenda_btn').on('click', function() {
+        console.log('Agenda tab clicked');
+
+        // Update tab active states
         $('#calendar_admin_agenda_btn').addClass('active');
         $('#calendar_admin_semana_btn').removeClass('active');
+
+        // Hide calendar, show agenda
         $('#calendar_admin_calendar_flexrow').hide();
         $('#calendar_admin_agenda_content').show();
+
+        // Render agenda view with current events
+        setTimeout(function() {
+            console.log('Triggering agenda render from tab click');
+            if (typeof renderAgendaView === 'function') {
+                renderAgendaView();
+            } else {
+                console.error('renderAgendaView function not found');
+            }
+        }, 100);
+
+        // Dispatch event for other listeners
+        $(document).trigger('agendaTabActivated');
     });
+
+    // Initial state - ensure correct tab is shown on page load
+    if ($('#calendar_admin_agenda_btn').hasClass('active')) {
+        $('#calendar_admin_calendar_flexrow').hide();
+        $('#calendar_admin_agenda_content').show();
+        setTimeout(function() {
+            if (typeof renderAgendaView === 'function') {
+                renderAgendaView();
+            }
+        }, 300);
+    } else {
+        $('#calendar_admin_calendar_flexrow').show();
+        $('#calendar_admin_agenda_content').hide();
+    }
 });
 </script>
 

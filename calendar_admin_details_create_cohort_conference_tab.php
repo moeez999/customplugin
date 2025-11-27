@@ -83,292 +83,203 @@
             <div style="display: flex; gap: 8px;">
                 <button type="button" class="conference-nav-prev"
                     style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
+                    <img src="./img/prev.svg" alt="">
                 </button>
                 <button type="button" class="conference-nav-next"
                     style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
+                    <img src="./img/next.svg" alt="">
                 </button>
             </div>
         </div>
 
         <!-- View 1: Teachers & Cohorts -->
-        <div class="conference-view-1" style="display: block;">
-            <div class="conference_modal_fieldrow">
-                <?php
-require_once(__DIR__ . '/../../config.php');
-require_login();
-
-global $DB;
-
-/** Fetch cohorts with valid idnumber */
-$sql = "SELECT id, name, idnumber
-          FROM {cohort}
-         WHERE idnumber IS NOT NULL AND idnumber <> ''
-      ORDER BY timemodified DESC, id DESC";
-
-$cohorts = $DB->get_records_sql($sql);
-?>
-
-                <div>
-                    <span class="conference_modal_label">Attending Cohorts</span>
-                    <div class="conference_modal_dropdown_btn" id="conferenceCohortsDropdown">
-                        Select Cohort
-                        <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg"
-                                alt=""></span>
-                    </div>
-                    <div class="conference_modal_dropdown_list" id="conferenceCohortsDropdownList">
-                        <input type="text" id="searchCohorts" class="dropdown-search" placeholder="Search cohorts...">
-                        <ul id="conferenceCohortsList">
-                            <?php
-            if ($cohorts) {
-                foreach ($cohorts as $c) {
-                    $shortname = format_string($c->name);
-                    $idn       = trim((string)$c->idnumber);
-
-                    echo '<li class="conference_cohort_item" 
-                              data-id="'.(int)$c->id.'" 
-                              data-idnumber="'.s($idn).'" 
-                              data-name="'.s($shortname).'">'.
-                              $shortname.
-                         '</li>';
-                }
-            } else {
-                echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';
-            }
+        <div class="main-conference-participants-container">
+            <div class="conference-view-1" style="display: block;">
+                <div class="conference_modal_fieldrow">
+                    <?php
+            require_once(__DIR__ . '/../../config.php');
+            require_login();
+            
+            global $DB;
+            
+            /** Fetch cohorts with valid idnumber */
+            $sql = "SELECT id, name, idnumber
+              FROM {cohort}
+             WHERE idnumber IS NOT NULL AND idnumber <> ''
+                  ORDER BY timemodified DESC, id DESC";
+            
+            $cohorts = $DB->get_records_sql($sql);
             ?>
-                        </ul>
-                    </div>
-                </div>
-
-                <?php
-require_once(__DIR__ . '/../../config.php');
-require_login();
-
-global $DB, $PAGE, $OUTPUT;
-
-/** Collect unique teacher user IDs from cohorts */
-$userIds = $DB->get_fieldset_sql("
-    SELECT DISTINCT uid
-      FROM (
-            SELECT cohortmainteacher AS uid FROM {cohort}
-             WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
-            UNION
-            SELECT cohortguideteacher AS uid FROM {cohort}
-             WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
-      ) t
-");
-
-/** Fetch user records (not deleted/suspended) */
-$teachers = [];
-if ($userIds) {
-    list($inSql, $params) = $DB->get_in_or_equal($userIds, SQL_PARAMS_NAMED);
-    $fields = "id, firstname, lastname, picture, imagealt,
-               firstnamephonetic, lastnamephonetic, middlename, alternatename";
-    $teachers = $DB->get_records_select(
-        'user',
-        "id $inSql AND deleted = 0 AND suspended = 0",
-        $params,
-        'firstname ASC, lastname ASC',
-        $fields
-    );
-}
-
-?>
-
-                <div>
-                    <span class="conference_modal_label">Teachers</span>
-                    <div class="conference_modal_dropdown_btn" id="conferenceTeachersDropdown">
-                        Select Teacher
-                        <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg"
-                                alt=""></span>
-                    </div>
-                    <div class="conference_modal_dropdown_list" id="conferenceTeachersDropdownList">
-                        <input type="text" id="searchTeachers" class="dropdown-search" placeholder="Search teachers...">
-                        <ul id="conferenceTeachersList">
-                            <?php
-            if (!empty($teachers)) {
-                foreach ($teachers as $teacher) {
-                    $picture = new user_picture($teacher);
-                    $picture->size = 40;
-                    $imageurl = $picture->get_url($PAGE)->out(false);
-                    $fullname = fullname($teacher, true);
-
-                    echo '<li class="conference_teacher_item" 
-                              data-userid="'.(int)$teacher->id.'" 
-                              data-name="'.s($fullname).'" 
-                              data-img="'.s($imageurl).'">';
-
-                    echo '<img src="'.s($imageurl).'" 
-                              class="calendar_admin_details_create_cohort_teacher_avatar" 
-                              alt="'.s($fullname).'" /> ';
-
-                    echo format_string($fullname);
-
-                    echo '</li>';
-                }
-            } else {
-                echo '<li aria-disabled="true">No teachers found</li>';
-            }
-            ?>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- View 2: Students & Teachers -->
-        <div class="conference-view-2" style="display: none;">
-            <div class="conference_modal_fieldrow">
-                <!-- Students Dropdown -->
-                <div>
-                    <span class="conference_modal_label">Select Students</span>
-                    <div class="conference_modal_dropdown_btn" id="conferenceStudentsDropdown">
-                        Select Students
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
-                    </div>
-                    <div class="conference_modal_dropdown_list" id="conferenceStudentsDropdownList">
-                        <input type="text" id="searchStudents_conference" class="dropdown-search"
-                            placeholder="Search students...">
-                        <ul id="conferenceStudentsList">
-                            <?php
-                            // Get all students (users with student role)
-                            $studentRole = $DB->get_record('role', ['shortname' => 'student'], 'id');
-                            $students = [];
-                            
-                            if ($studentRole) {
-                                // Get users with student role assignments
-                                $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                                               u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
-                                        FROM {user} u
-                                        JOIN {role_assignments} ra ON ra.userid = u.id
-                                        WHERE ra.roleid = :roleid
-                                          AND u.deleted = 0
-                                          AND u.suspended = 0
-                                        ORDER BY u.firstname ASC, u.lastname ASC
-                                        LIMIT 500";
-                                
-                                $students = $DB->get_records_sql($sql, ['roleid' => $studentRole->id]);
-                            }
-                            
-                            if (!empty($students)) {
-                                foreach ($students as $student) {
-                                    $picture = new user_picture($student);
-                                    $picture->size = 40;
-                                    $imageurl = $picture->get_url($PAGE)->out(false);
-                                    $fullname = fullname($student, true);
-
-                                    echo '<li class="conference_student_item" 
-                                            data-userid="'.(int)$student->id.'" 
-                                            data-name="'.s($fullname).'" 
-                                            data-img="'.s($imageurl).'">';
-
-                                    echo '<img src="'.s($imageurl).'" 
-                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
-                                            alt="'.s($fullname).'" /> ';
-
-                                    echo format_string($fullname);
-
-                                    echo '</li>';
-                                }
-                            } else {
-                                echo '<li style="pointer-events:none;opacity:.6;">No students found</li>';
-                            }
-                            ?>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Teachers Dropdown (duplicate from view 1) -->
-                <?php
-                // Get teachers again for view 2
-                $userIds2 = $DB->get_fieldset_sql("
-                    SELECT DISTINCT uid
-                    FROM (
-                            SELECT cohortmainteacher AS uid FROM {cohort}
-                            WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
-                            UNION
-                            SELECT cohortguideteacher AS uid FROM {cohort}
-                            WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
-                    ) t
-                ");
-
-                $teachers2 = [];
-                if ($userIds2) {
-                    list($inSql2, $params2) = $DB->get_in_or_equal($userIds2, SQL_PARAMS_NAMED);
-                    $fields2 = "id, firstname, lastname, picture, imagealt,
-                            firstnamephonetic, lastnamephonetic, middlename, alternatename";
-                    $teachers2 = $DB->get_records_select(
-                        'user',
-                        "id $inSql2 AND deleted = 0 AND suspended = 0",
-                        $params2,
-                        'firstname ASC, lastname ASC',
-                        $fields2
-                    );
+                    <div>
+                        <span class="conference_modal_label">Attending Cohorts</span>
+                        <div class="conference_modal_dropdown_btn" id="conferenceCohortsDropdown">
+                            Select Cohort
+                            <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg"
+                                    alt=""></span>
+                        </div>
+                        <div class="conference_modal_dropdown_list" id="conferenceCohortsDropdownList">
+                            <input type="text" id="searchCohorts" class="dropdown-search"
+                                placeholder="Search cohorts...">
+                            <ul id="conferenceCohortsList">
+                                <?php
+                if ($cohorts) {
+                    foreach ($cohorts as $c) {
+                        $shortname = format_string($c->name);
+                        $idn       = trim((string)$c->idnumber);
+                        echo '<li class="conference_cohort_item"
+                                  data-id="'.(int)$c->id.'"
+                                  data-idnumber="'.s($idn).'"
+                                  data-name="'.s($shortname).'">'.
+                                  $shortname.
+                             '</li>';
+                    }
+                } else {
+                    echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';
                 }
                 ?>
-
-                <div>
-                    <span class="conference_modal_label">Teachers</span>
-                    <div class="conference_modal_dropdown_btn" id="conferenceTeachersDropdown2">
-                        Select Teacher
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
+                            </ul>
+                        </div>
                     </div>
-                    <div class="conference_modal_dropdown_list" id="conferenceTeachersDropdownList2">
-                        <input type="text" id="searchTeachers_conference2" class="dropdown-search"
-                            placeholder="Search teachers...">
-                        <ul id="conferenceTeachersList2">
-                            <?php
-                            if (!empty($teachers2)) {
-                                foreach ($teachers2 as $teacher) {
-                                    $picture = new user_picture($teacher);
-                                    $picture->size = 40;
-                                    $imageurl = $picture->get_url($PAGE)->out(false);
-                                    $fullname = fullname($teacher, true);
-
-                                    echo '<li class="conference_teacher_item" 
-                                            data-userid="'.(int)$teacher->id.'" 
-                                            data-name="'.s($fullname).'" 
-                                            data-img="'.s($imageurl).'">';
-
-                                    echo '<img src="'.s($imageurl).'" 
-                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
-                                            alt="'.s($fullname).'" /> ';
-
-                                    echo format_string($fullname);
-
-                                    echo '</li>';
+                    <?php
+            require_once(__DIR__ . '/../../config.php');
+            require_login();
+            
+            global $DB, $PAGE, $OUTPUT;
+            
+            /** Collect unique teacher user IDs from cohorts */
+            $userIds = $DB->get_fieldset_sql("
+                SELECT DISTINCT uid
+                  FROM (
+                SELECT cohortmainteacher AS uid FROM {cohort}
+                 WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
+                UNION
+                SELECT cohortguideteacher AS uid FROM {cohort}
+                 WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
+                  ) t
+            ");
+            
+            /** Fetch user records (not deleted/suspended) */
+            $teachers = [];
+            if ($userIds) {
+                list($inSql, $params) = $DB->get_in_or_equal($userIds, SQL_PARAMS_NAMED);
+                $fields = "id, firstname, lastname, picture, imagealt,
+                   firstnamephonetic, lastnamephonetic, middlename, alternatename";
+                $teachers = $DB->get_records_select(
+            'user',
+            "id $inSql AND deleted = 0 AND suspended = 0",
+            $params,
+            'firstname ASC, lastname ASC',
+            $fields
+                );
+            }
+            
+            ?>
+                    <div>
+                        <span class="conference_modal_label">Teachers</span>
+                        <div class="conference_modal_dropdown_btn" id="conferenceTeachersDropdown">
+                            Select Teacher
+                            <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg"
+                                    alt=""></span>
+                        </div>
+                        <div class="conference_modal_dropdown_list" id="conferenceTeachersDropdownList">
+                            <input type="text" id="searchTeachers" class="dropdown-search"
+                                placeholder="Search teachers...">
+                            <ul id="conferenceTeachersList">
+                                <?php
+                if (!empty($teachers)) {
+                    foreach ($teachers as $teacher) {
+                        $picture = new user_picture($teacher);
+                        $picture->size = 40;
+                        $imageurl = $picture->get_url($PAGE)->out(false);
+                        $fullname = fullname($teacher, true);
+                        echo '<li class="conference_teacher_item"
+                                  data-userid="'.(int)$teacher->id.'"
+                                  data-name="'.s($fullname).'"
+                                  data-img="'.s($imageurl).'">';
+                        echo '<img src="'.s($imageurl).'"
+                                  class="calendar_admin_details_create_cohort_teacher_avatar"
+                                  alt="'.s($fullname).'" /> ';
+                        echo format_string($fullname);
+                        echo '</li>';
+                    }
+                } else {
+                    echo '<li aria-disabled="true">No teachers found</li>';
+                }
+                ?>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="conference_modal_label">Select Students</span>
+                        <div class="conference_modal_dropdown_btn" id="conferenceStudentsDropdown">
+                            Select Students
+                            <span style="float:right; font-size:1rem;">
+                                <img src="./img/dropdown-arrow-down.svg" alt="">
+                            </span>
+                        </div>
+                        <div class="conference_modal_dropdown_list" id="conferenceStudentsDropdownList">
+                            <input type="text" id="searchStudents_conference" class="dropdown-search"
+                                placeholder="Search students...">
+                            <ul id="conferenceStudentsList">
+                                <?php
+                                // Get all students (users with student role)
+                                $studentRole = $DB->get_record('role', ['shortname' => 'student'], 'id');
+                                $students = [];
+            
+                                if ($studentRole) {
+                                    // Get users with student role assignments
+                                    $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                                   u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
+                                            FROM {user} u
+                                            JOIN {role_assignments} ra ON ra.userid = u.id
+                                            WHERE ra.roleid = :roleid
+                                              AND u.deleted = 0
+                                              AND u.suspended = 0
+                                            ORDER BY u.firstname ASC, u.lastname ASC
+                                            LIMIT 500";
+            
+                                    $students = $DB->get_records_sql($sql, ['roleid' => $studentRole->id]);
                                 }
-                            } else {
-                                echo '<li aria-disabled="true">No teachers found</li>';
-                            }
-                            ?>
-                        </ul>
+            
+                                if (!empty($students)) {
+                                    foreach ($students as $student) {
+                                        $picture = new user_picture($student);
+                                        $picture->size = 40;
+                                        $imageurl = $picture->get_url($PAGE)->out(false);
+                                        $fullname = fullname($student, true);
+                                        echo '<li class="conference_student_item"
+                                                data-userid="'.(int)$student->id.'"
+                                                data-name="'.s($fullname).'"
+                                                data-img="'.s($imageurl).'">';
+                                        echo '<img src="'.s($imageurl).'"
+                                                class="calendar_admin_details_create_cohort_teacher_avatar"
+                                                alt="'.s($fullname).'" /> ';
+                                        echo format_string($fullname);
+                                        echo '</li>';
+                                    }
+                                } else {
+                                    echo '<li style="pointer-events:none;opacity:.6;">No students found</li>';
+                                }
+                                ?>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="conferenceParticipantsLists-container">
+                <div class="conference_modal_lists_row">
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_cohort_list"></ul>
+                    </div>
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_attendees_list"></ul>
+                    </div>
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_students_list"></ul>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="conference_modal_lists_row">
-            <div class="conference_modal_attendees_section">
-                <ul class="conference_modal_cohort_list"></ul>
-            </div>
-            <div class="conference_modal_attendees_section" style="display: none;">
-                <ul class="conference_modal_students_list"></ul>
-            </div>
-            <div class="conference_modal_attendees_section">
-                <ul class="conference_modal_attendees_list"></ul>
-            </div>
-        </div>
-
         <button type="submit" class="conference_modal_btn">Schedule Conference</button>
     </form>
 </div>
@@ -392,20 +303,24 @@ if ($userIds) {
     const $navPrev = $parent.find('.conference-nav-prev');
     const $studentlist = $parent.find('.conference_modal_attendees_section').eq(1);
     const $cohortlist = $parent.find('.conference_modal_attendees_section').first();
+    const $participants = $parent.find('.main-conference-participants-container');
 
     // Navigation click handlers
     $navNext.on('click', function() {
-        $view1.hide();
-        $view2.show();
-        $cohortlist.hide();
-        $studentlist.show();
+        const scrollAmount = 300; // Adjust this value as needed
+        const currentScroll = $participants.scrollLeft();
+        $participants.animate({
+            scrollLeft: currentScroll + scrollAmount
+        }, 300, 'swing');
     });
 
     $navPrev.on('click', function() {
-        $view2.hide();
-        $view1.show();
-        $cohortlist.show();
-        $studentlist.hide();
+        const scrollAmount = 300; // Adjust this value as needed
+        const currentScroll = $participants.scrollLeft();
+        $participants.animate({
+            scrollLeft: currentScroll - scrollAmount
+        }, 300, 'swing');
+
     });
 
     // ✅ Extract and validate schedule info (days + times)
@@ -916,4 +831,25 @@ if ($userIds) {
     outline: none;
     font-size: 0.9rem;
 }
+
+.conferenceParticipantsLists-container {
+    overflow: visible;
+    /* allow dropdowns to escape horizontally/vertically */
+}
+
+.conferenceParticipantsLists-container::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+.conferenceParticipantsLists-container::-webkit-scrollbar-thumb {
+    background: #d1d1d1;
+    border-radius: 2px;
+}
+
+.conferenceParticipantsLists-container::-webkit-scrollbar-thumb:hover {
+    background: #f7f7f7;
+}
+
+.main-conference-participants-container {}
 </style>

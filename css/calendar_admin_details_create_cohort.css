@@ -489,17 +489,41 @@ h2 {
   margin-bottom: 13px;
   color: #6d6d6d;
 }
+.peertalk-view-1 {
+  overflow: visible; /* allow dropdowns to escape horizontally/vertically */
+}
+.peertalk-view-1::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
 
+.main-peertalk-participants-container {
+  overflow-x: auto;
+}
+.main-peertalk-participants-container::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.main-conference-participants-container {
+  overflow-x: auto;
+}
+.main-conference-participants-container::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
 .conference_modal_fieldrow {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
   gap: 13px;
-  margin-bottom: 18px;
+  overflow: visible; /* avoid clipping dropdowns */
+  padding-bottom: 10px; /* Add some padding */
+  width: 150%;
 }
 
 .conference_modal_fieldrow > div {
   flex: 1 1 47%;
-  min-width: 150px;
+  width: 49%;
   position: relative;
 }
 
@@ -548,6 +572,12 @@ h2 {
   box-shadow: 0 4px 18px #0001;
   z-index: 100;
   margin-top: 1px;
+  height: 225px;
+  overflow-y: auto;
+}
+.conference_modal_dropdown_list::-webkit-scrollbar {
+  width: 4px;
+  background: transparent;
 }
 
 .conference_modal_dropdown_list ul {
@@ -1398,10 +1428,18 @@ input[type="date"] {
   gap: 28px;
   justify-content: space-between;
   align-items: flex-start;
+  width: 150%;
 }
-
+.peerTalkParticipantsLists-container {
+  overflow: visible; /* keep dropdowns from being clipped */
+}
+.peerTalkParticipantsLists-container::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
 .conference_modal_lists_row > .conference_modal_attendees_section {
   flex: 1 1 0;
+  width: 49%;
 }
 .conference_modal_cohort_list {
   padding: 0;

@@ -86,305 +86,235 @@
             <div style="display: flex; gap: 8px;">
                 <button type="button" class="peertalk-nav-prev"
                     style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
+                    <img src="./img/prev.svg" alt="">
                 </button>
                 <button type="button" class="peertalk-nav-next"
                     style="width: 32px; height: 32px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
+                    <img src="./img/next.svg" alt="">
                 </button>
             </div>
         </div>
 
         <!-- View 1: Teachers & Cohorts -->
-        <div class="peertalk-view-1" style="display: block;">
-            <div class="conference_modal_fieldrow">
-                <?php
-require_once(__DIR__ . '/../../config.php');
-require_login();
-
-global $DB;
-
-/** Fetch cohorts with valid idnumber */
-$sql = "SELECT id, name, idnumber
-          FROM {cohort}
-         WHERE idnumber IS NOT NULL AND idnumber <> ''
-      ORDER BY timemodified DESC, id DESC";
-
-$cohorts = $DB->get_records_sql($sql);
-?>
-
-                <div>
-                    <span class="conference_modal_label">Attending Cohorts</span>
-
-                    <div class="conference_modal_dropdown_btn" id="peertalkCohortsDropdown">
-                        Select Cohort
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
-                    </div>
-
-                    <div class="conference_modal_dropdown_list" id="peertalkCohortsDropdownList">
-                        <input type="text" id="searchCohorts_peertalk" class="dropdown-search"
-                            placeholder="Search cohorts...">
-
-                        <ul id="peertalkCohortsList">
-                            <?php
-            if ($cohorts) {
-                foreach ($cohorts as $c) {
-                    $shortname = format_string($c->name);   // SHOW THIS
-                    $idn       = trim((string)$c->idnumber); // Use for payload
-
-                    echo '<li class="peertalk_cohort_item" 
-                              data-id="'.(int)$c->id.'" 
-                              data-idnumber="'.s($idn).'" 
-                              data-name="'.s($shortname).'">'.
-                              $shortname.
-                         '</li>';
-                }
-            } else {
-                echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';
-            }
+        <div class="main-peertalk-participants-container">
+            <div class="peertalk-view-1" style="display: block;">
+                <div class="conference_modal_fieldrow">
+                    <?php
+            require_once(__DIR__ . '/../../config.php');
+            require_login();
+            
+            global $DB;
+            
+            /** Fetch cohorts with valid idnumber */
+            $sql = "SELECT id, name, idnumber
+              FROM {cohort}
+             WHERE idnumber IS NOT NULL AND idnumber <> ''
+                  ORDER BY timemodified DESC, id DESC";
+            
+            $cohorts = $DB->get_records_sql($sql);
             ?>
-                        </ul>
-                    </div>
-                </div>
-
-                <?php
-require_once(__DIR__ . '/../../config.php');
-require_login();
-
-global $DB, $PAGE, $OUTPUT;
-
-/** Collect unique teacher user IDs from cohorts */
-$userIds = $DB->get_fieldset_sql("
-    SELECT DISTINCT uid
-      FROM (
-            SELECT cohortmainteacher AS uid FROM {cohort}
-             WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
-            UNION
-            SELECT cohortguideteacher AS uid FROM {cohort}
-             WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
-      ) t
-");
-
-/** Fetch user records (not deleted/suspended) */
-$teachers = [];
-if ($userIds) {
-    list($inSql, $params) = $DB->get_in_or_equal($userIds, SQL_PARAMS_NAMED);
-    $fields = "id, firstname, lastname, picture, imagealt,
-               firstnamephonetic, lastnamephonetic, middlename, alternatename";
-    $teachers = $DB->get_records_select(
-        'user',
-        "id $inSql AND deleted = 0 AND suspended = 0",
-        $params,
-        'firstname ASC, lastname ASC',
-        $fields
-    );
-}
-
-?>
-
-                <div>
-                    <span class="conference_modal_label">Teachers</span>
-
-                    <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown">
-                        Select Teacher
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
-                    </div>
-
-                    <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList">
-                        <input type="text" id="searchTeachers_peertalk" class="dropdown-search"
-                            placeholder="Search teachers...">
-
-                        <ul id="peertalkTeachersList">
-                            <?php
-            if (!empty($teachers)) {
-                foreach ($teachers as $teacher) {
-                    $picture = new user_picture($teacher);
-                    $picture->size = 40;
-                    $imageurl = $picture->get_url($PAGE)->out(false);
-                    $fullname = fullname($teacher, true);
-
-                    echo '<li class="peertalk_teacher_item" 
-                              data-userid="'.(int)$teacher->id.'" 
-                              data-name="'.s($fullname).'" 
-                              data-img="'.s($imageurl).'">';
-
-                    echo '<img src="'.s($imageurl).'" 
-                              class="calendar_admin_details_create_cohort_teacher_avatar" 
-                              alt="'.s($fullname).'" /> ';
-
-                    echo format_string($fullname);
-
-                    echo '</li>';
-                }
-            } else {
-                echo '<li aria-disabled="true">No teachers found</li>';
-            }
-            ?>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- View 2: Students & Teachers -->
-        <div class="peertalk-view-2" style="display: none;">
-            <div class="conference_modal_fieldrow">
-                <!-- Students Dropdown -->
-                <div>
-                    <span class="conference_modal_label">Select Students</span>
-                    <div class="conference_modal_dropdown_btn" id="peertalkStudentsDropdown">
-                        Select Students
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
-                    </div>
-                    <div class="conference_modal_dropdown_list" id="peertalkStudentsDropdownList">
-                        <input type="text" id="searchStudents_peertalk" class="dropdown-search"
-                            placeholder="Search students...">
-                        <ul id="peertalkStudentsList">
-                            <?php
-                            // Get all students (users with student role)
-                            $studentRole = $DB->get_record('role', ['shortname' => 'student'], 'id');
-                            $students = [];
-                            
-                            if ($studentRole) {
-                                // Get users with student role assignments
-                                $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
-                                               u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
-                                        FROM {user} u
-                                        JOIN {role_assignments} ra ON ra.userid = u.id
-                                        WHERE ra.roleid = :roleid
-                                          AND u.deleted = 0
-                                          AND u.suspended = 0
-                                        ORDER BY u.firstname ASC, u.lastname ASC
-                                        LIMIT 500";
-                                
-                                $students = $DB->get_records_sql($sql, ['roleid' => $studentRole->id]);
-                            }
-                            
-                            if (!empty($students)) {
-                                foreach ($students as $student) {
-                                    $picture = new user_picture($student);
-                                    $picture->size = 40;
-                                    $imageurl = $picture->get_url($PAGE)->out(false);
-                                    $fullname = fullname($student, true);
-
-                                    echo '<li class="peertalk_student_item" 
-                                            data-userid="'.(int)$student->id.'" 
-                                            data-name="'.s($fullname).'" 
-                                            data-img="'.s($imageurl).'">';
-
-                                    echo '<img src="'.s($imageurl).'" 
-                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
-                                            alt="'.s($fullname).'" /> ';
-
-                                    echo format_string($fullname);
-
-                                    echo '</li>';
-                                }
-                            } else {
-                                echo '<li style="pointer-events:none;opacity:.6;">No students found</li>';
-                            }
-                            ?>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Teachers Dropdown (duplicate from view 1) -->
-                <?php
-                // Get teachers again for view 2
-                $userIds2 = $DB->get_fieldset_sql("
-                    SELECT DISTINCT uid
-                    FROM (
-                            SELECT cohortmainteacher AS uid FROM {cohort}
-                            WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
-                            UNION
-                            SELECT cohortguideteacher AS uid FROM {cohort}
-                            WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
-                    ) t
-                ");
-
-                $teachers2 = [];
-                if ($userIds2) {
-                    list($inSql2, $params2) = $DB->get_in_or_equal($userIds2, SQL_PARAMS_NAMED);
-                    $fields2 = "id, firstname, lastname, picture, imagealt,
-                            firstnamephonetic, lastnamephonetic, middlename, alternatename";
-                    $teachers2 = $DB->get_records_select(
-                        'user',
-                        "id $inSql2 AND deleted = 0 AND suspended = 0",
-                        $params2,
-                        'firstname ASC, lastname ASC',
-                        $fields2
-                    );
+                    <div>
+                        <span class="conference_modal_label">Attending Cohorts</span>
+                        <div class="conference_modal_dropdown_btn" id="peertalkCohortsDropdown">
+                            Select Cohort
+                            <span style="float:right; font-size:1rem;">
+                                <img src="./img/dropdown-arrow-down.svg" alt="">
+                            </span>
+                        </div>
+                        <div class="conference_modal_dropdown_list" id="peertalkCohortsDropdownList">
+                            <input type="text" id="searchCohorts_peertalk" class="dropdown-search"
+                                placeholder="Search cohorts...">
+                            <ul id="peertalkCohortsList">
+                                <?php
+                if ($cohorts) {
+                    foreach ($cohorts as $c) {
+                        $shortname = format_string($c->name);   // SHOW THIS
+                        $idn       = trim((string)$c->idnumber); // Use for payload
+                        echo '<li class="peertalk_cohort_item"
+                                  data-id="'.(int)$c->id.'"
+                                  data-idnumber="'.s($idn).'"
+                                  data-name="'.s($shortname).'">'.
+                                  $shortname.
+                             '</li>';
+                    }
+                } else {
+                    echo '<li style="pointer-events:none;opacity:.6;">No cohorts found</li>';
                 }
                 ?>
-
-                <div>
-                    <span class="conference_modal_label">Teachers</span>
-                    <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown2">
-                        Select Teacher
-                        <span style="float:right; font-size:1rem;">
-                            <img src="./img/dropdown-arrow-down.svg" alt="">
-                        </span>
+                            </ul>
+                        </div>
                     </div>
-                    <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList2">
-                        <input type="text" id="searchTeachers_peertalk2" class="dropdown-search"
-                            placeholder="Search teachers...">
-                        <ul id="peertalkTeachersList2">
-                            <?php
-                            if (!empty($teachers2)) {
-                                foreach ($teachers2 as $teacher) {
-                                    $picture = new user_picture($teacher);
-                                    $picture->size = 40;
-                                    $imageurl = $picture->get_url($PAGE)->out(false);
-                                    $fullname = fullname($teacher, true);
-
-                                    echo '<li class="peertalk_teacher_item" 
-                                            data-userid="'.(int)$teacher->id.'" 
-                                            data-name="'.s($fullname).'" 
-                                            data-img="'.s($imageurl).'">';
-
-                                    echo '<img src="'.s($imageurl).'" 
-                                            class="calendar_admin_details_create_cohort_teacher_avatar" 
-                                            alt="'.s($fullname).'" /> ';
-
-                                    echo format_string($fullname);
-
-                                    echo '</li>';
+                    <?php
+            require_once(__DIR__ . '/../../config.php');
+            require_login();
+            
+            global $DB, $PAGE, $OUTPUT;
+            
+            /** Collect unique teacher user IDs from cohorts */
+            $userIds = $DB->get_fieldset_sql("
+                SELECT DISTINCT uid
+                  FROM (
+                SELECT cohortmainteacher AS uid FROM {cohort}
+                 WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
+                UNION
+                SELECT cohortguideteacher AS uid FROM {cohort}
+                 WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
+                  ) t
+            ");
+            
+            /** Fetch user records (not deleted/suspended) */
+            $teachers = [];
+            if ($userIds) {
+                list($inSql, $params) = $DB->get_in_or_equal($userIds, SQL_PARAMS_NAMED);
+                $fields = "id, firstname, lastname, picture, imagealt,
+                   firstnamephonetic, lastnamephonetic, middlename, alternatename";
+                $teachers = $DB->get_records_select(
+            'user',
+            "id $inSql AND deleted = 0 AND suspended = 0",
+            $params,
+            'firstname ASC, lastname ASC',
+            $fields
+                );
+            }
+            
+            ?>
+                    <div>
+                        <span class="conference_modal_label">Teachers</span>
+                        <div class="conference_modal_dropdown_btn" id="peertalkTeachersDropdown">
+                            Select Teacher
+                            <span style="float:right; font-size:1rem;">
+                                <img src="./img/dropdown-arrow-down.svg" alt="">
+                            </span>
+                        </div>
+                        <div class="conference_modal_dropdown_list" id="peertalkTeachersDropdownList">
+                            <input type="text" id="searchTeachers_peertalk" class="dropdown-search"
+                                placeholder="Search teachers...">
+                            <ul id="peertalkTeachersList">
+                                <?php
+                if (!empty($teachers)) {
+                    foreach ($teachers as $teacher) {
+                        $picture = new user_picture($teacher);
+                        $picture->size = 40;
+                        $imageurl = $picture->get_url($PAGE)->out(false);
+                        $fullname = fullname($teacher, true);
+                        echo '<li class="peertalk_teacher_item"
+                                  data-userid="'.(int)$teacher->id.'"
+                                  data-name="'.s($fullname).'"
+                                  data-img="'.s($imageurl).'">';
+                        echo '<img src="'.s($imageurl).'"
+                                  class="calendar_admin_details_create_cohort_teacher_avatar"
+                                  alt="'.s($fullname).'" /> ';
+                        echo format_string($fullname);
+                        echo '</li>';
+                    }
+                } else {
+                    echo '<li aria-disabled="true">No teachers found</li>';
+                }
+                ?>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="conference_modal_fieldrow">
+                        <!-- Students Dropdown -->
+                        <div>
+                            <span class="conference_modal_label">Select Students</span>
+                            <div class="conference_modal_dropdown_btn" id="peertalkStudentsDropdown">
+                                Select Students
+                                <span style="float:right; font-size:1rem;">
+                                    <img src="./img/dropdown-arrow-down.svg" alt="">
+                                </span>
+                            </div>
+                            <div class="conference_modal_dropdown_list" id="peertalkStudentsDropdownList">
+                                <input type="text" id="searchStudents_peertalk" class="dropdown-search"
+                                    placeholder="Search students...">
+                                <ul id="peertalkStudentsList">
+                                    <?php
+                                // Get all students (users with student role)
+                                $studentRole = $DB->get_record('role', ['shortname' => 'student'], 'id');
+                                $students = [];
+            
+                                if ($studentRole) {
+                                    // Get users with student role assignments
+                                    $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.picture, u.imagealt,
+                                                   u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
+                                            FROM {user} u
+                                            JOIN {role_assignments} ra ON ra.userid = u.id
+                                            WHERE ra.roleid = :roleid
+                                              AND u.deleted = 0
+                                              AND u.suspended = 0
+                                            ORDER BY u.firstname ASC, u.lastname ASC
+                                            LIMIT 500";
+            
+                                    $students = $DB->get_records_sql($sql, ['roleid' => $studentRole->id]);
                                 }
-                            } else {
-                                echo '<li aria-disabled="true">No teachers found</li>';
-                            }
-                            ?>
-                        </ul>
+            
+                                if (!empty($students)) {
+                                    foreach ($students as $student) {
+                                        $picture = new user_picture($student);
+                                        $picture->size = 40;
+                                        $imageurl = $picture->get_url($PAGE)->out(false);
+                                        $fullname = fullname($student, true);
+                                        echo '<li class="peertalk_student_item"
+                                                data-userid="'.(int)$student->id.'"
+                                                data-name="'.s($fullname).'"
+                                                data-img="'.s($imageurl).'">';
+                                        echo '<img src="'.s($imageurl).'"
+                                                class="calendar_admin_details_create_cohort_teacher_avatar"
+                                                alt="'.s($fullname).'" /> ';
+                                        echo format_string($fullname);
+                                        echo '</li>';
+                                    }
+                                } else {
+                                    echo '<li style="pointer-events:none;opacity:.6;">No students found</li>';
+                                }
+                                ?>
+                                </ul>
+                            </div>
+                        </div>
+                        <!-- Teachers Dropdown (duplicate from view 1) -->
+                        <?php
+                    // Get teachers again for view 2
+                    $userIds2 = $DB->get_fieldset_sql("
+                        SELECT DISTINCT uid
+                        FROM (
+                                SELECT cohortmainteacher AS uid FROM {cohort}
+                                WHERE cohortmainteacher IS NOT NULL AND cohortmainteacher > 0
+                                UNION
+                                SELECT cohortguideteacher AS uid FROM {cohort}
+                                WHERE cohortguideteacher IS NOT NULL AND cohortguideteacher > 0
+                        ) t
+                    ");
+                    $teachers2 = [];
+                    if ($userIds2) {
+                        list($inSql2, $params2) = $DB->get_in_or_equal($userIds2, SQL_PARAMS_NAMED);
+                        $fields2 = "id, firstname, lastname, picture, imagealt,
+                                firstnamephonetic, lastnamephonetic, middlename, alternatename";
+                        $teachers2 = $DB->get_records_select(
+                            'user',
+                            "id $inSql2 AND deleted = 0 AND suspended = 0",
+                            $params2,
+                            'firstname ASC, lastname ASC',
+                            $fields2
+                        );
+                    }
+                    ?>
+                    </div>
+                </div>
+            </div>
+            <div class="peerTalkParticipantsLists-container">
+                <div class="conference_modal_lists_row">
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_cohort_list"></ul>
+                    </div>
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_attendees_list"></ul>
+                    </div>
+                    <div class="conference_modal_attendees_section">
+                        <ul class="conference_modal_students_list"></ul>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="conference_modal_lists_row">
-            <div class="conference_modal_attendees_section">
-                <ul class="conference_modal_cohort_list"></ul>
-            </div>
-            <div class="conference_modal_attendees_section" style="display: none;">
-                <ul class="conference_modal_students_list"></ul>
-            </div>
-            <div class="conference_modal_attendees_section">
-                <ul class="conference_modal_attendees_list"></ul>
-            </div>
-
-
-
-        </div>
-
         <button type="submit" class="peertalk_modal_btn">Schedule Peer Talk</button>
     </form>
 </div>
@@ -401,28 +331,39 @@ if ($userIds) {
     const $colorList = $parent.find('#colorDropdownList_peertalk');
 
     // View navigation
-    const $view1 = $parent.find('.peertalk-view-1');
-    const $view2 = $parent.find('.peertalk-view-2');
+    const $view1 = $parent.find('.main-peertalk-participants-container');
+
     const $navNext = $parent.find('.peertalk-nav-next');
     const $navPrev = $parent.find('.peertalk-nav-prev');
     const $studentlist = $parent.find('.conference_modal_attendees_section').eq(1);
     const $cohortlist = $parent.find('.conference_modal_attendees_section').first();
-
-    // Navigation click handlers
+    const $participantsContainer = $parent.find('.peerTalkParticipantsLists-container');
     $navNext.on('click', function() {
+        const scrollAmount = 300; // Adjust this value as needed
+        const currentScroll = $participantsContainer.scrollLeft();
 
-        $view1.hide();
-        $view2.show();
-        $cohortlist.hide();
-        $studentlist.show();
+        $participantsContainer.animate({
+            scrollLeft: currentScroll + scrollAmount
+        }, 300, 'swing');
+
+        $view1.animate({
+            scrollLeft: currentScroll + scrollAmount
+        }, 300, 'swing');
     });
 
+    // Scroll to left when prev is clicked
     $navPrev.on('click', function() {
-        $view2.hide();
-        $view1.show();
-        $cohortlist.show();
-        $studentlist.hide();
-    });
+        const scrollAmount = 300; // Adjust this value as needed
+        const currentScroll = $participantsContainer.scrollLeft();
+
+        $participantsContainer.animate({
+            scrollLeft: currentScroll - scrollAmount
+        }, 300, 'swing');
+
+        $view1.animate({
+            scrollLeft: currentScroll - scrollAmount
+        }, 300, 'swing');
+    })
 
     // These two are for the "End" options in the repeat UI.
     // Add data attributes in your HTML:
