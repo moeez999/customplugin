@@ -55,19 +55,29 @@ try {
     // -----------------------------
     $oldDetails = json_decode($statusrow->detailsjson, true);
 
-    // Extract the last previous state (if exists)
+    // Extract the FULL previous state (KEEP action also)
     $previousFinal = null;
 
     if (is_array($oldDetails)) {
 
+        // If previous cycles exist: use the LAST “current” fully
         if (!empty($oldDetails['current'])) {
             $previousFinal = $oldDetails['current'];
 
-        } else if (!empty($oldDetails['cancel'])) {
+        } 
+        // If last action was cancel, keep that FULL block
+        else if (!empty($oldDetails['cancel'])) {
             $previousFinal = $oldDetails['cancel'];
 
-        } else if (!empty($oldDetails['previous'])) {
+        } 
+        // If previous exists from older logic
+        else if (!empty($oldDetails['previous'])) {
             $previousFinal = $oldDetails['previous'];
+
+        } 
+        // Flat structure fallback
+        else {
+            $previousFinal = $oldDetails;
         }
     }
 
@@ -75,13 +85,14 @@ try {
     // Build NEW details JSON
     // -----------------------------
     $details = [
-        'previous' => $previousFinal,   // may be null if first time
+        'previous' => $previousFinal,   // full previous with action preserved
         'current'  => [
             'date'    => $newDate,
             'start'   => $newStart,
             'end'     => $newEnd,
             'teacher' => $newTeacher,
-            'time'    => time()
+            'time'    => time(),
+            'action'  => 'reschedule_instant'   // <-- ADDED here for parity with others
         ],
         'action' => 'reschedule_instant'
     ];

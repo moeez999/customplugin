@@ -46,43 +46,48 @@ try {
     $old = json_decode($statusrow->detailsjson, true);
 
     // =======================
-    // Fetch event row to get REAL previous values (fallback)
+    // Fetch event row for fallback
     // =======================
     $event = $DB->get_record('googlemeet_events', ['id' => $eventid], '*', MUST_EXIST);
 
     // =======================
     // DETERMINE LAST PREVIOUS ENTRY
+    // (MUST INCLUDE ACTION ALSO)
     // =======================
     $lastPrevious = null;
 
-    // 1️⃣ If old JSON has current → use it
+    // 1️⃣ Most recent current block (full)
     if (!empty($old['current'])) {
         $lastPrevious = $old['current'];
     }
-    // 2️⃣ If old JSON has previous → use it
+    // 2️⃣ Previous block
     else if (!empty($old['previous'])) {
         $lastPrevious = $old['previous'];
     }
-    // 3️⃣ If old JSON has history → last entry
+    // 3️⃣ Cancel block (previous cancel)
+    else if (!empty($old['cancel'])) {
+        $lastPrevious = $old['cancel'];
+    }
+    // 4️⃣ History array last entry
     else if (!empty($old['history']) && is_array($old['history'])) {
         $lastPrevious = end($old['history']);
     }
-    // 4️⃣ FALLBACK: Use actual event data from googlemeet_events
+    // 5️⃣ Fallback to DB event data
     else {
-        // Reconstruct previous schedule from DB
         $lastPrevious = [
-            'date'    => date("Y-m-d", $event->starttime),
-            'start'   => date("H:i", $event->starttime),
-            'end'     => date("H:i", $event->endtime),
-            'teacher' => (int)$event->teacher
+            'date'    => date("Y-m-d", $event->eventdate),
+            'start'   => date("H:i", $event->eventdate),
+            'end'     => date("H:i", $event->eventdate + ($event->duration * 60)),
+            'teacher' => 0,   // no teacher in group event table
+            'action'  => 'original'
         ];
     }
 
     // =======================
-    // NEW JSON (only previous + cancel)
+    // NEW JSON: previous + current(cancel)
     // =======================
     $details = [
-        'previous' => $lastPrevious,    // ALWAYS ONLY ONE LAST PREVIOUS
+        'previous' => $lastPrevious,
         'current' => [
             'action'     => 'cancel_no_makeup',
             'reason'     => $reason,
@@ -94,7 +99,7 @@ try {
     ];
 
     // =======================
-    // UPDATE THE STATUS ROW
+    // Update Status Row
     // =======================
     $update = new stdClass();
     $update->id           = $statusrow->id;

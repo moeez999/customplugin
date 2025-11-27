@@ -1493,6 +1493,81 @@ try {
 }
 
 
+// ----------------------------------------------------------
+// TEACHER TIMEOFF FOR ALL TEACHERS DETECTED IN EVENTS
+// ----------------------------------------------------------
+$teacherTimeoff = [];
+
+try {
+    // 1) Collect all teacher IDs from filtered events
+    $allTeacherIds = [];
+    foreach ($filtered as $ev) {
+        if (!empty($ev['teacherids']) && is_array($ev['teacherids'])) {
+            foreach ($ev['teacherids'] as $tid) {
+                $allTeacherIds[] = (int)$tid;
+            }
+        }
+    }
+    $allTeacherIds = array_values(array_unique(array_filter($allTeacherIds)));
+
+    // 2) For each teacher, fetch timeoff inside window
+    foreach ($allTeacherIds as $tid) {
+
+        $records = $DB->get_records_select(
+            'local_teacher_timeoff',
+            'teacherid = :tid
+             AND untildate >= :winstart
+             AND fromdate <= :winend',
+            [
+                'tid'      => $tid,
+                'winstart' => $startts,
+                'winend'   => $endts
+            ],
+            'fromdate ASC'
+        );
+
+        $list = [];
+
+        foreach ($records as $r) {
+
+            // allday vs timed
+            if ((int)$r->allday === 1) {
+                $start_ts = (int)$r->fromdate;            // 00:00
+                $end_ts   = (int)$r->untildate + 86399;   // 23:59:59
+            } else {
+                $start_ts = (int)$r->fromtime;
+                $end_ts   = (int)$r->untiltime;
+            }
+
+            // Window check
+            if ($end_ts < $startts || $start_ts > $endts) {
+                continue;
+            }
+
+            $list[] = [
+                'id'        => (int)$r->id,
+                'teacherid' => (int)$r->teacherid,
+                'title'     => $r->title,
+                'allday'    => (int)$r->allday,
+
+                'start_ts'  => $start_ts,
+                'end_ts'    => $end_ts,
+
+                'start'     => $fmt_iso($start_ts),
+                'end'       => $fmt_iso($end_ts),
+            ];
+        }
+
+        $teacherTimeoff[$tid] = $list;
+    }
+
+} catch (Throwable $e) {
+    $teacherTimeoff = [];
+}
+
+
+
+
     echo json_encode([
         'ok'      => true,
         'filters' => [
@@ -1507,6 +1582,7 @@ try {
         'events'   => array_values($filtered),
         'peertalk' => array_values($peertalkEvents),
         'conference' => array_values($conferenceEvents),
+        'teacher_timeoff' => $teacherTimeoff
     ]);
 
 } catch (Exception $e) {

@@ -746,6 +746,36 @@ input#class-name {
 </div>
 
 <script>
+// Loader and toast helpers
+function showGlobalLoader() {
+    if (window.$) {
+        window.$('#loader').css('display', 'flex');
+    } else {
+        var el = document.getElementById('loader');
+        if (el) el.style.display = 'flex';
+    }
+    window.__loaderShownAt = Date.now();
+}
+
+function hideGlobalLoader() {
+    var elapsed = window.__loaderShownAt ? Date.now() - window.__loaderShownAt : 3000;
+
+    function doHide() {
+        if (window.$) {
+            window.$('#loader').css('display', 'none');
+        } else {
+            var el = document.getElementById('loader');
+            if (el) el.style.display = 'none';
+        }
+        window.__loaderShownAt = 0;
+    }
+    if (elapsed >= 3000) {
+        doHide();
+    } else {
+        setTimeout(doHide, 3000 - elapsed);
+    }
+}
+
 $(document).ready(function() {
     // Calendar variables for manage session modal
     let sessionCalSelectedDate = new Date();
@@ -1677,6 +1707,73 @@ $(document).ready(function() {
 
         console.log('Cancel and Reschedule Later Payload:', payload);
 
+
+        // Show loader
+        if (typeof showGlobalLoader === 'function') {
+            showGlobalLoader();
+        } else {
+            $("body").append(
+                '<div id="custom-global-loader" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;"><div style="padding:20px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0002;">Loading...</div></div>'
+            );
+        }
+
+        $.ajax({
+            url: M.cfg.wwwroot + "/local/customplugin/ajax/cancel_reschedule_later.php",
+            type: "POST",
+            data: JSON.stringify(payload),
+            contentType: "application/json",
+            success: function(response) {
+                console.log("Cancel Later Response:", response);
+                // Hide loader
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                } else {
+                    $('#custom-global-loader').remove();
+                }
+                // Show toast
+                if (typeof showToast === 'function') {
+                    showToast('Session marked as Cancel (Reschedule Later)', 'success');
+                } else {
+                    $("body").append(
+                        '<div id="custom-toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:16px 32px;border-radius:8px;z-index:99999;">Session marked as Cancel (Reschedule Later)</div>'
+                    );
+                    setTimeout(function() {
+                        $('#custom-toast').fadeOut(400, function() {
+                            $(this).remove();
+                        });
+                    }, 2200);
+                }
+                // Reset form
+                $('#cr-reason').data('selected-value', null);
+                $('#cr-reason .cr-select-placeholder').text('Select Reason');
+                $('#cr-notes').val('');
+                // Close modal
+                $("#manage-session-modal").fadeOut(300);
+                $('#cancel-reschedule-modal').fadeOut(300);
+            },
+            error: function(xhr) {
+                // Hide loader
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                } else {
+                    $('#custom-global-loader').remove();
+                }
+                // Show toast
+                if (typeof showToast === 'function') {
+                    showToast('Something went wrong while updating the session.', 'error');
+                } else {
+                    $("body").append(
+                        '<div id="custom-toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#d32f2f;color:#fff;padding:16px 32px;border-radius:8px;z-index:99999;">Something went wrong while updating the session.</div>'
+                    );
+                    setTimeout(function() {
+                        $('#custom-toast').fadeOut(400, function() {
+                            $(this).remove();
+                        });
+                    }, 2200);
+                }
+            },
+        });
+
         // TODO: Add AJAX call here
         /*
         $.ajax({
@@ -1697,7 +1794,7 @@ $(document).ready(function() {
         */
 
         // Close modal after successful submission
-        $('#cancel-reschedule-modal').fadeOut(300);
+        // (Handled above)
     });
 
     // Cancel (No Make-Up) modal - Cancel button closes modal
@@ -1758,33 +1855,102 @@ $(document).ready(function() {
 
         console.log('Cancel (No Make-Up) Payload:', payload);
 
-            $.ajax({
-        url: M.cfg.wwwroot + "/local/customplugin/ajax/calendar_admin_cancel_event.php",
-        type: "POST",
-        data: JSON.stringify(payload),
-        contentType: "application/json",
-        success: function (response) {
-            console.log("Cancel Response:", response);
 
-            if (response.status === "success") {
-                alert("Class cancelled successfully!");
-            } else {
-                alert("Error: " + response.error);
-            }
-
-            // Close modal if you have one
-            $("#manage-session-modal").fadeOut(300);
-
-            // Reload calendar (optional)
-            if (typeof loadCalendarEvents === "function") {
-                loadCalendarEvents();
-            }
-        },
-        error: function (xhr) {
-            console.error("Cancel Error:", xhr.responseText);
-            alert("Something went wrong while cancelling the class.");
+        // Show loader
+        if (typeof showGlobalLoader === 'function') {
+            showGlobalLoader();
+        } else {
+            $("body").append(
+                '<div id="custom-global-loader" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;"><div style="padding:20px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0002;">Loading...</div></div>'
+            );
         }
-    });
+
+        $.ajax({
+            url: M.cfg.wwwroot + "/local/customplugin/ajax/calendar_admin_cancel_event.php",
+            type: "POST",
+            data: JSON.stringify(payload),
+            contentType: "application/json",
+            success: function(response) {
+                // Hide loader
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                } else {
+                    $('#custom-global-loader').remove();
+                }
+                console.log("Cancel Response:", response);
+                if (response.status === "success") {
+                    // Show toast
+                    if (typeof showToast === 'function') {
+                        showToast('Class cancelled successfully!', 'success');
+                    } else {
+                        $("body").append(
+                            '<div id="custom-toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:16px 32px;border-radius:8px;z-index:99999;">Class cancelled successfully!</div>'
+                        );
+                        setTimeout(function() {
+                            $('#custom-toast').fadeOut(400, function() {
+                                $(this).remove();
+                            });
+                        }, 2200);
+                    }
+                    // Reset form
+                    $('#cancel-reason').data('selected-value', null);
+                    $('#cancel-reason .cancel-placeholder-text').text('Select Reason');
+                    $('#specific-notes').val('');
+                } else {
+                    // Show toast
+                    if (typeof showToast === 'function') {
+                        showToast('Error: ' + response.error, 'error');
+                    } else {
+                        $("body").append(
+                            '<div id="custom-toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#d32f2f;color:#fff;padding:16px 32px;border-radius:8px;z-index:99999;">Error: ' +
+                            response.error + '</div>');
+                        setTimeout(function() {
+                            $('#custom-toast').fadeOut(400, function() {
+                                $(this).remove();
+                            });
+                        }, 2200);
+                    }
+                }
+                // Close modal if you have one
+                $("#manage-session-modal").fadeOut(300);
+                // Reload calendar (optional)
+                if (typeof loadCalendarEvents === "function") {
+                    loadCalendarEvents();
+                }
+                // Close both modals
+                $('#cancel-confirmation-modal').fadeOut(300);
+                $('#cancel-nomakeup-modal').fadeOut(300);
+            },
+            error: function(xhr) {
+                // Hide loader
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                } else {
+                    $('#custom-global-loader').remove();
+                }
+                console.error("Cancel Error:", xhr.responseText);
+                // Show toast
+                if (typeof showToast === 'function') {
+                    showToast('Something went wrong while cancelling the class.', 'error');
+                } else {
+                    $("body").append(
+                        '<div id="custom-toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#d32f2f;color:#fff;padding:16px 32px;border-radius:8px;z-index:99999;">Something went wrong while cancelling the class.</div>'
+                    );
+                    setTimeout(function() {
+                        $('#custom-toast').fadeOut(400, function() {
+                            $(this).remove();
+                        });
+                    }, 2200);
+                }
+                // Reset form
+                $('#cancel-reason').data('selected-value', null);
+                $('#cancel-reason .cancel-placeholder-text').text('Select Reason');
+                $('#specific-notes').val('');
+                // Close both modals
+                $('#cancel-confirmation-modal').fadeOut(300);
+                $('#cancel-nomakeup-modal').fadeOut(300);
+            }
+        });
 
         // TODO: Add AJAX call here to actually cancel the session
         /*
@@ -1806,9 +1972,7 @@ $(document).ready(function() {
         });
         */
 
-        // Close both modals
-        $('#cancel-confirmation-modal').fadeOut(300);
-        $('#cancel-nomakeup-modal').fadeOut(300);
+        // (Handled above)
     });
 
     // Close confirmation modal when clicking outside

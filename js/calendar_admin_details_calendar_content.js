@@ -2072,6 +2072,9 @@ $(function () {
     });
     */
 
+    // Show loader
+    if (window.showGlobalLoader) window.showGlobalLoader();
+
     $.ajax({
       url: M.cfg.wwwroot + "/local/customplugin/ajax/reschedule_groupclass.php",
       type: "POST",
@@ -2079,18 +2082,64 @@ $(function () {
       contentType: "application/json",
       success: function (response) {
         console.log("Reschedule Response:", response);
-        alert("Session updated successfully!");
+        if (window.hideGlobalLoader) window.hideGlobalLoader();
+        if (window.showToast) {
+          window.showToast("Session updated successfully!", "success");
+        } else {
+          // fallback toast
+          let toast = document.createElement('div');
+          toast.className = 'custom-toast success';
+          toast.innerText = 'Session updated successfully!';
+          toast.style.position = 'fixed';
+          toast.style.bottom = '32px';
+          toast.style.left = '50%';
+          toast.style.transform = 'translateX(-50%)';
+          toast.style.background = '#1649c7';
+          toast.style.color = '#fff';
+          toast.style.padding = '12px 32px';
+          toast.style.borderRadius = '8px';
+          toast.style.fontSize = '1rem';
+          toast.style.zIndex = 9999;
+          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          document.body.appendChild(toast);
+          setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 400);
+          }, 2200);
+        }
         $("#manage-session-modal").fadeOut(300);
+        $(".custom-dropdown .dropdown-list").hide();
       },
       error: function (xhr) {
-        console.error("Reschedule Error:", xhr.responseText);
-        alert("Something went wrong while updating session.");
+        if (window.hideGlobalLoader) window.hideGlobalLoader();
+        if (window.showToast) {
+          window.showToast("Something went wrong while updating session.", "error");
+        } else {
+          let toast = document.createElement('div');
+          toast.className = 'custom-toast error';
+          toast.innerText = 'Something went wrong while updating session.';
+          toast.style.position = 'fixed';
+          toast.style.bottom = '32px';
+          toast.style.left = '50%';
+          toast.style.transform = 'translateX(-50%)';
+          toast.style.background = '#fe2e0c';
+          toast.style.color = '#fff';
+          toast.style.padding = '12px 32px';
+          toast.style.borderRadius = '8px';
+          toast.style.fontSize = '1rem';
+          toast.style.zIndex = 9999;
+          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          document.body.appendChild(toast);
+          setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 400);
+          }, 2200);
+        }
       },
+      complete: function() {
+        if (window.hideGlobalLoader) window.hideGlobalLoader();
+      }
     });
-
-    // Close modal
-    $("#manage-session-modal").fadeOut(300);
-    $(".custom-dropdown .dropdown-list").hide();
   });
 
   /* ====== CLICK: empty slot -> open cohort modal ====== */
