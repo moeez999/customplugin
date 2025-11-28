@@ -1567,6 +1567,49 @@ try {
 
 
 
+// ----------------------------------------------------------
+// TEACHER EXTRA SLOTS
+// ----------------------------------------------------------
+$teacherExtraSlots = [];
+
+try {
+    foreach ($allTeacherIds as $tid) {
+
+        $records = $DB->get_records_select(
+            'local_teacher_extra_slots',
+            'teacherid = :tid
+             AND end_ts >= :winstart
+             AND start_ts <= :winend',
+            [
+                'tid'      => $tid,
+                'winstart' => $startts,
+                'winend'   => $endts
+            ],
+            'start_ts ASC'
+        );
+
+        $list = [];
+
+        foreach ($records as $r) {
+            $list[] = [
+                'id'        => (int)$r->id,
+                'teacherid' => (int)$r->teacherid,
+                'title'     => $r->title,
+                'start_ts'  => (int)$r->start_ts,
+                'end_ts'    => (int)$r->end_ts,
+                'start'     => $fmt_iso((int)$r->start_ts),
+                'end'       => $fmt_iso((int)$r->end_ts),
+            ];
+        }
+
+        $teacherExtraSlots[$tid] = $list;
+    }
+} catch (Throwable $e) {
+    $teacherExtraSlots = [];
+}
+
+
+
 
     echo json_encode([
         'ok'      => true,
@@ -1582,7 +1625,8 @@ try {
         'events'   => array_values($filtered),
         'peertalk' => array_values($peertalkEvents),
         'conference' => array_values($conferenceEvents),
-        'teacher_timeoff' => $teacherTimeoff
+        'teacher_timeoff' => $teacherTimeoff,
+        'teacher_extra_slots' => $teacherExtraSlots
     ]);
 
 } catch (Exception $e) {

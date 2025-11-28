@@ -3140,6 +3140,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             alert('Session updated successfully!');
 
+            if (window.refetchCustomPluginData) {
+                window.refetchCustomPluginData('update-one2one');
+            } else if (window.fetchCalendarEvents) {
+                window.fetchCalendarEvents();
+            }
+
             // Reset form after successful submission
             resetManageClassForm();
         } catch (error) {

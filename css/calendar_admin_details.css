@@ -1340,7 +1340,13 @@ body {
 .student-cohort-header:first-child {
   margin-top: 0;
 }
-
+.wrapper-course {
+  width: 100%;
+  padding: 24px 16px !important;
+  background-color: #fff;
+  border-radius: 7px;
+  transition: all 0.2s ease-in-out;
+}
 .student-option {
   border-radius: 10px;
   transition: background 0.2s;

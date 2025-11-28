@@ -1897,6 +1897,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 showToastCreateClass('✅ 1:1 Class scheduled successfully!', 'success');
 
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('create-one2one');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                }
+
                 // Optional: Reset form after success
                 setTimeout(() => {
                     resetOne2OneForm();

@@ -2087,25 +2087,30 @@ $(function () {
           window.showToast("Session updated successfully!", "success");
         } else {
           // fallback toast
-          let toast = document.createElement('div');
-          toast.className = 'custom-toast success';
-          toast.innerText = 'Session updated successfully!';
-          toast.style.position = 'fixed';
-          toast.style.bottom = '32px';
-          toast.style.left = '50%';
-          toast.style.transform = 'translateX(-50%)';
-          toast.style.background = '#1649c7';
-          toast.style.color = '#fff';
-          toast.style.padding = '12px 32px';
-          toast.style.borderRadius = '8px';
-          toast.style.fontSize = '1rem';
+          let toast = document.createElement("div");
+          toast.className = "custom-toast success";
+          toast.innerText = "Session updated successfully!";
+          toast.style.position = "fixed";
+          toast.style.bottom = "32px";
+          toast.style.left = "50%";
+          toast.style.transform = "translateX(-50%)";
+          toast.style.background = "#1649c7";
+          toast.style.color = "#fff";
+          toast.style.padding = "12px 32px";
+          toast.style.borderRadius = "8px";
+          toast.style.fontSize = "1rem";
           toast.style.zIndex = 9999;
-          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
           document.body.appendChild(toast);
           setTimeout(() => {
-            toast.style.opacity = '0';
+            toast.style.opacity = "0";
             setTimeout(() => toast.remove(), 400);
           }, 2200);
+        }
+        if (window.refetchCustomPluginData) {
+          window.refetchCustomPluginData("reschedule");
+        } else if (window.fetchCalendarEvents) {
+          window.fetchCalendarEvents();
         }
         $("#manage-session-modal").fadeOut(300);
         $(".custom-dropdown .dropdown-list").hide();
@@ -2113,32 +2118,35 @@ $(function () {
       error: function (xhr) {
         if (window.hideGlobalLoader) window.hideGlobalLoader();
         if (window.showToast) {
-          window.showToast("Something went wrong while updating session.", "error");
+          window.showToast(
+            "Something went wrong while updating session.",
+            "error"
+          );
         } else {
-          let toast = document.createElement('div');
-          toast.className = 'custom-toast error';
-          toast.innerText = 'Something went wrong while updating session.';
-          toast.style.position = 'fixed';
-          toast.style.bottom = '32px';
-          toast.style.left = '50%';
-          toast.style.transform = 'translateX(-50%)';
-          toast.style.background = '#fe2e0c';
-          toast.style.color = '#fff';
-          toast.style.padding = '12px 32px';
-          toast.style.borderRadius = '8px';
-          toast.style.fontSize = '1rem';
+          let toast = document.createElement("div");
+          toast.className = "custom-toast error";
+          toast.innerText = "Something went wrong while updating session.";
+          toast.style.position = "fixed";
+          toast.style.bottom = "32px";
+          toast.style.left = "50%";
+          toast.style.transform = "translateX(-50%)";
+          toast.style.background = "#fe2e0c";
+          toast.style.color = "#fff";
+          toast.style.padding = "12px 32px";
+          toast.style.borderRadius = "8px";
+          toast.style.fontSize = "1rem";
           toast.style.zIndex = 9999;
-          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
           document.body.appendChild(toast);
           setTimeout(() => {
-            toast.style.opacity = '0';
+            toast.style.opacity = "0";
             setTimeout(() => toast.remove(), 400);
           }, 2200);
         }
       },
-      complete: function() {
+      complete: function () {
         if (window.hideGlobalLoader) window.hideGlobalLoader();
-      }
+      },
     });
   });
 
@@ -4421,70 +4429,118 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (allEvents.length > 0) {
-        window.events = allEvents.map((ev) => {
+        window.events = [];
+        allEvents.forEach((ev) => {
           const startDate = new Date(ev.start);
           const endDate = new Date(ev.end);
 
           // Match event teacher with selected teachers for proper color assignment
           let teacherId = null;
-
           if (teacherids && teacherids.length > 0) {
-            // Find which selected teacher is associated with this event
             const eventTeacherIds = Array.isArray(ev.teacherids)
               ? ev.teacherids
               : ev.teacher_id
               ? [ev.teacher_id]
               : [];
-
-            // Find first match between selected teachers and event teachers
             teacherId =
               teacherids.find((selectedId) =>
                 eventTeacherIds.includes(selectedId)
-              ) || eventTeacherIds[0]; // Fallback to event's first teacher
+              ) || eventTeacherIds[0];
           } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
-            // No teacher filter: use first teacher from event data
             teacherId = ev.teacherids[0];
           } else if (ev.teacher_id) {
-            // Fallback: use single teacher_id field
             teacherId = ev.teacher_id;
           }
 
-          // Determine event color based on class type
-          let eventColor = "e-blue"; // Default for main classes
+          let eventColor = "e-blue";
           if (
             ev.class_type === "one2one_weekly" ||
             ev.class_type === "one2one_single"
           ) {
             eventColor = "e-green";
           } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
-            eventColor = "e-purple"; // Purple for peertalk events
+            eventColor = "e-purple";
           } else if (
             ev.class_type === "conference" ||
             ev.source === "conference"
           ) {
-            eventColor = "e-orange"; // Orange for conference events
+            eventColor = "e-orange";
           }
 
-          return {
+          // Main event object
+          const eventObj = {
             date: startDate.toISOString().split("T")[0],
-            title: ev.title,
+            title: ev.title || "",
             start: startDate.toTimeString().slice(0, 5),
             end: endDate.toTimeString().slice(0, 5),
             color: eventColor,
-            repeat: ev.is_recurring,
-            meetingurl: ev.meetingurl,
-            viewurl: ev.viewurl || ev.meetingurl,
-            avatar: "",
-            teacherId: teacherId,
-            classType: ev.class_type,
+            repeat:
+              typeof ev.is_recurring !== "undefined"
+                ? ev.is_recurring
+                : ev.repeat || false,
+            meetingurl: ev.meetingurl || "",
+            viewurl: ev.viewurl || ev.meetingurl || "",
+            avatar: ev.avatar || "",
+            teacherId:
+              typeof teacherId !== "undefined"
+                ? teacherId
+                : ev.teacherId || (ev.teacherids && ev.teacherids[0]) || "",
+            classType: ev.classType || ev.class_type || "",
             source: ev.source || "event",
             studentnames: ev.studentnames || [],
             studentids: ev.studentids || [],
             cohortids: ev.cohortids || [],
-            eventid: ev.eventid,
-            cmid: ev.cmid,
-            googlemeetid: ev.googlemeetid,
+            eventid: ev.eventid || "",
+            cmid: ev.cmid || 0,
+            googlemeetid:
+              typeof ev.googlemeetid !== "undefined" ? ev.googlemeetid : 0,
+            courseid: typeof ev.courseid !== "undefined" ? ev.courseid : 0,
+            is_parent:
+              typeof ev.is_parent !== "undefined" ? ev.is_parent : false,
+            main_event_id:
+              typeof ev.main_event_id !== "undefined" ? ev.main_event_id : "",
+            sequence: typeof ev.sequence !== "undefined" ? ev.sequence : 1,
+            teachernames: ev.teachernames || [],
+            statuses: ev.statuses || [],
+            rescheduled:
+              typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
+            faded: false,
           };
+          window.events.push(eventObj);
+          debugger;
+          // If event is reschedule_instant, add previous event as faded
+          if (
+            Array.isArray(ev.statuses) &&
+            ev.statuses.some(
+              (s) => s.code === "reschedule_instant" && s.previous
+            )
+          ) {
+            debugger;
+            // Find the status with previous
+            const statusObj = ev.statuses.find(
+              (s) => s.code === "reschedule_instant" && s.previous
+            );
+            if (statusObj && statusObj.previous) {
+              // Parse previous event date and times
+              const prevDate = statusObj.previous.date;
+              const prevStart = statusObj.previous.start;
+              const prevEnd = statusObj.previous.end;
+              // Use previous teacher/avatar if available
+              window.events.push({
+                ...eventObj,
+                date: prevDate,
+                start: prevStart,
+                end: prevEnd,
+                faded: true,
+                title: eventObj.title
+                  ? eventObj.title + " (Previous)"
+                  : "Previous Event",
+                teacherId: statusObj.previous.teacher || eventObj.teacherId,
+                avatar: ev.previous_teacher_picture || eventObj.avatar,
+                teachernames: [ev.previous_teachername || ""],
+              });
+            }
+          }
         });
 
         // Re-render your week view
@@ -4502,6 +4558,35 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
+
+  // Unified helper to reload dropdown data + calendar after mutations
+  async function refetchCustomPluginData(reason = "") {
+    try {
+      console.log(
+        `Refetching calendar data${reason ? ` (${reason})` : ""}`
+      );
+
+      await Promise.allSettled([
+        loadTeachers(),
+        selectedTeacherIds.length
+          ? loadCohortsForTeachers(selectedTeacherIds, false)
+          : loadAllCohorts(),
+        selectedCohortIds.length
+          ? loadStudentsForCohorts(selectedCohortIds, false)
+          : loadAllStudents(),
+      ]);
+
+      if (typeof fetchCalendarEvents === "function") {
+        await fetchCalendarEvents();
+      } else if (typeof triggerCalendarReload === "function") {
+        triggerCalendarReload();
+      }
+    } catch (err) {
+      console.error("refetchCustomPluginData failed", err);
+    }
+  }
+
+  window.refetchCustomPluginData = refetchCustomPluginData;
 
   // Expose globally so it can be called from filter changes
   window.fetchCalendarEvents = fetchCalendarEvents;

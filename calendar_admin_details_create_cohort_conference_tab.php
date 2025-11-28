@@ -749,6 +749,12 @@
                     alert("🎉 Conference created successfully!");
                 }
 
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('create-conference');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                }
+
                 // Reset conference form
                 resetConferenceForm();
             })

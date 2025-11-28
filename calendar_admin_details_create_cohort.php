@@ -1245,6 +1245,12 @@
 
                             showToast('Cohort created successfully: ' + name);
 
+                            if (window.refetchCustomPluginData) {
+                                window.refetchCustomPluginData('create-cohort');
+                            } else if (window.fetchCalendarEvents) {
+                                window.fetchCalendarEvents();
+                            }
+
 
                             resetCohortFields();
                         } catch (err) {

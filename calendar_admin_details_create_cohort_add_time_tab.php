@@ -788,6 +788,28 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             console.log('✅ Add Time form payload:', payload);
+
+                    $.ajax({
+            url: M.cfg.wwwroot + "/local/customplugin/ajax/teacher_timeoff_add.php",
+            type: "POST",
+            data: JSON.stringify(payload),
+            contentType: "application/json",
+            success: function (response) {
+                console.log("Time Off Response:", response);
+
+                if (response.status === "success") {
+                    alert("Teacher time off scheduled successfully!");
+                    $("#manage-session-modal").fadeOut(300);
+                } else {
+                    alert("Failed: " + response.error);
+                }
+            },
+            error: function (xhr) {
+                console.error("Error:", xhr.responseText);
+                alert("Something went wrong.");
+            }
+        });
+
         });
 
 
