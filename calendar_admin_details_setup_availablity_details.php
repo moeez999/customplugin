@@ -653,23 +653,7 @@
 
                                 <div class="calendar_admin_details_setup_availablity_blocklayer"
                                     id="calendar_admin_details_setup_availablity_blocks">
-                                    <!-- Initial blocks remain the same -->
-                                    <div class="calendar_admin_details_setup_availablity_block" data-day="3"
-                                        data-slot="16"
-                                        style="top:calc(var(--cal-setup-hour)*8); height:calc(var(--cal-setup-hour)*3);
-                          left:calc((100% - var(--cal-setup-timecol))/7*3 + var(--cal-setup-timecol));
-                          right:calc((100% - var(--cal-setup-timecol)) - ((100% - var(--cal-setup-timecol))/7*4 + var(--cal-setup-timecol)));">
-                                        <div class="calendar_admin_details_setup_availablity_timelabel"></div>
-                                        <div class="calendar_admin_details_setup_availablity_resize">v</div>
-                                    </div>
-                                    <div class="calendar_admin_details_setup_availablity_block" data-day="4"
-                                        data-slot="22"
-                                        style="top:calc(var(--cal-setup-hour)*11); height:calc(var(--cal-setup-hour)*3);
-                          left:calc((100% - var(--cal-setup-timecol))/7*4 + var(--cal-setup-timecol));
-                          right:calc((100% - var(--cal-setup-timecol)) - ((100% - var(--cal-setup-timecol))/7*5 + var(--cal-setup-timecol)));">
-                                        <div class="calendar_admin_details_setup_availablity_timelabel"></div>
-                                        <div class="calendar_admin_details_setup_availablity_resize">v</div>
-                                    </div>
+                                    <!-- Blocks will be rendered dynamically -->
                                 </div>
                             </div>
                         </div>
@@ -752,6 +736,34 @@
             slots: slots,
             action: action,
             startDate: getStartDate()
+        });
+
+        // =============================
+        // AJAX CALL TO BACKEND
+        // =============================
+        $.ajax({
+            url: M.cfg.wwwroot + "/local/customplugin/ajax/teacher_availability.php",
+            type: "POST",
+            data: JSON.stringify({
+                teacher: teacherPayload,
+                slots: slots,
+                action: action,
+                startDate: getStartDate()
+            }),
+            contentType: "application/json",
+            success: function(response) {
+                console.log("Availability Response:", response);
+
+                if (response.status === "success") {
+                    alert("Availability saved successfully (" + response.action + ")");
+                } else {
+                    alert("Error: " + response.error);
+                }
+            },
+            error: function(xhr) {
+                console.error("Availability Error:", xhr.responseText);
+                alert("Something went wrong while saving availability.");
+            }
         });
     }
 
@@ -847,6 +859,34 @@
 
             $('body').append($menu);
 
+            function fetchTeacherAvailability(payload) {
+                $.ajax({
+                    url: M.cfg.wwwroot + "/local/customplugin/ajax/get_teacher_availability.php",
+                    type: "POST",
+                    data: JSON.stringify(payload),
+                    contentType: "application/json",
+                    success: function (res) {
+                        console.log("Teacher availability response:", res);
+
+                        if (!res || res.ok === false) {
+                            alert("Failed to load availability: " + (res && res.error ? res.error : "Unknown error"));
+                            return;
+                        }
+
+                        const slots = Array.isArray(res.availability) ? res.availability : [];
+                        if (typeof window.renderAvailability === "function") {
+                            window.renderAvailability(slots);
+                        } else {
+                            console.warn("renderAvailability not ready; availability data skipped");
+                        }
+                    },
+                    error: function (xhr) {
+                        console.error("Load teacher availability error:", xhr.responseText);
+                        alert("Something went wrong while loading availability.");
+                    }
+                });
+            }
+
             // Initialize first teacher
             if (teachers.length > 0) {
                 $('#calendar_admin_details_setup_availablity_username').text(teachers[0].name);
@@ -858,6 +898,7 @@
                     .attr('data-teacher-id', teachers[0].id)
                     .attr('data-teacher-name', teachers[0].name)
                     .attr('data-teacher-img', teachers[0].img);
+                fetchTeacherAvailability(teachers[0]);
             }
 
             function pos() {
@@ -890,7 +931,7 @@
             function dcl(e) {
                 if (!$(e.target).closest(
                         '#calendar_admin_details_setup_availablity_menu,#calendar_admin_details_setup_availablity_userbtn'
-                        ).length) close();
+                    ).length) close();
             }
 
             function k(e) {
@@ -919,6 +960,7 @@
                     img: $(this).data('img')
                 };
                 console.log('Selected teacher payload:', payload);
+                fetchTeacherAvailability(payload);
                 $('#calendar_admin_details_setup_availablity_username').text(payload.name);
                 $('#calendar_admin_details_setup_availablity_avatar').attr('src', payload.img);
                 const $userBtn = $('#calendar_admin_details_setup_availablity_userbtn');
@@ -1000,6 +1042,66 @@
             else $block.prepend(`<span class="calendar_admin_details_setup_availablity_timelabel">${label}</span>`);
         }
         window.__cal_updateLabel = updateLabel;
+
+        // Render availability blocks from backend payload
+        const DAY_TO_INDEX = {
+            monday: 0,
+            tuesday: 1,
+            wednesday: 2,
+            thursday: 3,
+            friday: 4,
+            saturday: 5,
+            sunday: 6
+        };
+
+        function toMinutes(val) {
+            if (typeof val === 'number' && !Number.isNaN(val)) return val;
+            if (typeof val === 'string') {
+                if (val.includes(':')) {
+                    const parts = val.split(':');
+                    const h = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1] || '0', 10);
+                    if (!Number.isNaN(h)) return h * 60 + (Number.isNaN(m) ? 0 : m);
+                }
+                const parsed = parseInt(val, 10);
+                if (!Number.isNaN(parsed)) return parsed;
+            }
+            return null;
+        }
+
+        function renderAvailability(slots = []) {
+            $('.calendar_admin_details_setup_availablity_day .calendar_admin_details_setup_availablity_block').remove();
+            $('#calendar_admin_details_setup_availablity_blocks').empty();
+
+            if (!Array.isArray(slots)) return;
+
+            slots.forEach((slot) => {
+                const dayIdx = DAY_TO_INDEX[String(slot.day || '').toLowerCase()];
+                if (typeof dayIdx !== 'number') return;
+
+                const startMin = toMinutes(slot.startTime);
+                const endMin = toMinutes(slot.endTime);
+                if (startMin === null || endMin === null || endMin <= startMin) return;
+
+                const $day = $('.calendar_admin_details_setup_availablity_day').eq(dayIdx);
+                if (!$day.length) return;
+
+                const slotIndex = Math.floor(startMin / 30);
+                const topPx = slotIndex * SLOT_H;
+                const heightPx = Math.max(MIN_H, ((endMin - startMin) / 30) * SLOT_H);
+
+                const $block = $(`
+                    <div class="calendar_admin_details_setup_availablity_block" data-day="${dayIdx}" data-slot="${slotIndex}" style="top:${topPx}px; height:${heightPx}px;">
+                        <div class="calendar_admin_details_setup_availablity_timelabel"></div>
+                        <div class="calendar_admin_details_setup_availablity_resize">v</div>
+                    </div>
+                `);
+
+                $day.append($block);
+                updateLabel($block, startMin, endMin);
+            });
+        }
+        window.renderAvailability = renderAvailability;
 
         // Delete UI management
         function clearDeleteUI() {
@@ -1224,7 +1326,7 @@
         $(document).on('click', function(e) {
             if (!$(e.target).closest(
                     '.calendar_admin_details_setup_availablity_block,.calendar_admin_details_setup_availablity_deletebtn'
-                    ).length) {
+                ).length) {
                 clearDeleteUI();
             }
         });

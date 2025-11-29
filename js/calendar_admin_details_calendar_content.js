@@ -66,19 +66,8 @@ function getTeacherColor(teacherId) {
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/* ====== WHITE SLOT WINDOWS ======
-   days: 'all' | [0..6]  (Mon=0 ... Sun=6)
-   Or target a specific ISO date with { date:'YYYY-MM-DD', ... }
-*/
-
-const WHITE_SLOTS = [
-  // Example per your ask: 10:00–11:00 PM and 11:00 PM–12:00 AM every day
-  { days: "all", start: "22:00", end: "23:00" },
-  { days: "all", start: "23:00", end: "24:00" },
-  // More examples you can add later:
-  // { days:[5,6], start:'18:00', end:'20:00' },
-  // { date:'2025-08-31', start:'10:00', end:'12:00' },
-];
+// White slot windows derived from teacher availability payloads
+let whiteSlotRules = [];
 
 window.events = [];
 function pad2(n) {
@@ -122,29 +111,22 @@ function rangeText(startDate) {
     : `${m1} ${d1} - ${d2}, ${y}`;
 }
 
-/* NEW: check if a slot minute falls in any WHITE_SLOTS rule */
+/* NEW: check if a slot minute falls in any availability-derived white slot rule */
 function isWhiteSlotFor(dayIndex, isoDate, minuteOfDay) {
   const toMin = (hhmm) => {
     if (typeof hhmm === "number") return hhmm;
     const [h, m] = String(hhmm).split(":").map(Number);
+    if (Number.isNaN(h)) return null;
     return h * 60 + (m || 0);
   };
-  for (const rule of WHITE_SLOTS) {
-    // date-specific rule
-    if (rule.date) {
-      if (rule.date !== isoDate) continue;
-    } else {
-      // day-of-week rules
-      if (rule.days === "all") {
-        // ok
-      } else if (Array.isArray(rule.days)) {
-        if (!rule.days.includes(dayIndex)) continue;
-      } else {
-        continue;
-      }
+  for (const rule of whiteSlotRules) {
+    if (rule.date && rule.date !== isoDate) continue;
+    if (typeof rule.dayIndex === "number" && rule.dayIndex !== dayIndex) {
+      continue;
     }
     const s = toMin(rule.start),
       e = toMin(rule.end);
+    if (s === null || e === null) continue;
     if (minuteOfDay >= s && minuteOfDay < e) return true;
   }
   return false;
@@ -159,6 +141,7 @@ $(function () {
 
   /* ========= Create Cohort modal (uses your exact code) ========= */
   function openCreateCohortModal() {
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -173,6 +156,8 @@ $(function () {
     $("#peerTalkTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "block");
     $("#classTabContent").css("display", "none");
   }
@@ -197,6 +182,7 @@ $(function () {
     }
 
     // Show modal backdrop
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -213,6 +199,8 @@ $(function () {
     $("#conferenceTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "none");
     $("#classTabContent").css("display", "none");
     $("#peerTalkTabContent").css("display", "block");
@@ -710,6 +698,7 @@ $(function () {
     }
 
     // Show modal backdrop
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -726,6 +715,8 @@ $(function () {
     $("#peerTalkTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "none");
     $("#classTabContent").css("display", "none");
     $("#conferenceTabContent").css("display", "block");
@@ -1032,6 +1023,11 @@ $(function () {
       });
       this.style.zIndex = (++zSeed).toString();
 
+      // Highlight active event and gently dim overlapping neighbors for readability
+      $(".event").removeClass("event-active event-dimmed");
+      $clicked.addClass("event-active");
+      $group.not($clicked).addClass("event-dimmed");
+
       // Find the event data from window.events
       const dateStr = $day.data("date");
       const teacherId = $clicked.data("teacher-id");
@@ -1063,6 +1059,10 @@ $(function () {
           currentClickedEvent
         );
 
+        // Teacher time off: do nothing (just show it as busy)
+        if (classType === "teacher_timeoff" || source === "teacher_timeoff") {
+          return;
+        }
         // Check if it's a peertalk event
         if (classType === "peertalk" || source === "peertalk") {
           // Open peertalk modal with event data
@@ -2314,10 +2314,14 @@ $(function () {
         const isSingleton = (ev._max || 1) === 1;
         const cssPos = isSingleton
           ? { left: "0px", width: "calc(100% - 0px)" }
-          : {
-              left: MAX_LEFT - ev.stackIndex * STACK_OFFSET + "px",
-              width: `calc(100% - ${MAX_LEFT + 1}px)`,
-            };
+          : (() => {
+              const leftPx = ev.stackIndex * STACK_OFFSET;
+              const rightPad = STACK_OFFSET; // small inset on the right for overlap
+              return {
+                left: `${leftPx}px`,
+                width: `calc(100% - ${leftPx + rightPad}px)`,
+              };
+            })();
 
         // Get teacher color class and inline style for unlimited colors
         let teacherColorClass = "";
@@ -2348,14 +2352,29 @@ $(function () {
         } else if (ev.classType === "one2one_single") {
           classTypeClass = "class-type-one2one_single";
           borderColorStyle = "border-left-color: #4CAF50 !important;"; // Green border for one2one single
+        } else if (
+          ev.classType === "teacher_timeoff" ||
+          ev.class_type === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff"
+        ) {
+          classTypeClass = "class-type-timeoff";
+          borderColorStyle =
+            "border-color: rgba(253,216,48,0.7) !important; background: rgba(253,216,48,0.05) !important;";
         }
 
-        // Combine styles
-        const combinedStyle = `${teacherColorStyle}${borderColorStyle}`.trim();
+        // Combine styles (include any custom inline style from the event object)
+        const combinedStyle = `${teacherColorStyle}${borderColorStyle}${
+          ev.style || ""
+        }`.trim();
 
         // Check if event is short (less than 1 hour)
         const eventDuration = ev.end - ev.start;
         const isShortEvent = eventDuration < 60;
+
+        const isTimeOffEvent =
+          ev.classType === "teacher_timeoff" ||
+          ev.class_type === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff";
 
         // Build event HTML - hide details for short events
         const $ev = $(`
@@ -2398,7 +2417,9 @@ $(function () {
                   : ""
               }</div>
               ${
-                ev.repeat || !ev.repeat
+                isTimeOffEvent
+                  ? ""
+                  : ev.repeat || !ev.repeat
                   ? `<span class="ev-repeat" title="Repeats"><img src="./img/ev-repeat.svg" alt=""></span>`
                   : `<span class="ev-single" title="Single Session"><img src="./img/single-lesson.svg" alt=""></span>`
               }
@@ -2425,6 +2446,10 @@ $(function () {
             }
           </div>
         `).css({ top: top + "px", height: h + "px", ...cssPos });
+
+        // Base z-index by stackIndex so layers stay ordered; click will still raise
+        const baseZ = 1000 + (ev.stackIndex || 0);
+        $ev.css("z-index", baseZ);
 
         // Add hover tooltip for short events (less than 1 hour)
         if (isShortEvent) {
@@ -4375,6 +4400,119 @@ document.addEventListener("DOMContentLoaded", () => {
     return selected;
   }
 
+  const DAY_NAME_TO_INDEX = {
+    monday: 0,
+    tuesday: 1,
+    wednesday: 2,
+    thursday: 3,
+    friday: 4,
+    saturday: 5,
+    sunday: 6,
+  };
+
+  function normalizeMinutes(val) {
+    if (typeof val === "number" && !Number.isNaN(val)) return val;
+    if (typeof val === "string") {
+      if (val.includes(":")) {
+        const [h, m] = val.split(":").map(Number);
+        if (!Number.isNaN(h)) return h * 60 + (Number.isNaN(m) ? 0 : m);
+      }
+      const parsed = parseInt(val, 10);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function getSlotsForTeacher(map, tid) {
+    if (!map) return [];
+    return map[tid] || map[String(tid)] || map[Number(tid)] || [];
+  }
+
+  function updateWhiteSlotRules(
+    availabilityMap = {},
+    extraSlotMap = {},
+    activeTeacherIds = []
+  ) {
+    whiteSlotRules = [];
+    const teachers =
+      activeTeacherIds && activeTeacherIds.length > 0
+        ? activeTeacherIds
+        : Object.keys(availabilityMap);
+
+    if (!teachers || teachers.length === 0) return;
+
+    const baseDate = currentStart || new Date();
+    const baseMs = baseDate.getTime();
+    const weekEndMs =
+      currentEnd && currentEnd.getTime
+        ? currentEnd.getTime()
+        : baseMs + 6 * 24 * 60 * 60 * 1000;
+
+    teachers.forEach((tid) => {
+      //
+      // 1) NORMAL WEEKLY AVAILABILITY
+      //
+      const availSlots = getSlotsForTeacher(availabilityMap, tid);
+      availSlots.forEach((slot) => {
+        const dayIndex =
+          DAY_NAME_TO_INDEX[String(slot.day || "").toLowerCase()];
+        if (typeof dayIndex !== "number") return;
+
+        const dayDate = new Date(baseDate);
+        dayDate.setDate(baseDate.getDate() + dayIndex);
+
+        const startMin = normalizeMinutes(slot.startTime);
+        const endMin = normalizeMinutes(slot.endTime);
+        if (startMin === null || endMin === null) return;
+
+        whiteSlotRules.push({
+          date: ymd(dayDate),
+          dayIndex,
+          start: startMin,
+          end: endMin,
+        });
+      });
+
+      //
+      // 2) EXTRA SLOTS — FIXED TIMEZONE LOGIC
+      //
+      const extraSlots = getSlotsForTeacher(extraSlotMap, tid);
+      extraSlots.forEach((slot) => {
+        // ALWAYS parse ISO strings that contain timezone!!
+        const startMs = slot.start ? Date.parse(slot.start) : null;
+        const endMs = slot.end ? Date.parse(slot.end) : null;
+
+        // If ISO strings are missing, skip. We DO NOT USE start_ts/end_ts anymore.
+        if (!startMs || !endMs) return;
+        if (endMs <= startMs) return;
+        if (startMs < baseMs || startMs > weekEndMs) return;
+
+        const startDate = new Date(startMs);
+        const endDate = new Date(endMs);
+
+        console.log("Processing extra slot:", startDate, endDate);
+
+        // ❗IMPORTANT:
+        // Use LOCAL TIME from ISO string — NOT UTC.
+        // This keeps '09:30-05:00' exactly as 9:30.
+        const startMin = startDate.getHours() * 60 + startDate.getMinutes();
+
+        const endMin = endDate.getHours() * 60 + endDate.getMinutes();
+
+        console.log("startMin:", startMin, "endMin:", endMin);
+
+        whiteSlotRules.push({
+          date: ymd(startDate),
+          dayIndex: (startDate.getDay() + 6) % 7,
+          start: startMin,
+          end: endMin,
+        });
+
+        console.log("Added white slot rule:", whiteSlotRules);
+      });
+    });
+  }
+
   // ---------------- API call ----------------
 
   async function fetchCalendarEvents() {
@@ -4414,7 +4552,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       console.log("Fetched calendar events:", data);
 
-      // Merge regular events, peertalk events, and conference events
+      if (data.ok) {
+        updateWhiteSlotRules(
+          data.teacher_availability || {},
+          data.teacher_extra_slots || {},
+          teacherids
+        );
+      } else {
+        whiteSlotRules = [];
+      }
+
+      // Merge regular events, peertalk events, conference events, and teacher time off
       let allEvents = [];
       if (data.ok && Array.isArray(data.events)) {
         allEvents = [...data.events];
@@ -4427,126 +4575,158 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Adding conference events:", data.conference);
         allEvents = [...allEvents, ...data.conference];
       }
-
-      if (allEvents.length > 0) {
-        window.events = [];
-        allEvents.forEach((ev) => {
-          const startDate = new Date(ev.start);
-          const endDate = new Date(ev.end);
-
-          // Match event teacher with selected teachers for proper color assignment
-          let teacherId = null;
-          if (teacherids && teacherids.length > 0) {
-            const eventTeacherIds = Array.isArray(ev.teacherids)
-              ? ev.teacherids
-              : ev.teacher_id
-              ? [ev.teacher_id]
-              : [];
-            teacherId =
-              teacherids.find((selectedId) =>
-                eventTeacherIds.includes(selectedId)
-              ) || eventTeacherIds[0];
-          } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
-            teacherId = ev.teacherids[0];
-          } else if (ev.teacher_id) {
-            teacherId = ev.teacher_id;
-          }
-
-          let eventColor = "e-blue";
-          if (
-            ev.class_type === "one2one_weekly" ||
-            ev.class_type === "one2one_single"
-          ) {
-            eventColor = "e-green";
-          } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
-            eventColor = "e-purple";
-          } else if (
-            ev.class_type === "conference" ||
-            ev.source === "conference"
-          ) {
-            eventColor = "e-orange";
-          }
-
-          // Main event object
-          const eventObj = {
-            date: startDate.toISOString().split("T")[0],
-            title: ev.title || "",
-            start: startDate.toTimeString().slice(0, 5),
-            end: endDate.toTimeString().slice(0, 5),
-            color: eventColor,
-            repeat:
-              typeof ev.is_recurring !== "undefined"
-                ? ev.is_recurring
-                : ev.repeat || false,
-            meetingurl: ev.meetingurl || "",
-            viewurl: ev.viewurl || ev.meetingurl || "",
-            avatar: ev.avatar || "",
-            teacherId:
-              typeof teacherId !== "undefined"
-                ? teacherId
-                : ev.teacherId || (ev.teacherids && ev.teacherids[0]) || "",
-            classType: ev.classType || ev.class_type || "",
-            source: ev.source || "event",
-            studentnames: ev.studentnames || [],
-            studentids: ev.studentids || [],
-            cohortids: ev.cohortids || [],
-            eventid: ev.eventid || "",
-            cmid: ev.cmid || 0,
-            googlemeetid:
-              typeof ev.googlemeetid !== "undefined" ? ev.googlemeetid : 0,
-            courseid: typeof ev.courseid !== "undefined" ? ev.courseid : 0,
-            is_parent:
-              typeof ev.is_parent !== "undefined" ? ev.is_parent : false,
-            main_event_id:
-              typeof ev.main_event_id !== "undefined" ? ev.main_event_id : "",
-            sequence: typeof ev.sequence !== "undefined" ? ev.sequence : 1,
-            teachernames: ev.teachernames || [],
-            statuses: ev.statuses || [],
-            rescheduled:
-              typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
-            faded: false,
-          };
-          window.events.push(eventObj);
-          debugger;
-          // If event is reschedule_instant, add previous event as faded
-          if (
-            Array.isArray(ev.statuses) &&
-            ev.statuses.some(
-              (s) => s.code === "reschedule_instant" && s.previous
-            )
-          ) {
-            debugger;
-            // Find the status with previous
-            const statusObj = ev.statuses.find(
-              (s) => s.code === "reschedule_instant" && s.previous
-            );
-            if (statusObj && statusObj.previous) {
-              // Parse previous event date and times
-              const prevDate = statusObj.previous.date;
-              const prevStart = statusObj.previous.start;
-              const prevEnd = statusObj.previous.end;
-              // Use previous teacher/avatar if available
-              window.events.push({
-                ...eventObj,
-                date: prevDate,
-                start: prevStart,
-                end: prevEnd,
-                faded: true,
-                title: eventObj.title
-                  ? eventObj.title + " (Previous)"
-                  : "Previous Event",
-                teacherId: statusObj.previous.teacher || eventObj.teacherId,
-                avatar: ev.previous_teacher_picture || eventObj.avatar,
-                teachernames: [ev.previous_teachername || ""],
-              });
-            }
-          }
+      if (data.ok && data.teacher_timeoff) {
+        Object.entries(data.teacher_timeoff).forEach(([tid, items]) => {
+          if (!Array.isArray(items)) return;
+          items.forEach((item) => {
+            if (!item || !item.start || !item.end) return;
+            allEvents.push({
+              start: item.start,
+              end: item.end,
+              title: item.title || "Busy",
+              classType: "teacher_timeoff",
+              class_type: "teacher_timeoff",
+              source: "teacher_timeoff",
+              teacherids: [Number(tid) || tid],
+              style:
+                "border-color: rgba(253,216,48,0.7); background-color: rgba(253,216,48,0.05);",
+              color: "e-timeoff",
+            });
+          });
         });
+      }
 
-        // Re-render your week view
-        if (typeof renderWeek === "function") {
-          renderWeek(false);
+      window.events = [];
+      allEvents.forEach((ev) => {
+        const startDate = new Date(ev.start);
+        const endDate = new Date(ev.end);
+
+        // Match event teacher with selected teachers for proper color assignment
+        let teacherId = null;
+        if (teacherids && teacherids.length > 0) {
+          const eventTeacherIds = Array.isArray(ev.teacherids)
+            ? ev.teacherids
+            : ev.teacher_id
+            ? [ev.teacher_id]
+            : ev.teacherid
+            ? [ev.teacherid]
+            : [];
+          teacherId =
+            teacherids.find((selectedId) =>
+              eventTeacherIds.includes(selectedId)
+            ) || eventTeacherIds[0];
+        } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
+          teacherId = ev.teacherids[0];
+        } else if (ev.teacher_id) {
+          teacherId = ev.teacher_id;
+        } else if (ev.teacherid) {
+          teacherId = ev.teacherid;
+        } else if (ev.teacher) {
+          teacherId = ev.teacher;
         }
+
+        let eventColor = "e-blue";
+        if (
+          ev.class_type === "one2one_weekly" ||
+          ev.class_type === "one2one_single"
+        ) {
+          eventColor = "e-green";
+        } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
+          eventColor = "e-purple";
+        } else if (
+          ev.class_type === "conference" ||
+          ev.source === "conference"
+        ) {
+          eventColor = "e-orange";
+        } else if (
+          ev.class_type === "teacher_timeoff" ||
+          ev.classType === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff"
+        ) {
+          eventColor = "e-timeoff";
+        }
+
+        // Main event object
+        const eventObj = {
+          date: startDate.toISOString().split("T")[0],
+          title: ev.title || "",
+          start: startDate.toTimeString().slice(0, 5),
+          end: endDate.toTimeString().slice(0, 5),
+          color: eventColor,
+          repeat:
+            typeof ev.is_recurring !== "undefined"
+              ? ev.is_recurring
+              : ev.repeat || false,
+          meetingurl: ev.meetingurl || "",
+          viewurl: ev.viewurl || ev.meetingurl || "",
+          avatar: ev.avatar || "",
+          teacherId:
+            typeof teacherId !== "undefined" && teacherId !== null
+              ? teacherId
+              : ev.teacherId ||
+                ev.teacher_id ||
+                ev.teacherid ||
+                ev.teacher ||
+                (ev.teacherids && ev.teacherids[0]) ||
+                "",
+          classType: ev.classType || ev.class_type || "",
+          source: ev.source || "event",
+          studentnames: ev.studentnames || [],
+          studentids: ev.studentids || [],
+          cohortids: ev.cohortids || [],
+          eventid: ev.eventid || "",
+          cmid: ev.cmid || 0,
+          googlemeetid:
+            typeof ev.googlemeetid !== "undefined" ? ev.googlemeetid : 0,
+          courseid: typeof ev.courseid !== "undefined" ? ev.courseid : 0,
+          is_parent: typeof ev.is_parent !== "undefined" ? ev.is_parent : false,
+          main_event_id:
+            typeof ev.main_event_id !== "undefined" ? ev.main_event_id : "",
+          sequence: typeof ev.sequence !== "undefined" ? ev.sequence : 1,
+          teachernames: ev.teachernames || [],
+          statuses: ev.statuses || [],
+          rescheduled:
+            typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
+          faded: false,
+        };
+        window.events.push(eventObj);
+        debugger;
+        // If event is reschedule_instant, add previous event as faded
+        if (
+          Array.isArray(ev.statuses) &&
+          ev.statuses.some((s) => s.code === "reschedule_instant" && s.previous)
+        ) {
+          debugger;
+          // Find the status with previous
+          const statusObj = ev.statuses.find(
+            (s) => s.code === "reschedule_instant" && s.previous
+          );
+          if (statusObj && statusObj.previous) {
+            // Parse previous event date and times
+            const prevDate = statusObj.previous.date;
+            const prevStart = statusObj.previous.start;
+            const prevEnd = statusObj.previous.end;
+            // Use previous teacher/avatar if available
+            window.events.push({
+              ...eventObj,
+              date: prevDate,
+              start: prevStart,
+              end: prevEnd,
+              faded: true,
+              title: eventObj.title
+                ? eventObj.title + " (Previous)"
+                : "Previous Event",
+              teacherId: statusObj.previous.teacher || eventObj.teacherId,
+              avatar: ev.previous_teacher_picture || eventObj.avatar,
+              teachernames: [ev.previous_teachername || ""],
+            });
+          }
+        }
+      });
+
+      // Re-render your week view
+      if (typeof renderWeek === "function") {
+        renderWeek(false);
       }
     } catch (err) {
       console.error("Failed to load calendar events:", err);
@@ -4562,18 +4742,45 @@ document.addEventListener("DOMContentLoaded", () => {
   // Unified helper to reload dropdown data + calendar after mutations
   async function refetchCustomPluginData(reason = "") {
     try {
-      console.log(
-        `Refetching calendar data${reason ? ` (${reason})` : ""}`
-      );
+      console.log(`Refetching calendar data${reason ? ` (${reason})` : ""}`);
+
+      // Some pages may not have all helpers loaded; guard each call.
+      const loadTeachersFn =
+        typeof loadTeachers === "function"
+          ? loadTeachers
+          : () => Promise.resolve();
+      const loadCohortsFn =
+        typeof loadCohortsForTeachers === "function"
+          ? loadCohortsForTeachers
+          : typeof loadAllCohorts === "function"
+          ? loadAllCohorts
+          : () => Promise.resolve();
+      const loadStudentsForCohortsFn =
+        typeof loadStudentsForCohorts === "function"
+          ? loadStudentsForCohorts
+          : typeof loadAllStudents === "function"
+          ? loadAllStudents
+          : () => Promise.resolve();
+
+      const safeSelectedTeachers =
+        typeof selectedTeacherIds !== "undefined" &&
+        Array.isArray(selectedTeacherIds)
+          ? selectedTeacherIds
+          : [];
+      const safeSelectedCohorts =
+        typeof selectedCohortIds !== "undefined" &&
+        Array.isArray(selectedCohortIds)
+          ? selectedCohortIds
+          : [];
 
       await Promise.allSettled([
-        loadTeachers(),
-        selectedTeacherIds.length
-          ? loadCohortsForTeachers(selectedTeacherIds, false)
-          : loadAllCohorts(),
-        selectedCohortIds.length
-          ? loadStudentsForCohorts(selectedCohortIds, false)
-          : loadAllStudents(),
+        loadTeachersFn(),
+        safeSelectedTeachers.length
+          ? loadCohortsFn(safeSelectedTeachers, false)
+          : loadCohortsFn(),
+        safeSelectedCohorts.length
+          ? loadStudentsForCohortsFn(safeSelectedCohorts, false)
+          : loadStudentsForCohortsFn(),
       ]);
 
       if (typeof fetchCalendarEvents === "function") {
@@ -4590,6 +4797,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Expose globally so it can be called from filter changes
   window.fetchCalendarEvents = fetchCalendarEvents;
+
+  // Auto-refresh calendar after successful customplugin POSTs (except the fetch itself)
+  (function () {
+    let refreshTimer = null;
+    const debounceRefresh = (reason) => {
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (typeof refetchCustomPluginData === "function") {
+          refetchCustomPluginData(reason);
+        } else if (typeof fetchCalendarEvents === "function") {
+          fetchCalendarEvents();
+        }
+      }, 250);
+    };
+
+    $(document).ajaxSuccess(function (_e, _xhr, settings) {
+      if (
+        !settings ||
+        !settings.url ||
+        typeof settings.type === "undefined" ||
+        String(settings.type).toUpperCase() !== "POST"
+      ) {
+        return;
+      }
+      const url = String(settings.url);
+      if (!url.includes("/local/customplugin/ajax/")) return;
+      // Skip calendar fetch endpoints to avoid loops
+      if (
+        url.includes("calendar_admin_get_events") ||
+        url.includes("calendar_admin_filters")
+      )
+        return;
+      debounceRefresh("ajax-success");
+    });
+  })();
 
   // ---------------- Wire week navigation ----------------
 

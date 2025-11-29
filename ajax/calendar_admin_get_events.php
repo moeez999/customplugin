@@ -1567,6 +1567,58 @@ try {
 
 
 
+
+
+
+
+
+// ----------------------------------------------------------
+// TEACHER WEEKLY AVAILABILITY (GLOBAL – NOT DATE-BASED)
+// ----------------------------------------------------------
+$teacherAvailability = [];
+
+try {
+
+    foreach ($allTeacherIds as $tid) {
+
+        // Fetch ALL availability for this teacher (no time-window filtering)
+        $records = $DB->get_records(
+            'local_teacher_availability',
+            ['teacherid' => $tid],
+            'weekday ASC, starttime ASC'
+        );
+
+        $list = [];
+
+        foreach ($records as $r) {
+
+            // Convert weekday → day name
+            $dayName = date('l', strtotime("Sunday +{$r->weekday} days"));
+
+            // Convert unix startdate → Y-m-d
+            $startDateStr = $r->startdate ? date("Y-m-d", (int)$r->startdate) : null;
+
+            // Build exact UI payload-like structure
+            $list[] = [
+                'id'        => (int)$r->id,
+                'day'       => $dayName,            // "Monday"
+                'startTime' => $r->starttime,       // "14:30"
+                'endTime'   => $r->endtime,         // "16:30"
+                'startDate' => $startDateStr,       // "2025-11-24"
+                'raw'       => json_decode($r->rawjson, true) ?? null
+            ];
+        }
+
+        $teacherAvailability[$tid] = $list;
+    }
+
+} catch (Throwable $e) {
+    $teacherAvailability = [];
+}
+
+
+
+
 // ----------------------------------------------------------
 // TEACHER EXTRA SLOTS
 // ----------------------------------------------------------
@@ -1611,6 +1663,8 @@ try {
 
 
 
+
+
     echo json_encode([
         'ok'      => true,
         'filters' => [
@@ -1626,7 +1680,8 @@ try {
         'peertalk' => array_values($peertalkEvents),
         'conference' => array_values($conferenceEvents),
         'teacher_timeoff' => $teacherTimeoff,
-        'teacher_extra_slots' => $teacherExtraSlots
+        'teacher_extra_slots' => $teacherExtraSlots,
+        'teacher_availability'=> $teacherAvailability
     ]);
 
 } catch (Exception $e) {
