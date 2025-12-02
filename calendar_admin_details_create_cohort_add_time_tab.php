@@ -846,6 +846,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     notify("Teacher time off scheduled successfully!", "success");
                     resetAddTimeForm(parent, initialAddTimeState);
                     $("#manage-session-modal").fadeOut(300);
+                    
+                    // Refresh calendar
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('teacher-timeoff-add');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    }
                 } else {
                     notify("Failed: " + response.error, "error");
                 }

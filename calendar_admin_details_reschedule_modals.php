@@ -1512,7 +1512,113 @@ $(document).ready(function() {
     </div>
 </section>
 
+<!-- Reason of Cancellation Modal (Read-only) -->
+<section id="reason-of-cancellation-modal" class="reason-cancellation-modal-section modal-overlay"
+    style="display: none;">
+    <div class="reason-cancellation-container">
+        <button class="reason-cancellation-close-btn" id="close-reason-cancellation" aria-label="Close modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div class="reason-cancellation-content">
+            <h2 class="reason-cancellation-title">Reason Of Cancellation</h2>
+            <p class="reason-cancellation-subtitle">Monday, September 2, 7:00-8:00 Am</p>
+            <div class="reason-cancellation-text" id="cancellation-reason-text">
+                Daniella was unable to attend the online class due to unforeseen personal reasons. Over the past few
+                days, I encountered some challenges that required my immediate attention
+            </div>
+            <button class="reason-cancellation-ok-btn" id="reason-cancellation-ok">Ok</button>
+        </div>
+    </div>
+</section>
+
 <style>
+.reason-cancellation-modal-section {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10003;
+}
+
+.reason-cancellation-container {
+    background: white;
+    border-radius: 8px;
+    max-width: 520px;
+    width: 90%;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+
+.reason-cancellation-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+    transition: color 0.2s;
+}
+
+.reason-cancellation-close-btn:hover {
+    color: #1F2937;
+}
+
+.reason-cancellation-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #232323;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+}
+
+.reason-cancellation-subtitle {
+    font-size: 16px;
+    font-weight: 400;
+    color: #4D4C5C;
+    margin: 0 0 24px 0;
+}
+
+.reason-cancellation-text {
+    font-size: 15px;
+    font-weight: 400;
+    color: #232323;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+    text-align: left;
+}
+
+.reason-cancellation-ok-btn {
+    width: 100%;
+    padding: 12px 24px;
+    background-color: #ff2500;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.reason-cancellation-ok-btn:hover {
+    background-color: #e02000;
+}
+
 .cancel-confirmation-modal-section {
     position: fixed;
     top: 0;
@@ -1747,6 +1853,14 @@ $(document).ready(function() {
                 $('#cr-reason').data('selected-value', null);
                 $('#cr-reason .cr-select-placeholder').text('Select Reason');
                 $('#cr-notes').val('');
+
+                // Refresh calendar
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('cancel-reschedule-later');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                }
+
                 // Close modal
                 $("#manage-session-modal").fadeOut(300);
                 $('#cancel-reschedule-modal').fadeOut(300);
@@ -1913,8 +2027,12 @@ $(document).ready(function() {
                 }
                 // Close modal if you have one
                 $("#manage-session-modal").fadeOut(300);
-                // Reload calendar (optional)
-                if (typeof loadCalendarEvents === "function") {
+                // Reload calendar
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('cancel-no-makeup');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                } else if (typeof loadCalendarEvents === "function") {
                     loadCalendarEvents();
                 }
                 // Close both modals
@@ -1981,5 +2099,72 @@ $(document).ready(function() {
             $(this).fadeOut(300);
         }
     });
+
+    // Reason of Cancellation modal handlers
+    $('#close-reason-cancellation, #reason-cancellation-ok').on('click', function(e) {
+        e.preventDefault();
+        $('#reason-of-cancellation-modal').fadeOut(300);
+    });
+
+    // Close reason of cancellation modal when clicking outside
+    $('#reason-of-cancellation-modal').on('click', function(e) {
+        if ($(e.target).hasClass('modal-overlay')) {
+            $(this).fadeOut(300);
+        }
+    });
+
+    // Function to open reason of cancellation modal
+    window.openReasonOfCancellationModal = function(eventData) {
+        console.log('Opening Reason of Cancellation modal for:', eventData);
+
+        // Extract cancellation reason from event statuses
+        let cancellationReason = '';
+        let reasonText = '';
+
+        if (eventData && eventData.statuses && Array.isArray(eventData.statuses)) {
+            const cancelStatus = eventData.statuses.find(s => s.code === 'cancel_no_makeup');
+            if (cancelStatus) {
+                // Check nested structure: details.current or top-level
+                const statusData = cancelStatus.details?.current || cancelStatus;
+
+                reasonText = statusData.reasonText || statusData.reason_text || '';
+                const notes = statusData.notes || '';
+                cancellationReason = reasonText;
+                if (notes) {
+                    cancellationReason += (reasonText ? '. ' : '') + notes;
+                }
+            }
+        }
+
+        // Format date/time from event data
+        const dateStr = eventData.date || '';
+        const startTime = eventData.start || '';
+        const endTime = eventData.end || '';
+
+        // Format the subtitle (e.g., "Monday, September 2, 7:00-8:00 Am")
+        let subtitle = '';
+        if (dateStr) {
+            const date = new Date(dateStr);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'
+            ];
+            const dayName = dayNames[date.getDay()];
+            const monthName = monthNames[date.getMonth()];
+            const dayNum = date.getDate();
+            subtitle = `${dayName}, ${monthName} ${dayNum}`;
+
+            if (startTime && endTime) {
+                subtitle += `, ${startTime}-${endTime}`;
+            }
+        }
+
+        // Update modal content
+        $('#reason-of-cancellation-modal .reason-cancellation-subtitle').text(subtitle);
+        $('#cancellation-reason-text').text(cancellationReason || 'No reason provided.');
+
+        // Show the modal
+        $('#reason-of-cancellation-modal').fadeIn(300);
+    };
 });
 </script>

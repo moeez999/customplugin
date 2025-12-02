@@ -69,6 +69,51 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // White slot windows derived from teacher availability payloads
 let whiteSlotRules = [];
 
+// Map event status codes to icons/labels
+const STATUS_ICON_MAP = {
+  scheduled: { icon: "./img/confirmed.svg", label: "Taught" },
+
+  cancel_no_makeup: {
+    icon: "./img/cancelled.svg",
+    label: "Cancelled (No Makeup)",
+  },
+
+  cancel_reschedule_later: {
+    icon: "./img/rescheduled.svg",
+    label: "Cancelled (Reschedule Later)",
+  },
+  reschedule_instant: { icon: "./img/rescheduled.svg", label: "Rescheduled" },
+  covered: { icon: "./img/covered.svg", label: "Covered" },
+  missed: { icon: "./img/missed.svg", label: "Missed" },
+  pendingconfirmation: {
+    icon: "./img/pendingconfirmation.svg",
+    label: "Pending Confirmation",
+  },
+  pending_confirmation: {
+    icon: "./img/pendingconfirmation.svg",
+    label: "Pending Confirmation",
+  },
+
+  makeup: { icon: "./img/makeup.svg", label: "Makeup" },
+  make_up: { icon: "./img/makeup.svg", label: "Makeup" },
+};
+
+function getActiveStatusMeta(statuses) {
+  if (!Array.isArray(statuses) || statuses.length === 0) return null;
+  const activeStatuses = statuses.filter((s) => s && s.isactive);
+  const statusObj = activeStatuses.length
+    ? activeStatuses[activeStatuses.length - 1]
+    : statuses[statuses.length - 1];
+  if (!statusObj || !statusObj.code) return null;
+  const code = String(statusObj.code).toLowerCase().trim();
+  const direct = STATUS_ICON_MAP[code];
+  if (direct) return { ...direct, code, statusObj };
+  if (code.startsWith("reschedule")) {
+    return { ...STATUS_ICON_MAP.rescheduled, code, statusObj };
+  }
+  return null;
+}
+
 window.events = [];
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -1063,10 +1108,36 @@ $(function () {
         if (classType === "teacher_timeoff" || source === "teacher_timeoff") {
           return;
         }
+
+        // Check if event is cancelled (cancel_no_makeup) - show reason modal
+        const activeStatus = getActiveStatusMeta(
+          currentClickedEvent.statuses || []
+        );
+        console.log(
+          "Active status for clicked event:",
+          activeStatus,
+          "Statuses:",
+          currentClickedEvent.statuses
+        );
+
+        if (activeStatus && activeStatus.code === "cancel_no_makeup") {
+          console.log(
+            "Opening Reason of Cancellation modal for cancelled event",
+            currentClickedEvent
+          );
+          if (typeof window.openReasonOfCancellationModal === "function") {
+            window.openReasonOfCancellationModal(currentClickedEvent);
+          } else {
+            console.error("openReasonOfCancellationModal function not found");
+          }
+          return;
+        }
+
         // Check if it's a peertalk event
         if (classType === "peertalk" || source === "peertalk") {
           // Open peertalk modal with event data
           openPeerTalkModalWithData(currentClickedEvent);
+          return;
         }
         // Check if it's a conference event
         else if (classType === "conference" || source === "conference") {
@@ -1076,6 +1147,7 @@ $(function () {
           );
           // Open conference modal with event data
           openConferenceModalWithData(currentClickedEvent);
+          return;
         }
         // Check if it's NOT a 1:1 lesson (for regular group lessons)
         else if (
@@ -1084,6 +1156,7 @@ $(function () {
         ) {
           // This is a group lesson, open the dropdown menu
           openMenuOptionsDropdown(e, this);
+          return;
         }
         // If it's a 1:1 lesson, do nothing (no dropdown)
       }
@@ -1094,6 +1167,58 @@ $(function () {
     const dropdown = document.getElementById("menu-options");
     const menuContainer = dropdown.querySelector(".menu-container");
     if (!dropdown || !menuContainer) return;
+
+    const activeStatus = getActiveStatusMeta(
+      (currentClickedEvent && currentClickedEvent.statuses) || []
+    );
+    const isCancelRescheduleLater =
+      activeStatus && activeStatus.code === "cancel_reschedule_later";
+
+    const toggleMenuItem = (href, show) => {
+      const link = menuContainer.querySelector(`a[href="${href}"]`);
+      if (!link) return;
+      const holder = link.closest(".menu-item") || link.closest("li") || link;
+      holder.style.display = show ? "" : "none";
+    };
+
+    // Hide manage + cancel-reschedule-later options when status is cancel_reschedule_later
+    toggleMenuItem("#manage-session", !isCancelRescheduleLater);
+    toggleMenuItem("#cancel-reschedule-later", !isCancelRescheduleLater);
+
+    // Hide the default menu list entirely when CRL, only show the CRL panel
+    const menuList = menuContainer.querySelector(".menu-list");
+    if (menuList) {
+      menuList.style.display = isCancelRescheduleLater ? "none" : "";
+    }
+
+    // Build / toggle the dedicated panel for make-up vs no-make-up actions
+    let crlPanel = menuContainer.querySelector(
+      ".cancel-reschedule-later-panel"
+    );
+
+    if (!crlPanel) {
+      crlPanel = document.createElement("div");
+      crlPanel.className = "cancel-reschedule-later-panel";
+      crlPanel.style.display = "none";
+      crlPanel.style.flexDirection = "column";
+      crlPanel.style.gap = "6px";
+      crlPanel.innerHTML = `
+        <a href="#schedule-makeup-now" class="menu-link crl-option" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#f7f7f7; text-decoration:none;">
+          <span style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+            <img src="./img/manage-session-reschedule.svg" alt="Schedule Make-up Now" style="width:20px; height:20px;">
+          </span>
+          <span style="color:#111; font-weight:500;">Schedule Make-up Now</span>
+        </a>
+        <a href="#cancel-no-makeup" class="menu-link crl-option" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#fff; text-decoration:none; border:1px solid #f3f3f3;">
+          <span style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+            <img src="./img/cancel-no-make-up.svg" alt="Cancel (no make-up)" style="width:20px; height:20px;">
+          </span>
+          <span style="color:#d44333; font-weight:600;">Cancel (no make-up)</span>
+        </a>
+      `;
+      menuContainer.appendChild(crlPanel);
+    }
+    crlPanel.style.display = isCancelRescheduleLater ? "flex" : "none";
 
     // Close any existing dropdown
     closeMenuOptionsDropdown();
@@ -1188,6 +1313,13 @@ $(function () {
       closeMenuOptionsDropdown();
 
       // Open cancel (no make-up) modal
+      openCancelNoMakeupModal(currentClickedEvent);
+    } else if (href === "#schedule-makeup-now" && currentClickedEvent) {
+      closeMenuOptionsDropdown();
+      // Open manage session modal instead of cancel/reschedule
+      openManageSessionModal(currentClickedEvent);
+    } else if (href === "#cancel-no-makeup" && currentClickedEvent) {
+      closeMenuOptionsDropdown();
       openCancelNoMakeupModal(currentClickedEvent);
     }
   });
@@ -2375,6 +2507,24 @@ $(function () {
           ev.classType === "teacher_timeoff" ||
           ev.class_type === "teacher_timeoff" ||
           ev.source === "teacher_timeoff";
+        debugger;
+        const statusMeta = getActiveStatusMeta(ev.statuses);
+        const statusIconHtml = (() => {
+          if (!statusMeta) return "";
+          if (statusMeta.code === "cancel_reschedule_later") {
+            return `<span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; pointer-events:none; z-index:2;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; ">
+                  <img src="./img/pendingconfirmation.svg" alt="Pending Confirmation" title="Pending Confirmation" style="width:16px; height:16px;">
+                </span>
+                <span style="display:inline-flex; align-items:center; justify-content:center; ">
+                  <img src="./img/cancelled.svg" alt="Cancelled" title="Cancelled" style="width:16px; height:16px;">
+                </span>
+              </span>`;
+          }
+          return `<span class="ev-status-icon" title="${statusMeta.label}" aria-label="${statusMeta.label}" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+                <img src="${statusMeta.icon}" alt="${statusMeta.label}" style="width:16px; height:16px;">
+              </span>`;
+        })();
 
         // Build event HTML - hide details for short events
         const $ev = $(`
@@ -2407,7 +2557,8 @@ $(function () {
           ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
         }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${
           ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""
-        }>
+        }${statusMeta ? ` data-status-code="${statusMeta.code}"` : ""}>
+            ${statusIconHtml}
             ${
               !isShortEvent
                 ? `<div class="ev-top">
@@ -4690,13 +4841,12 @@ document.addEventListener("DOMContentLoaded", () => {
           faded: false,
         };
         window.events.push(eventObj);
-        debugger;
+
         // If event is reschedule_instant, add previous event as faded
         if (
           Array.isArray(ev.statuses) &&
           ev.statuses.some((s) => s.code === "reschedule_instant" && s.previous)
         ) {
-          debugger;
           // Find the status with previous
           const statusObj = ev.statuses.find(
             (s) => s.code === "reschedule_instant" && s.previous
@@ -4812,6 +4962,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 250);
     };
 
+    // Handle jQuery AJAX POST requests
     $(document).ajaxSuccess(function (_e, _xhr, settings) {
       if (
         !settings ||
@@ -4831,6 +4982,69 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       debounceRefresh("ajax-success");
     });
+
+    // Intercept fetch API to auto-refresh on POST/PUT/PATCH
+    const originalFetch = window.fetch;
+    window.fetch = function (...args) {
+      const request = args[0];
+      const options = args[1] || {};
+
+      // Get URL from request or args
+      const url = typeof request === "string" ? request : request.url || "";
+      const method = (options.method || "GET").toUpperCase();
+
+      // Only intercept POST/PUT/PATCH to customplugin endpoints
+      if (
+        (method === "POST" || method === "PUT" || method === "PATCH") &&
+        url.includes("/local/customplugin/ajax/")
+      ) {
+        // Skip calendar fetch endpoints to avoid loops
+        if (
+          url.includes("calendar_admin_get_events") ||
+          url.includes("calendar_admin_filters") ||
+          url.includes("get_cohort_details") ||
+          url.includes("get_teacher_availability")
+        ) {
+          return originalFetch.apply(this, args);
+        }
+
+        // Call original fetch and auto-refresh on success
+        return originalFetch.apply(this, args).then((response) => {
+          // Clone response so we can read it
+          const clonedResponse = response.clone();
+
+          // Check if response is successful
+          if (response.ok) {
+            // Try to parse as JSON to verify success
+            clonedResponse
+              .json()
+              .then((data) => {
+                // Check various success indicators
+                if (
+                  data &&
+                  (data.ok === true ||
+                    data.success === true ||
+                    data.status === "success" ||
+                    data.error === false ||
+                    data.error === null ||
+                    data.error === undefined)
+                ) {
+                  debounceRefresh("fetch-success");
+                }
+              })
+              .catch(() => {
+                // If JSON parse fails, still refresh for successful responses
+                debounceRefresh("fetch-success");
+              });
+          }
+
+          return response;
+        });
+      }
+
+      // For non-POST/PUT/PATCH or non-customplugin URLs, use original fetch
+      return originalFetch.apply(this, args);
+    };
   })();
 
   // ---------------- Wire week navigation ----------------

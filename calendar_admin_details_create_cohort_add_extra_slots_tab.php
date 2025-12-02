@@ -710,7 +710,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     $("#addExtraSlotModal").fadeOut(300);
 
                     // Refresh calendar
-                    if (typeof loadAdminCalendarEvents === "function") {
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('add-extra-slot');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    } else if (typeof loadAdminCalendarEvents === "function") {
                         loadAdminCalendarEvents();
                     }
                 },

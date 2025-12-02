@@ -756,6 +756,13 @@
 
                 if (response.status === "success") {
                     alert("Availability saved successfully (" + response.action + ")");
+                    
+                    // Refresh calendar
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('teacher-availability');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    }
                 } else {
                     alert("Error: " + response.error);
                 }
