@@ -1245,6 +1245,12 @@
 
                             showToast('Cohort created successfully: ' + name);
 
+                            if (window.refetchCustomPluginData) {
+                                window.refetchCustomPluginData('create-cohort');
+                            } else if (window.fetchCalendarEvents) {
+                                window.fetchCalendarEvents();
+                            }
+
 
                             resetCohortFields();
                         } catch (err) {
@@ -1313,6 +1319,13 @@
             }, 500);
         });
 
+        // Make sure only one cohort-related modal/backdrop is visible at a time
+        function closeCohortOverlays() {
+            $('#customRecurrenceModalBackdrop, #calendarDateModalBackdrop, #monthly_cal_modal_backdrop, #timePickerModalBackdrop').fadeOut(0);
+        }
+        // expose for other scripts (e.g. calendar_admin_details_calendar_content.js)
+        window.closeCohortOverlays = closeCohortOverlays;
+
         // ===== UNIFIED TAB HANDLER =====
         function openTab(tabName) {
 
@@ -1367,6 +1380,7 @@
             }
 
             // Show the modal
+            closeCohortOverlays();
             $('#calendar_admin_details_create_cohort_modal_backdrop').fadeIn();
             $('#calendar_admin_details_create_cohort_content').html('');
 

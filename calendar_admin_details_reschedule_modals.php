@@ -729,6 +729,55 @@ input#class-name {
 }
 </style>
 
+<!-- Time Off Modal (Teacher Busy Time) -->
+<div id="timeoff-modal" class="modal-overlay" style="display:none;">
+    <div class="popup"
+        style="width:520px; background:#fff; border-radius:12px; padding:20px 24px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+        <div class="header"
+            style="display:flex; justify-content:space-between; align-items:center; font-size:18px; font-weight:600; margin-bottom:12px;">
+            <span style="color:#ff3b2f; border-bottom:3px solid #ff3b2f; padding-bottom:4px;">Time off</span>
+            <button id="close-timeoff" class="close"
+                style="font-size:20px; cursor:pointer; background:none; border:none;">✕</button>
+        </div>
+
+        <div class="row" style="display:flex; align-items:center; gap:12px; margin:18px 0;">
+            <div class="dot" style="width:18px; height:18px; border-radius:50%; border:3px solid #dab100;"></div>
+            <div class="label" style="font-size:16px; font-weight:500;">Busy Time</div>
+        </div>
+
+        <div class="date-row" style="display:flex;  margin-top:10px; gap:20px;">
+            <div>
+                <div class="date-info" style="display:flex; align-items:center; gap:10px;">
+                    <div class="clock-icon" style="width:18px; height:18px; ">
+                        <img src="./img/busy-clock.svg" alt="">
+                    </div>
+                    <div id="timeoff-date-line" class="date-text" style="font-size:16px; font-weight:600;">September 26
+                    </div>
+                </div>
+                <div id="timeoff-day-line" class="sub-text" style="font-size:16px; color:gray; margin-top:4px;">
+                    Thursday</div>
+            </div>
+            <div>
+                <img src="./img/line.svg" alt="">
+            </div>
+
+            <div>
+                <div id="timeoff-time-range" class="times"
+                    style="font-size:16px; font-weight:600; display:flex; gap:6px; align-items:center;">06:00 → 07:00
+                </div>
+                <div id="timeoff-duration" class="duration"
+                    style="font-size:16px; color:gray; margin-top:4px; text-align:right;">1 hour</div>
+            </div>
+        </div>
+
+        <button id="timeoff-cancel-btn" class="btn"
+            style="width:100%; padding:12px 0; background:none; border:2px solid #ff3b2f; color:#ff3b2f; border-radius:8px; font-size:16px; margin-top:22px; cursor:pointer;">Cancel
+            time off</button>
+    </div>
+</div>
+
+</div>
+
 <!-- ========= CALENDAR MODAL FOR MANAGE SESSION ========= -->
 <div class="session_cal_modal_backdrop" id="session_cal_modal_backdrop">
     <div class="session_cal_modal">
@@ -1512,7 +1561,113 @@ $(document).ready(function() {
     </div>
 </section>
 
+<!-- Reason of Cancellation Modal (Read-only) -->
+<section id="reason-of-cancellation-modal" class="reason-cancellation-modal-section modal-overlay"
+    style="display: none;">
+    <div class="reason-cancellation-container">
+        <button class="reason-cancellation-close-btn" id="close-reason-cancellation" aria-label="Close modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div class="reason-cancellation-content">
+            <h2 class="reason-cancellation-title">Reason Of Cancellation</h2>
+            <p class="reason-cancellation-subtitle">Monday, September 2, 7:00-8:00 Am</p>
+            <div class="reason-cancellation-text" id="cancellation-reason-text">
+                Daniella was unable to attend the online class due to unforeseen personal reasons. Over the past few
+                days, I encountered some challenges that required my immediate attention
+            </div>
+            <button class="reason-cancellation-ok-btn" id="reason-cancellation-ok">Ok</button>
+        </div>
+    </div>
+</section>
+
 <style>
+.reason-cancellation-modal-section {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10003;
+}
+
+.reason-cancellation-container {
+    background: white;
+    border-radius: 8px;
+    max-width: 520px;
+    width: 90%;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+
+.reason-cancellation-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+    transition: color 0.2s;
+}
+
+.reason-cancellation-close-btn:hover {
+    color: #1F2937;
+}
+
+.reason-cancellation-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #232323;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+}
+
+.reason-cancellation-subtitle {
+    font-size: 16px;
+    font-weight: 400;
+    color: #4D4C5C;
+    margin: 0 0 24px 0;
+}
+
+.reason-cancellation-text {
+    font-size: 15px;
+    font-weight: 400;
+    color: #232323;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+    text-align: left;
+}
+
+.reason-cancellation-ok-btn {
+    width: 100%;
+    padding: 12px 24px;
+    background-color: #ff2500;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.reason-cancellation-ok-btn:hover {
+    background-color: #e02000;
+}
+
 .cancel-confirmation-modal-section {
     position: fixed;
     top: 0;
@@ -1747,6 +1902,14 @@ $(document).ready(function() {
                 $('#cr-reason').data('selected-value', null);
                 $('#cr-reason .cr-select-placeholder').text('Select Reason');
                 $('#cr-notes').val('');
+
+                // Refresh calendar
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('cancel-reschedule-later');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                }
+
                 // Close modal
                 $("#manage-session-modal").fadeOut(300);
                 $('#cancel-reschedule-modal').fadeOut(300);
@@ -1913,8 +2076,12 @@ $(document).ready(function() {
                 }
                 // Close modal if you have one
                 $("#manage-session-modal").fadeOut(300);
-                // Reload calendar (optional)
-                if (typeof loadCalendarEvents === "function") {
+                // Reload calendar
+                if (window.refetchCustomPluginData) {
+                    window.refetchCustomPluginData('cancel-no-makeup');
+                } else if (window.fetchCalendarEvents) {
+                    window.fetchCalendarEvents();
+                } else if (typeof loadCalendarEvents === "function") {
                     loadCalendarEvents();
                 }
                 // Close both modals
@@ -1980,6 +2147,202 @@ $(document).ready(function() {
         if ($(e.target).hasClass('modal-overlay')) {
             $(this).fadeOut(300);
         }
+    });
+
+    // Reason of Cancellation modal handlers
+    $('#close-reason-cancellation, #reason-cancellation-ok').on('click', function(e) {
+        e.preventDefault();
+        $('#reason-of-cancellation-modal').fadeOut(300);
+    });
+
+    // Close reason of cancellation modal when clicking outside
+    $('#reason-of-cancellation-modal').on('click', function(e) {
+        if ($(e.target).hasClass('modal-overlay')) {
+            $(this).fadeOut(300);
+        }
+    });
+
+    // Function to open reason of cancellation modal
+    window.openReasonOfCancellationModal = function(eventData) {
+        console.log('Opening Reason of Cancellation modal for:', eventData);
+
+        // Extract cancellation reason from event statuses
+        let cancellationReason = '';
+        let reasonText = '';
+
+        if (eventData && eventData.statuses && Array.isArray(eventData.statuses)) {
+            const cancelStatus = eventData.statuses.find(s => s.code === 'cancel_no_makeup');
+            if (cancelStatus) {
+                // Check nested structure: details.current or top-level
+                const statusData = cancelStatus.details?.current || cancelStatus;
+
+                reasonText = statusData.reasonText || statusData.reason_text || '';
+                const notes = statusData.notes || '';
+                cancellationReason = reasonText;
+                if (notes) {
+                    cancellationReason += (reasonText ? '. ' : '') + notes;
+                }
+            }
+        }
+
+        // Format date/time from event data
+        const dateStr = eventData.date || '';
+        const startTime = eventData.start || '';
+        const endTime = eventData.end || '';
+
+        // Format the subtitle (e.g., "Monday, September 2, 7:00-8:00 Am")
+        let subtitle = '';
+        if (dateStr) {
+            const date = new Date(dateStr);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'
+            ];
+            const dayName = dayNames[date.getDay()];
+            const monthName = monthNames[date.getMonth()];
+            const dayNum = date.getDate();
+            subtitle = `${dayName}, ${monthName} ${dayNum}`;
+
+            if (startTime && endTime) {
+                subtitle += `, ${startTime}-${endTime}`;
+            }
+        }
+
+        // Update modal content
+        $('#reason-of-cancellation-modal .reason-cancellation-subtitle').text(subtitle);
+        $('#cancellation-reason-text').text(cancellationReason || 'No reason provided.');
+
+        // Show the modal
+        $('#reason-of-cancellation-modal').fadeIn(300);
+    };
+
+    // Ensure Time Off modal receives event data and labels are populated
+    (function() {
+        var prevOpen = window.openTimeOffModal;
+
+        function formatTime12h(t) {
+            if (!t) return '';
+            try {
+                var h, m;
+                if (typeof t === 'string' && t.indexOf(':') > -1) {
+                    var p = t.split(':');
+                    h = parseInt(p[0], 10);
+                    m = parseInt(p[1], 10) || 0;
+                } else if (t instanceof Date) {
+                    h = t.getHours();
+                    m = t.getMinutes();
+                } else {
+                    return '';
+                }
+                var ampm = h >= 12 ? 'PM' : 'AM';
+                var hh = h % 12;
+                if (hh === 0) hh = 12;
+                return hh + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+            } catch (e) {
+                return String(t || '');
+            }
+        }
+
+        function formatDateParts(dateStr) {
+            if (!dateStr) return {
+                monthDay: '',
+                weekday: ''
+            };
+            try {
+                var d = new Date(dateStr);
+                var monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                    'September', 'October', 'November', 'December'
+                ];
+                var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+                    'Saturday'
+                ];
+                return {
+                    monthDay: monthNames[d.getMonth()] + ' ' + d.getDate(),
+                    weekday: dayNames[d.getDay()]
+                };
+            } catch (e) {
+                return {
+                    monthDay: String(dateStr),
+                    weekday: ''
+                };
+            }
+        }
+
+        window.openTimeOffModal = function(eventData) {
+            try {
+                // Persist raw event for cancel click
+                $('#timeoff-modal').data('eventData', eventData || {});
+
+                // Populate labels
+                var dateParts = formatDateParts(eventData && (eventData.date || eventData.startDate ||
+                    eventData.start));
+                if (dateParts.monthDay) $('#timeoff-date-line').text(dateParts.monthDay);
+                if (dateParts.weekday) $('#timeoff-day-line').text(dateParts.weekday);
+
+                var startLbl = formatTime12h(eventData && (eventData.start || eventData.startTime));
+                var endLbl = formatTime12h(eventData && (eventData.end || eventData.endTime));
+                if (startLbl || endLbl) {
+                    $('#timeoff-time-range').text((startLbl || '') + (startLbl && endLbl ? ' → ' : '') +
+                        (endLbl || ''));
+                }
+
+                // Duration from HH:mm
+                (function setDuration() {
+                    var s = eventData && (eventData.start || eventData.startTime);
+                    var e = eventData && (eventData.end || eventData.endTime);
+                    if (typeof s === 'string' && typeof e === 'string' && s.indexOf(':') > -1 && e
+                        .indexOf(':') > -1) {
+                        var sp = s.split(':'),
+                            ep = e.split(':');
+                        var sm = (+sp[0]) * 60 + (+sp[1]);
+                        var em = (+ep[0]) * 60 + (+ep[1]);
+                        var diff = Math.max(0, em - sm);
+                        var hrs = Math.floor(diff / 60),
+                            mins = diff % 60;
+                        var label = hrs > 0 ? (hrs + (hrs === 1 ? ' hour' : ' hours')) : '';
+                        if (mins > 0) label += (label ? ' ' : '') + mins + ' min';
+                        if (label) $('#timeoff-duration').text(label);
+                    }
+                })();
+
+                $('#timeoff-modal').fadeIn(200);
+            } catch (err) {
+                console.error('openTimeOffModal error:', err);
+            }
+
+            if (typeof prevOpen === 'function') {
+                try {
+                    return prevOpen(eventData);
+                } catch (e) {}
+            }
+        };
+    })();
+
+    // Time Off modal - log payload on cancel click
+    $('#timeoff-cancel-btn').on('click', function(e) {
+        e.preventDefault();
+        var $modal = $('#timeoff-modal');
+        var eventData = $modal.data('eventData') || {};
+
+        var payload = {
+            action: 'cancel_time_off',
+            classType: 'teacher_timeoff',
+            timeoffId: eventData.timeoffid || eventData.id || eventData.eventid || null,
+            eventid: eventData.eventid || null,
+            teacherId: eventData.teacherid || eventData.teacher_id || eventData.teacherId || null,
+            dateLabel: $('#timeoff-date-line').text().trim(),
+            dayLabel: $('#timeoff-day-line').text().trim(),
+            timeRangeLabel: $('#timeoff-time-range').text().replace(/\s+/g, ' ').trim(),
+            durationLabel: $('#timeoff-duration').text().trim(),
+            start: eventData.start || eventData.startTime || eventData.start_at || null,
+            end: eventData.end || eventData.endTime || eventData.end_at || null,
+            timezone: (Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
+                null,
+            source: 'timeoff-modal',
+            rawEventData: eventData
+        };
+
+        console.log('Time Off Cancel Payload:', payload);
     });
 });
 </script>

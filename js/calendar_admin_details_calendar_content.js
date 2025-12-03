@@ -66,19 +66,53 @@ function getTeacherColor(teacherId) {
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/* ====== WHITE SLOT WINDOWS ======
-   days: 'all' | [0..6]  (Mon=0 ... Sun=6)
-   Or target a specific ISO date with { date:'YYYY-MM-DD', ... }
-*/
+// White slot windows derived from teacher availability payloads
+let whiteSlotRules = [];
 
-const WHITE_SLOTS = [
-  // Example per your ask: 10:00–11:00 PM and 11:00 PM–12:00 AM every day
-  { days: "all", start: "22:00", end: "23:00" },
-  { days: "all", start: "23:00", end: "24:00" },
-  // More examples you can add later:
-  // { days:[5,6], start:'18:00', end:'20:00' },
-  // { date:'2025-08-31', start:'10:00', end:'12:00' },
-];
+// Map event status codes to icons/labels
+const STATUS_ICON_MAP = {
+  scheduled: { icon: "./img/confirmed.svg", label: "Taught" },
+
+  cancel_no_makeup: {
+    icon: "./img/cancelled.svg",
+    label: "Cancelled (No Makeup)",
+  },
+
+  cancel_reschedule_later: {
+    icon: "./img/rescheduled.svg",
+    label: "Cancelled (Reschedule Later)",
+  },
+  reschedule_instant: { icon: "./img/rescheduled.svg", label: "Rescheduled" },
+  covered: { icon: "./img/covered.svg", label: "Covered" },
+  missed: { icon: "./img/missed.svg", label: "Missed" },
+  pendingconfirmation: {
+    icon: "./img/pendingconfirmation.svg",
+    label: "Pending Confirmation",
+  },
+  pending_confirmation: {
+    icon: "./img/pendingconfirmation.svg",
+    label: "Pending Confirmation",
+  },
+
+  makeup: { icon: "./img/makeup.svg", label: "Makeup" },
+  make_up: { icon: "./img/makeup.svg", label: "Makeup" },
+};
+
+function getActiveStatusMeta(statuses) {
+  if (!Array.isArray(statuses) || statuses.length === 0) return null;
+  const activeStatuses = statuses.filter((s) => s && s.isactive);
+  const statusObj = activeStatuses.length
+    ? activeStatuses[activeStatuses.length - 1]
+    : statuses[statuses.length - 1];
+  if (!statusObj || !statusObj.code) return null;
+  const code = String(statusObj.code).toLowerCase().trim();
+  const direct = STATUS_ICON_MAP[code];
+  if (direct) return { ...direct, code, statusObj };
+  if (code.startsWith("reschedule")) {
+    return { ...STATUS_ICON_MAP.rescheduled, code, statusObj };
+  }
+  return null;
+}
 
 window.events = [];
 function pad2(n) {
@@ -122,29 +156,22 @@ function rangeText(startDate) {
     : `${m1} ${d1} - ${d2}, ${y}`;
 }
 
-/* NEW: check if a slot minute falls in any WHITE_SLOTS rule */
+/* NEW: check if a slot minute falls in any availability-derived white slot rule */
 function isWhiteSlotFor(dayIndex, isoDate, minuteOfDay) {
   const toMin = (hhmm) => {
     if (typeof hhmm === "number") return hhmm;
     const [h, m] = String(hhmm).split(":").map(Number);
+    if (Number.isNaN(h)) return null;
     return h * 60 + (m || 0);
   };
-  for (const rule of WHITE_SLOTS) {
-    // date-specific rule
-    if (rule.date) {
-      if (rule.date !== isoDate) continue;
-    } else {
-      // day-of-week rules
-      if (rule.days === "all") {
-        // ok
-      } else if (Array.isArray(rule.days)) {
-        if (!rule.days.includes(dayIndex)) continue;
-      } else {
-        continue;
-      }
+  for (const rule of whiteSlotRules) {
+    if (rule.date && rule.date !== isoDate) continue;
+    if (typeof rule.dayIndex === "number" && rule.dayIndex !== dayIndex) {
+      continue;
     }
     const s = toMin(rule.start),
       e = toMin(rule.end);
+    if (s === null || e === null) continue;
     if (minuteOfDay >= s && minuteOfDay < e) return true;
   }
   return false;
@@ -159,6 +186,7 @@ $(function () {
 
   /* ========= Create Cohort modal (uses your exact code) ========= */
   function openCreateCohortModal() {
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -173,6 +201,8 @@ $(function () {
     $("#peerTalkTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "block");
     $("#classTabContent").css("display", "none");
   }
@@ -197,6 +227,7 @@ $(function () {
     }
 
     // Show modal backdrop
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -213,6 +244,8 @@ $(function () {
     $("#conferenceTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "none");
     $("#classTabContent").css("display", "none");
     $("#peerTalkTabContent").css("display", "block");
@@ -710,6 +743,7 @@ $(function () {
     }
 
     // Show modal backdrop
+    if (window.closeCohortOverlays) window.closeCohortOverlays();
     $("#calendar_admin_details_create_cohort_modal_backdrop").fadeIn();
 
     const $bd = $("#calendar_admin_details_create_cohort_modal_backdrop");
@@ -726,6 +760,8 @@ $(function () {
     $("#peerTalkTabContent").css("display", "none");
     $("#addTimeTabContent").css("display", "none");
     $("#addExtraSlotsTabContent").css("display", "none");
+    $("#manageclassTabContent").css("display", "none");
+    $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "none");
     $("#classTabContent").css("display", "none");
     $("#conferenceTabContent").css("display", "block");
@@ -1032,6 +1068,11 @@ $(function () {
       });
       this.style.zIndex = (++zSeed).toString();
 
+      // Highlight active event and gently dim overlapping neighbors for readability
+      $(".event").removeClass("event-active event-dimmed");
+      $clicked.addClass("event-active");
+      $group.not($clicked).addClass("event-dimmed");
+
       // Find the event data from window.events
       const dateStr = $day.data("date");
       const teacherId = $clicked.data("teacher-id");
@@ -1063,10 +1104,43 @@ $(function () {
           currentClickedEvent
         );
 
+        // Teacher time off: open Time Off modal
+        if (classType === "teacher_timeoff" || source === "teacher_timeoff") {
+          if (typeof window.openTimeOffModal === "function") {
+            window.openTimeOffModal(currentClickedEvent);
+          }
+          return;
+        }
+
+        // Check if event is cancelled (cancel_no_makeup) - show reason modal
+        const activeStatus = getActiveStatusMeta(
+          currentClickedEvent.statuses || []
+        );
+        console.log(
+          "Active status for clicked event:",
+          activeStatus,
+          "Statuses:",
+          currentClickedEvent.statuses
+        );
+
+        if (activeStatus && activeStatus.code === "cancel_no_makeup") {
+          console.log(
+            "Opening Reason of Cancellation modal for cancelled event",
+            currentClickedEvent
+          );
+          if (typeof window.openReasonOfCancellationModal === "function") {
+            window.openReasonOfCancellationModal(currentClickedEvent);
+          } else {
+            console.error("openReasonOfCancellationModal function not found");
+          }
+          return;
+        }
+
         // Check if it's a peertalk event
         if (classType === "peertalk" || source === "peertalk") {
           // Open peertalk modal with event data
           openPeerTalkModalWithData(currentClickedEvent);
+          return;
         }
         // Check if it's a conference event
         else if (classType === "conference" || source === "conference") {
@@ -1076,6 +1150,7 @@ $(function () {
           );
           // Open conference modal with event data
           openConferenceModalWithData(currentClickedEvent);
+          return;
         }
         // Check if it's NOT a 1:1 lesson (for regular group lessons)
         else if (
@@ -1084,6 +1159,7 @@ $(function () {
         ) {
           // This is a group lesson, open the dropdown menu
           openMenuOptionsDropdown(e, this);
+          return;
         }
         // If it's a 1:1 lesson, do nothing (no dropdown)
       }
@@ -1094,6 +1170,58 @@ $(function () {
     const dropdown = document.getElementById("menu-options");
     const menuContainer = dropdown.querySelector(".menu-container");
     if (!dropdown || !menuContainer) return;
+
+    const activeStatus = getActiveStatusMeta(
+      (currentClickedEvent && currentClickedEvent.statuses) || []
+    );
+    const isCancelRescheduleLater =
+      activeStatus && activeStatus.code === "cancel_reschedule_later";
+
+    const toggleMenuItem = (href, show) => {
+      const link = menuContainer.querySelector(`a[href="${href}"]`);
+      if (!link) return;
+      const holder = link.closest(".menu-item") || link.closest("li") || link;
+      holder.style.display = show ? "" : "none";
+    };
+
+    // Hide manage + cancel-reschedule-later options when status is cancel_reschedule_later
+    toggleMenuItem("#manage-session", !isCancelRescheduleLater);
+    toggleMenuItem("#cancel-reschedule-later", !isCancelRescheduleLater);
+
+    // Hide the default menu list entirely when CRL, only show the CRL panel
+    const menuList = menuContainer.querySelector(".menu-list");
+    if (menuList) {
+      menuList.style.display = isCancelRescheduleLater ? "none" : "";
+    }
+
+    // Build / toggle the dedicated panel for make-up vs no-make-up actions
+    let crlPanel = menuContainer.querySelector(
+      ".cancel-reschedule-later-panel"
+    );
+
+    if (!crlPanel) {
+      crlPanel = document.createElement("div");
+      crlPanel.className = "cancel-reschedule-later-panel";
+      crlPanel.style.display = "none";
+      crlPanel.style.flexDirection = "column";
+      crlPanel.style.gap = "6px";
+      crlPanel.innerHTML = `
+        <a href="#schedule-makeup-now" class="menu-link crl-option" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#f7f7f7; text-decoration:none;">
+          <span style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+            <img src="./img/manage-session-reschedule.svg" alt="Schedule Make-up Now" style="width:20px; height:20px;">
+          </span>
+          <span style="color:#111; font-weight:500;">Schedule Make-up Now</span>
+        </a>
+        <a href="#cancel-no-makeup" class="menu-link crl-option" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#fff; text-decoration:none; border:1px solid #f3f3f3;">
+          <span style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+            <img src="./img/cancel-no-make-up.svg" alt="Cancel (no make-up)" style="width:20px; height:20px;">
+          </span>
+          <span style="color:#d44333; font-weight:600;">Cancel (no make-up)</span>
+        </a>
+      `;
+      menuContainer.appendChild(crlPanel);
+    }
+    crlPanel.style.display = isCancelRescheduleLater ? "flex" : "none";
 
     // Close any existing dropdown
     closeMenuOptionsDropdown();
@@ -1188,6 +1316,13 @@ $(function () {
       closeMenuOptionsDropdown();
 
       // Open cancel (no make-up) modal
+      openCancelNoMakeupModal(currentClickedEvent);
+    } else if (href === "#schedule-makeup-now" && currentClickedEvent) {
+      closeMenuOptionsDropdown();
+      // Open manage session modal instead of cancel/reschedule
+      openManageSessionModal(currentClickedEvent);
+    } else if (href === "#cancel-no-makeup" && currentClickedEvent) {
+      closeMenuOptionsDropdown();
       openCancelNoMakeupModal(currentClickedEvent);
     }
   });
@@ -1957,6 +2092,142 @@ $(function () {
     }
   });
 
+  // ===== Time Off Modal (Teacher Busy Time) =====
+  // Ensure modal markup exists; if not, append it with existing styles
+  (function ensureTimeOffModal() {
+    if (!document.getElementById("timeoff-modal")) {
+      const modalHtml = `
+        <div id="timeoff-modal" class="modal-overlay" style="display:none;">
+          <div class="modal-card">
+            <div class="modal-header">
+              <div class="modal-title">Time off</div>
+              <button id="close-timeoff" class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="timeoff-row">
+                <span class="status-dot busy"></span>
+                <span class="status-label">Busy Time</span>
+              </div>
+              <div class="timeoff-details">
+                <div class="date-block">
+                  <span class="date-icon">🕘</span>
+                  <div class="date-lines">
+                    <div class="date-line" id="timeoff-date-line">September 26</div>
+                    <div class="date-subline" id="timeoff-day-line">Thursday</div>
+                  </div>
+                </div>
+                <div class="time-block">
+                  <span id="timeoff-time-range">06:00 → 07:00</span>
+                  <div class="time-subline" id="timeoff-duration">1 hour</div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button id="timeoff-cancel-btn" class="danger-btn">Cancel time off</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.insertAdjacentHTML("beforeend", modalHtml);
+    }
+  })();
+
+  function openTimeOffModal(eventData) {
+    // Persist event data for downstream handlers (e.g., cancel click)
+    try {
+      $("#timeoff-modal").data("eventData", eventData || {});
+    } catch (e) {}
+    // Format date
+    let dateStr = "";
+    let dayStr = "";
+    if (eventData.date) {
+      const [y, m, d] = eventData.date.split("-").map((x) => parseInt(x, 10));
+      const dateObj = new Date(y, m - 1, d);
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      const dayNames = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ];
+      dateStr = `${monthNames[dateObj.getMonth()]} ${d}`;
+      dayStr = dayNames[dateObj.getDay()];
+    }
+
+    // Format time range and duration
+    let startMin = null,
+      endMin = null;
+    if (typeof eventData.start === "number") startMin = eventData.start;
+    else if (eventData.start) startMin = minutes(eventData.start);
+    if (typeof eventData.end === "number") endMin = eventData.end;
+    else if (eventData.end) endMin = minutes(eventData.end);
+    const timeRange =
+      startMin != null && endMin != null
+        ? `${fmt12(startMin)} → ${fmt12(endMin)}`
+        : "";
+    const durationMin =
+      startMin != null && endMin != null ? Math.max(0, endMin - startMin) : 0;
+    const durationStr =
+      durationMin >= 60
+        ? `${Math.floor(durationMin / 60)} hour${
+            Math.floor(durationMin / 60) > 1 ? "s" : ""
+          }`
+        : `${durationMin} min`;
+
+    // Populate
+    $("#timeoff-date-line").text(dateStr);
+    $("#timeoff-day-line").text(dayStr);
+    $("#timeoff-time-range").text(timeRange);
+    $("#timeoff-duration").text(durationStr);
+
+    // Show
+    $("#timeoff-modal").fadeIn(200);
+  }
+
+  // Close Time Off modal
+  $(document).on("click", "#close-timeoff", function () {
+    $("#timeoff-modal").fadeOut(200);
+  });
+
+  // Close when clicking outside
+  $(document).on("click", "#timeoff-modal", function (e) {
+    if ($(e.target).hasClass("modal-overlay")) {
+      $("#timeoff-modal").fadeOut(200);
+    }
+  });
+
+  // Cancel Time Off action (placeholder; wire to backend if available)
+  $(document).on("click", "#timeoff-cancel-btn", function () {
+    const ev = window.getCurrentClickedEvent && window.getCurrentClickedEvent();
+    if (!ev) {
+      $("#timeoff-modal").fadeOut(200);
+      return;
+    }
+    // TODO: call backend to cancel teacher time off; on success, refetch and close
+    $("#timeoff-modal").fadeOut(200);
+    if (typeof window.refetchCustomPluginData === "function") {
+      window.refetchCustomPluginData();
+    }
+  });
+
+  // Expose globally
+  window.openTimeOffModal = openTimeOffModal;
+
   // Handle manage session form submission
   $(document).on("submit", "#manage-session-form", function (e) {
     e.preventDefault();
@@ -2087,25 +2358,30 @@ $(function () {
           window.showToast("Session updated successfully!", "success");
         } else {
           // fallback toast
-          let toast = document.createElement('div');
-          toast.className = 'custom-toast success';
-          toast.innerText = 'Session updated successfully!';
-          toast.style.position = 'fixed';
-          toast.style.bottom = '32px';
-          toast.style.left = '50%';
-          toast.style.transform = 'translateX(-50%)';
-          toast.style.background = '#1649c7';
-          toast.style.color = '#fff';
-          toast.style.padding = '12px 32px';
-          toast.style.borderRadius = '8px';
-          toast.style.fontSize = '1rem';
+          let toast = document.createElement("div");
+          toast.className = "custom-toast success";
+          toast.innerText = "Session updated successfully!";
+          toast.style.position = "fixed";
+          toast.style.bottom = "32px";
+          toast.style.left = "50%";
+          toast.style.transform = "translateX(-50%)";
+          toast.style.background = "#1649c7";
+          toast.style.color = "#fff";
+          toast.style.padding = "12px 32px";
+          toast.style.borderRadius = "8px";
+          toast.style.fontSize = "1rem";
           toast.style.zIndex = 9999;
-          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
           document.body.appendChild(toast);
           setTimeout(() => {
-            toast.style.opacity = '0';
+            toast.style.opacity = "0";
             setTimeout(() => toast.remove(), 400);
           }, 2200);
+        }
+        if (window.refetchCustomPluginData) {
+          window.refetchCustomPluginData("reschedule");
+        } else if (window.fetchCalendarEvents) {
+          window.fetchCalendarEvents();
         }
         $("#manage-session-modal").fadeOut(300);
         $(".custom-dropdown .dropdown-list").hide();
@@ -2113,32 +2389,35 @@ $(function () {
       error: function (xhr) {
         if (window.hideGlobalLoader) window.hideGlobalLoader();
         if (window.showToast) {
-          window.showToast("Something went wrong while updating session.", "error");
+          window.showToast(
+            "Something went wrong while updating session.",
+            "error"
+          );
         } else {
-          let toast = document.createElement('div');
-          toast.className = 'custom-toast error';
-          toast.innerText = 'Something went wrong while updating session.';
-          toast.style.position = 'fixed';
-          toast.style.bottom = '32px';
-          toast.style.left = '50%';
-          toast.style.transform = 'translateX(-50%)';
-          toast.style.background = '#fe2e0c';
-          toast.style.color = '#fff';
-          toast.style.padding = '12px 32px';
-          toast.style.borderRadius = '8px';
-          toast.style.fontSize = '1rem';
+          let toast = document.createElement("div");
+          toast.className = "custom-toast error";
+          toast.innerText = "Something went wrong while updating session.";
+          toast.style.position = "fixed";
+          toast.style.bottom = "32px";
+          toast.style.left = "50%";
+          toast.style.transform = "translateX(-50%)";
+          toast.style.background = "#fe2e0c";
+          toast.style.color = "#fff";
+          toast.style.padding = "12px 32px";
+          toast.style.borderRadius = "8px";
+          toast.style.fontSize = "1rem";
           toast.style.zIndex = 9999;
-          toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
           document.body.appendChild(toast);
           setTimeout(() => {
-            toast.style.opacity = '0';
+            toast.style.opacity = "0";
             setTimeout(() => toast.remove(), 400);
           }, 2200);
         }
       },
-      complete: function() {
+      complete: function () {
         if (window.hideGlobalLoader) window.hideGlobalLoader();
-      }
+      },
     });
   });
 
@@ -2234,6 +2513,113 @@ $(function () {
     const perDay = Array.from({ length: 7 }, () => []);
     console.log("Events to render:", events);
     events.forEach((raw) => {
+      // Check if event has reschedule_instant status with previous/current data
+      const statusMeta = getActiveStatusMeta(raw.statuses);
+      let hasRescheduleInstant = false;
+      let previousEvent = null;
+      let currentEvent = null;
+
+      if (
+        statusMeta &&
+        statusMeta.code === "reschedule_instant" &&
+        statusMeta.statusObj &&
+        statusMeta.statusObj.details
+      ) {
+        const details = statusMeta.statusObj.details;
+        if (
+          details.previous &&
+          details.previous.action === "reschedule_instant" &&
+          details.current &&
+          details.current.action === "reschedule_instant"
+        ) {
+          hasRescheduleInstant = true;
+          previousEvent = details.previous;
+          currentEvent = details.current;
+        }
+      }
+
+      // If reschedule_instant with both previous and current, create two events
+      if (hasRescheduleInstant && previousEvent && currentEvent) {
+        // Create faded previous event
+        const prevIdx = weekDates.indexOf(previousEvent.date);
+        if (prevIdx !== -1) {
+          const ePrev = { ...raw };
+          ePrev.date = previousEvent.date;
+          ePrev.start =
+            typeof previousEvent.start === "string"
+              ? minutes(previousEvent.start)
+              : previousEvent.start;
+          ePrev.end =
+            typeof previousEvent.end === "string"
+              ? minutes(previousEvent.end)
+              : previousEvent.end;
+          ePrev.teacherId = previousEvent.teacher || raw.teacherId;
+          ePrev.isFadedReschedule = true; // Mark as faded
+          ePrev.isReschedulePrevious = true;
+
+          // Handle midnight-crossing for previous event
+          if (ePrev.end < ePrev.start) {
+            const pairedId = `paired-prev-${Date.now()}-${Math.random()}`;
+            const ePrev1 = { ...ePrev };
+            ePrev1.end = 24 * 60;
+            ePrev1.isMidnightCrossing = true;
+            ePrev1.pairedId = pairedId;
+            ePrev1.part = "start";
+            perDay[prevIdx].push(ePrev1);
+
+            const ePrev2 = { ...ePrev };
+            ePrev2.start = 0;
+            ePrev2.isMidnightCrossing = true;
+            ePrev2.pairedId = pairedId;
+            ePrev2.part = "end";
+            if (prevIdx < 6) perDay[prevIdx + 1].push(ePrev2);
+          } else {
+            perDay[prevIdx].push(ePrev);
+          }
+        }
+
+        // Create current event
+        const currIdx = weekDates.indexOf(currentEvent.date);
+        if (currIdx !== -1) {
+          const eCurr = { ...raw };
+          eCurr.date = currentEvent.date;
+          eCurr.start =
+            typeof currentEvent.start === "string"
+              ? minutes(currentEvent.start)
+              : currentEvent.start;
+          eCurr.end =
+            typeof currentEvent.end === "string"
+              ? minutes(currentEvent.end)
+              : currentEvent.end;
+          eCurr.teacherId = currentEvent.teacher || raw.teacherId;
+          eCurr.isRescheduleCurrent = true;
+
+          // Handle midnight-crossing for current event
+          if (eCurr.end < eCurr.start) {
+            const pairedId = `paired-curr-${Date.now()}-${Math.random()}`;
+            const eCurr1 = { ...eCurr };
+            eCurr1.end = 24 * 60;
+            eCurr1.isMidnightCrossing = true;
+            eCurr1.pairedId = pairedId;
+            eCurr1.part = "start";
+            perDay[currIdx].push(eCurr1);
+
+            const eCurr2 = { ...eCurr };
+            eCurr2.start = 0;
+            eCurr2.isMidnightCrossing = true;
+            eCurr2.pairedId = pairedId;
+            eCurr2.part = "end";
+            if (currIdx < 6) perDay[currIdx + 1].push(eCurr2);
+          } else {
+            perDay[currIdx].push(eCurr);
+          }
+        }
+
+        // Skip normal processing for this event
+        return;
+      }
+
+      // Normal event processing
       let di = null;
       if (raw.date) {
         const idx = weekDates.indexOf(raw.date);
@@ -2306,10 +2692,14 @@ $(function () {
         const isSingleton = (ev._max || 1) === 1;
         const cssPos = isSingleton
           ? { left: "0px", width: "calc(100% - 0px)" }
-          : {
-              left: MAX_LEFT - ev.stackIndex * STACK_OFFSET + "px",
-              width: `calc(100% - ${MAX_LEFT + 1}px)`,
-            };
+          : (() => {
+              const leftPx = ev.stackIndex * STACK_OFFSET;
+              const rightPad = STACK_OFFSET; // small inset on the right for overlap
+              return {
+                left: `${leftPx}px`,
+                width: `calc(100% - ${leftPx + rightPad}px)`,
+              };
+            })();
 
         // Get teacher color class and inline style for unlimited colors
         let teacherColorClass = "";
@@ -2340,14 +2730,54 @@ $(function () {
         } else if (ev.classType === "one2one_single") {
           classTypeClass = "class-type-one2one_single";
           borderColorStyle = "border-left-color: #4CAF50 !important;"; // Green border for one2one single
+        } else if (
+          ev.classType === "teacher_timeoff" ||
+          ev.class_type === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff"
+        ) {
+          classTypeClass = "class-type-timeoff";
+          borderColorStyle = "border-color: rgba(253,216,48,0.7) !important;";
         }
 
-        // Combine styles
-        const combinedStyle = `${teacherColorStyle}${borderColorStyle}`.trim();
+        // Combine styles (include any custom inline style from the event object)
+        const combinedStyle = `${teacherColorStyle}${borderColorStyle}${
+          ev.style || ""
+        }`.trim();
 
         // Check if event is short (less than 1 hour)
         const eventDuration = ev.end - ev.start;
         const isShortEvent = eventDuration < 60;
+
+        const isTimeOffEvent =
+          ev.classType === "teacher_timeoff" ||
+          ev.class_type === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff";
+        debugger;
+        const statusMeta = getActiveStatusMeta(ev.statuses);
+        const statusIconHtml = (() => {
+          // Hide status icon for current reschedule events (makeup icon shows instead)
+          if (ev.isRescheduleCurrent) return "";
+          if (!statusMeta) return "";
+          if (statusMeta.code === "cancel_reschedule_later") {
+            return `<span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; pointer-events:none; z-index:2;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; ">
+                  <img src="./img/pendingconfirmation.svg" alt="Pending Confirmation" title="Pending Confirmation" style="width:16px; height:16px;">
+                </span>
+                <span style="display:inline-flex; align-items:center; justify-content:center; ">
+                  <img src="./img/cancelled.svg" alt="Cancelled" title="Cancelled" style="width:16px; height:16px;">
+                </span>
+              </span>`;
+          }
+          return `<span class="ev-status-icon" title="${statusMeta.label}" aria-label="${statusMeta.label}" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+                <img src="${statusMeta.icon}" alt="${statusMeta.label}" style="width:16px; height:16px;">
+              </span>`;
+        })();
+
+        // Add faded styling for previous reschedule events
+        const fadedClass = ev.isFadedReschedule ? " faded-reschedule" : "";
+        const fadedStyle = ev.isFadedReschedule
+          ? "opacity: 0.4; filter: grayscale(0.5);"
+          : "";
 
         // Build event HTML - hide details for short events
         const $ev = $(`
@@ -2357,14 +2787,15 @@ $(function () {
           ev.isMidnightCrossing ? " midnight-crossing" : ""
         }${
           isShortEvent ? " short-event" : ""
-        }" style="${combinedStyle}" data-start="${ev.start}" data-end="${
-          ev.end
-        }" data-date="${ev.date || ""}" data-title="${(ev.title || "").replace(
-          /"/g,
-          "&quot;"
-        )}" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""}${
-          ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""
-        }${ev.part ? ` data-part="${ev.part}"` : ""}${
+        }${fadedClass}" style="${combinedStyle}${fadedStyle}" data-start="${
+          ev.start
+        }" data-end="${ev.end}" data-date="${ev.date || ""}" data-title="${(
+          ev.title || ""
+        ).replace(/"/g, "&quot;")}" ${
+          ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""
+        }${ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""}${
+          ev.part ? ` data-part="${ev.part}"` : ""
+        }${
           ev.studentids && ev.studentids.length > 0
             ? ` data-student-ids="${ev.studentids.join(",")}"`
             : ""
@@ -2380,7 +2811,8 @@ $(function () {
           ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
         }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${
           ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""
-        }>
+        }${statusMeta ? ` data-status-code="${statusMeta.code}"` : ""}>
+            ${statusIconHtml}
             ${
               !isShortEvent
                 ? `<div class="ev-top">
@@ -2390,7 +2822,11 @@ $(function () {
                   : ""
               }</div>
               ${
-                ev.repeat || !ev.repeat
+                isTimeOffEvent
+                  ? ""
+                  : ev.isRescheduleCurrent
+                  ? `<span class="ev-makeup" title="Make-up Class"><img src="./img/makeup.svg" alt=""></span>`
+                  : ev.repeat
                   ? `<span class="ev-repeat" title="Repeats"><img src="./img/ev-repeat.svg" alt=""></span>`
                   : `<span class="ev-single" title="Single Session"><img src="./img/single-lesson.svg" alt=""></span>`
               }
@@ -2417,6 +2853,10 @@ $(function () {
             }
           </div>
         `).css({ top: top + "px", height: h + "px", ...cssPos });
+
+        // Base z-index by stackIndex so layers stay ordered; click will still raise
+        const baseZ = 1000 + (ev.stackIndex || 0);
+        $ev.css("z-index", baseZ);
 
         // Add hover tooltip for short events (less than 1 hour)
         if (isShortEvent) {
@@ -3038,6 +3478,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const displayName =
       c.cohorttype === "one1one" && c.studentname ? c.studentname : c.name;
 
+    // Log cohorts being added to dropdown
+
+    console.log("Dropdown Cohort:", c);
+
     wrap.innerHTML = `
             <label class="cohort-label">
                 <div class="cohort-details">
@@ -3220,6 +3664,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (checkbox) checkbox.checked = true;
           option.classList.add("selected");
         }
+        // Log group cohorts appended
+        try {
+          console.log("Appended Group Cohort:", { id: c.id, name: c.name });
+        } catch (e) {}
       });
     } else {
       cohortNoResults.style.display = "block";
@@ -3237,6 +3685,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if (checkbox) checkbox.checked = true;
           option.classList.add("selected");
         }
+        // Log 1:1 cohorts appended
+        try {
+          console.log("Appended 1:1 Cohort:", {
+            id: c.id,
+            name: c.studentname || c.name,
+          });
+        } catch (e) {}
       });
     } else if (oneOnOneNoResults) {
       oneOnOneNoResults.style.display = "block";
@@ -3307,6 +3762,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if (checkbox) checkbox.checked = true;
           option.classList.add("selected");
         }
+        // Log group cohorts appended (teacher-filtered)
+        try {
+          console.log("Appended Group Cohort (by teacher):", {
+            id: c.id,
+            name: c.name,
+          });
+        } catch (e) {}
       });
     } else {
       cohortNoResults.style.display = "block";
@@ -3333,6 +3795,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if (checkbox) checkbox.checked = true;
           option.classList.add("selected");
         }
+        // Log 1:1 cohorts appended (teacher-filtered)
+        try {
+          console.log("Appended 1:1 Cohort (by teacher):", {
+            id: c.id,
+            name: c.studentname || c.name,
+          });
+        } catch (e) {}
       });
     } else if (oneOnOneNoResults) {
       oneOnOneNoResults.style.display = "block";
@@ -3356,6 +3825,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------- Students ----------
 
   function createStudentOption(s) {
+    console.log("Creating student option:", s);
     const wrap = document.createElement("div");
     wrap.className = "student-option";
     wrap.dataset.studentId = s.id;
@@ -4367,6 +4837,115 @@ document.addEventListener("DOMContentLoaded", () => {
     return selected;
   }
 
+  const DAY_NAME_TO_INDEX = {
+    monday: 0,
+    tuesday: 1,
+    wednesday: 2,
+    thursday: 3,
+    friday: 4,
+    saturday: 5,
+    sunday: 6,
+  };
+
+  function normalizeMinutes(val) {
+    if (typeof val === "number" && !Number.isNaN(val)) return val;
+    if (typeof val === "string") {
+      if (val.includes(":")) {
+        const [h, m] = val.split(":").map(Number);
+        if (!Number.isNaN(h)) return h * 60 + (Number.isNaN(m) ? 0 : m);
+      }
+      const parsed = parseInt(val, 10);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function getSlotsForTeacher(map, tid) {
+    if (!map) return [];
+    return map[tid] || map[String(tid)] || map[Number(tid)] || [];
+  }
+
+  function updateWhiteSlotRules(
+    availabilityMap = {},
+    extraSlotMap = {},
+    activeTeacherIds = []
+  ) {
+    whiteSlotRules = [];
+    const teachers =
+      activeTeacherIds && activeTeacherIds.length > 0
+        ? activeTeacherIds
+        : Object.keys(availabilityMap);
+
+    if (!teachers || teachers.length === 0) return;
+
+    const baseDate = currentStart || new Date();
+    const baseMs = baseDate.getTime();
+    const weekEndMs =
+      currentEnd && currentEnd.getTime
+        ? currentEnd.getTime()
+        : baseMs + 6 * 24 * 60 * 60 * 1000;
+
+    teachers.forEach((tid) => {
+      //
+      // 1) NORMAL WEEKLY AVAILABILITY
+      //
+      const availSlots = getSlotsForTeacher(availabilityMap, tid);
+      availSlots.forEach((slot) => {
+        const dayIndex =
+          DAY_NAME_TO_INDEX[String(slot.day || "").toLowerCase()];
+        if (typeof dayIndex !== "number") return;
+
+        const dayDate = new Date(baseDate);
+        dayDate.setDate(baseDate.getDate() + dayIndex);
+
+        const startMin = normalizeMinutes(slot.startTime);
+        const endMin = normalizeMinutes(slot.endTime);
+        if (startMin === null || endMin === null) return;
+
+        whiteSlotRules.push({
+          date: ymd(dayDate),
+          dayIndex,
+          start: startMin,
+          end: endMin,
+        });
+      });
+
+      //
+      // 2) EXTRA SLOTS — FIXED TIMEZONE LOGIC
+      //
+      const extraSlots = getSlotsForTeacher(extraSlotMap, tid);
+      extraSlots.forEach((slot) => {
+        // ALWAYS parse ISO strings that contain timezone!!
+        const startMs = slot.start ? Date.parse(slot.start) : null;
+        const endMs = slot.end ? Date.parse(slot.end) : null;
+
+        // If ISO strings are missing, skip. We DO NOT USE start_ts/end_ts anymore.
+        if (!startMs || !endMs) return;
+        if (endMs <= startMs) return;
+        if (startMs < baseMs || startMs > weekEndMs) return;
+
+        const startDate = new Date(startMs);
+        const endDate = new Date(endMs);
+
+        console.log("Processing extra slot:", startDate, endDate);
+
+        // ❗IMPORTANT:
+        // Use LOCAL TIME from ISO string — NOT UTC.
+        // This keeps '09:30-05:00' exactly as 9:30.
+        const startMin = startDate.getHours() * 60 + startDate.getMinutes();
+
+        const endMin = endDate.getHours() * 60 + endDate.getMinutes();
+
+        whiteSlotRules.push({
+          date: ymd(startDate),
+          dayIndex: (startDate.getDay() + 6) % 7,
+          start: startMin,
+          end: endMin,
+        });
+      });
+    });
+  }
+
   // ---------------- API call ----------------
 
   async function fetchCalendarEvents() {
@@ -4406,7 +4985,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       console.log("Fetched calendar events:", data);
 
-      // Merge regular events, peertalk events, and conference events
+      if (data.ok) {
+        updateWhiteSlotRules(
+          data.teacher_availability || {},
+          data.teacher_extra_slots || {},
+          teacherids
+        );
+      } else {
+        whiteSlotRules = [];
+      }
+
+      // Merge regular events, peertalk events, conference events, and teacher time off
       let allEvents = [];
       if (data.ok && Array.isArray(data.events)) {
         allEvents = [...data.events];
@@ -4419,78 +5008,165 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Adding conference events:", data.conference);
         allEvents = [...allEvents, ...data.conference];
       }
-
-      if (allEvents.length > 0) {
-        window.events = allEvents.map((ev) => {
-          const startDate = new Date(ev.start);
-          const endDate = new Date(ev.end);
-
-          // Match event teacher with selected teachers for proper color assignment
-          let teacherId = null;
-
-          if (teacherids && teacherids.length > 0) {
-            // Find which selected teacher is associated with this event
-            const eventTeacherIds = Array.isArray(ev.teacherids)
-              ? ev.teacherids
-              : ev.teacher_id
-              ? [ev.teacher_id]
-              : [];
-
-            // Find first match between selected teachers and event teachers
-            teacherId =
-              teacherids.find((selectedId) =>
-                eventTeacherIds.includes(selectedId)
-              ) || eventTeacherIds[0]; // Fallback to event's first teacher
-          } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
-            // No teacher filter: use first teacher from event data
-            teacherId = ev.teacherids[0];
-          } else if (ev.teacher_id) {
-            // Fallback: use single teacher_id field
-            teacherId = ev.teacher_id;
-          }
-
-          // Determine event color based on class type
-          let eventColor = "e-blue"; // Default for main classes
-          if (
-            ev.class_type === "one2one_weekly" ||
-            ev.class_type === "one2one_single"
-          ) {
-            eventColor = "e-green";
-          } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
-            eventColor = "e-purple"; // Purple for peertalk events
-          } else if (
-            ev.class_type === "conference" ||
-            ev.source === "conference"
-          ) {
-            eventColor = "e-orange"; // Orange for conference events
-          }
-
-          return {
-            date: startDate.toISOString().split("T")[0],
-            title: ev.title,
-            start: startDate.toTimeString().slice(0, 5),
-            end: endDate.toTimeString().slice(0, 5),
-            color: eventColor,
-            repeat: ev.is_recurring,
-            meetingurl: ev.meetingurl,
-            viewurl: ev.viewurl || ev.meetingurl,
-            avatar: "",
-            teacherId: teacherId,
-            classType: ev.class_type,
-            source: ev.source || "event",
-            studentnames: ev.studentnames || [],
-            studentids: ev.studentids || [],
-            cohortids: ev.cohortids || [],
-            eventid: ev.eventid,
-            cmid: ev.cmid,
-            googlemeetid: ev.googlemeetid,
-          };
+      if (data.ok && data.teacher_timeoff) {
+        Object.entries(data.teacher_timeoff).forEach(([tid, items]) => {
+          if (!Array.isArray(items)) return;
+          items.forEach((item) => {
+            if (!item || !item.start || !item.end) return;
+            allEvents.push({
+              start: item.start,
+              end: item.end,
+              title: item.title || "Busy",
+              classType: "teacher_timeoff",
+              class_type: "teacher_timeoff",
+              source: "teacher_timeoff",
+              teacherids: [Number(tid) || tid],
+              teacherid: item.teacherid || Number(tid) || tid,
+              timeoffid: typeof item.id !== "undefined" ? item.id : null,
+              style:
+                "border-color: rgba(253,216,48,0.7); background-color: rgba(253,216,48,0.05);",
+              color: "e-timeoff",
+            });
+          });
         });
+      }
 
-        // Re-render your week view
-        if (typeof renderWeek === "function") {
-          renderWeek(false);
+      window.events = [];
+      allEvents.forEach((ev) => {
+        const startDate = new Date(ev.start);
+        const endDate = new Date(ev.end);
+
+        // Match event teacher with selected teachers for proper color assignment
+        let teacherId = null;
+        if (teacherids && teacherids.length > 0) {
+          const eventTeacherIds = Array.isArray(ev.teacherids)
+            ? ev.teacherids
+            : ev.teacher_id
+            ? [ev.teacher_id]
+            : ev.teacherid
+            ? [ev.teacherid]
+            : [];
+          teacherId =
+            teacherids.find((selectedId) =>
+              eventTeacherIds.includes(selectedId)
+            ) || eventTeacherIds[0];
+        } else if (Array.isArray(ev.teacherids) && ev.teacherids.length > 0) {
+          teacherId = ev.teacherids[0];
+        } else if (ev.teacher_id) {
+          teacherId = ev.teacher_id;
+        } else if (ev.teacherid) {
+          teacherId = ev.teacherid;
+        } else if (ev.teacher) {
+          teacherId = ev.teacher;
         }
+
+        let eventColor = "e-blue";
+        if (
+          ev.class_type === "one2one_weekly" ||
+          ev.class_type === "one2one_single"
+        ) {
+          eventColor = "e-green";
+        } else if (ev.class_type === "peertalk" || ev.source === "peertalk") {
+          eventColor = "e-purple";
+        } else if (
+          ev.class_type === "conference" ||
+          ev.source === "conference"
+        ) {
+          eventColor = "e-orange";
+        } else if (
+          ev.class_type === "teacher_timeoff" ||
+          ev.classType === "teacher_timeoff" ||
+          ev.source === "teacher_timeoff"
+        ) {
+          eventColor = "e-timeoff";
+        }
+
+        // Main event object
+        const eventObj = {
+          date: startDate.toISOString().split("T")[0],
+          title: ev.title || "",
+          start: startDate.toTimeString().slice(0, 5),
+          end: endDate.toTimeString().slice(0, 5),
+          color: eventColor,
+          repeat:
+            typeof ev.is_recurring !== "undefined"
+              ? ev.is_recurring
+              : ev.repeat || false,
+          meetingurl: ev.meetingurl || "",
+          viewurl: ev.viewurl || ev.meetingurl || "",
+          avatar: ev.avatar || "",
+          teacherId:
+            typeof teacherId !== "undefined" && teacherId !== null
+              ? teacherId
+              : ev.teacherId ||
+                ev.teacher_id ||
+                ev.teacherid ||
+                ev.teacher ||
+                (ev.teacherids && ev.teacherids[0]) ||
+                "",
+          classType: ev.classType || ev.class_type || "",
+          source: ev.source || "event",
+          studentnames: ev.studentnames || [],
+          studentids: ev.studentids || [],
+          cohortids: ev.cohortids || [],
+          eventid: ev.eventid || "",
+          timeoffid:
+            typeof ev.timeoffid !== "undefined"
+              ? ev.timeoffid
+              : typeof ev.id !== "undefined"
+              ? ev.id
+              : null,
+          cmid: ev.cmid || 0,
+          googlemeetid:
+            typeof ev.googlemeetid !== "undefined" ? ev.googlemeetid : 0,
+          courseid: typeof ev.courseid !== "undefined" ? ev.courseid : 0,
+          is_parent: typeof ev.is_parent !== "undefined" ? ev.is_parent : false,
+          main_event_id:
+            typeof ev.main_event_id !== "undefined" ? ev.main_event_id : "",
+          sequence: typeof ev.sequence !== "undefined" ? ev.sequence : 1,
+          teachernames: ev.teachernames || [],
+          statuses: ev.statuses || [],
+          rescheduled:
+            typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
+          faded: false,
+        };
+        window.events.push(eventObj);
+
+        // If event is reschedule_instant, add previous event as faded
+        if (
+          Array.isArray(ev.statuses) &&
+          ev.statuses.some((s) => s.code === "reschedule_instant" && s.previous)
+        ) {
+          // Find the status with previous
+          const statusObj = ev.statuses.find(
+            (s) => s.code === "reschedule_instant" && (s.previous || null)
+          );
+          if (statusObj && statusObj.previous) {
+            // Parse previous event date and times
+            const prevDate = statusObj.previous.date;
+            const prevStart = statusObj.previous.start;
+            const prevEnd = statusObj.previous.end;
+            // Use previous teacher/avatar if available
+            window.events.push({
+              ...eventObj,
+              date: prevDate,
+              start: prevStart,
+              end: prevEnd,
+              faded: true,
+              title: eventObj.title
+                ? eventObj.title + " (Previous)"
+                : "Previous Event",
+              teacherId: statusObj.previous.teacher || eventObj.teacherId,
+              avatar: ev.previous_teacher_picture || eventObj.avatar,
+              teachernames: [ev.previous_teachername || ""],
+            });
+          }
+        }
+      });
+
+      // Re-render your week view
+      if (typeof renderWeek === "function") {
+        renderWeek(false);
       }
     } catch (err) {
       console.error("Failed to load calendar events:", err);
@@ -4503,8 +5179,163 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Unified helper to reload dropdown data + calendar after mutations
+  async function refetchCustomPluginData(reason = "") {
+    try {
+      console.log(`Refetching calendar data${reason ? ` (${reason})` : ""}`);
+
+      // Some pages may not have all helpers loaded; guard each call.
+      const loadTeachersFn =
+        typeof loadTeachers === "function"
+          ? loadTeachers
+          : () => Promise.resolve();
+      const loadCohortsFn =
+        typeof loadCohortsForTeachers === "function"
+          ? loadCohortsForTeachers
+          : typeof loadAllCohorts === "function"
+          ? loadAllCohorts
+          : () => Promise.resolve();
+      const loadStudentsForCohortsFn =
+        typeof loadStudentsForCohorts === "function"
+          ? loadStudentsForCohorts
+          : typeof loadAllStudents === "function"
+          ? loadAllStudents
+          : () => Promise.resolve();
+
+      const safeSelectedTeachers =
+        typeof selectedTeacherIds !== "undefined" &&
+        Array.isArray(selectedTeacherIds)
+          ? selectedTeacherIds
+          : [];
+      const safeSelectedCohorts =
+        typeof selectedCohortIds !== "undefined" &&
+        Array.isArray(selectedCohortIds)
+          ? selectedCohortIds
+          : [];
+
+      await Promise.allSettled([
+        loadTeachersFn(),
+        safeSelectedTeachers.length
+          ? loadCohortsFn(safeSelectedTeachers, false)
+          : loadCohortsFn(),
+        safeSelectedCohorts.length
+          ? loadStudentsForCohortsFn(safeSelectedCohorts, false)
+          : loadStudentsForCohortsFn(),
+      ]);
+
+      if (typeof fetchCalendarEvents === "function") {
+        await fetchCalendarEvents();
+      } else if (typeof triggerCalendarReload === "function") {
+        triggerCalendarReload();
+      }
+    } catch (err) {
+      console.error("refetchCustomPluginData failed", err);
+    }
+  }
+
+  window.refetchCustomPluginData = refetchCustomPluginData;
+
   // Expose globally so it can be called from filter changes
   window.fetchCalendarEvents = fetchCalendarEvents;
+
+  // Auto-refresh calendar after successful customplugin POSTs (except the fetch itself)
+  (function () {
+    let refreshTimer = null;
+    const debounceRefresh = (reason) => {
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (typeof refetchCustomPluginData === "function") {
+          refetchCustomPluginData(reason);
+        } else if (typeof fetchCalendarEvents === "function") {
+          fetchCalendarEvents();
+        }
+      }, 250);
+    };
+
+    // Handle jQuery AJAX POST requests
+    $(document).ajaxSuccess(function (_e, _xhr, settings) {
+      if (
+        !settings ||
+        !settings.url ||
+        typeof settings.type === "undefined" ||
+        String(settings.type).toUpperCase() !== "POST"
+      ) {
+        return;
+      }
+      const url = String(settings.url);
+      if (!url.includes("/local/customplugin/ajax/")) return;
+      // Skip calendar fetch endpoints to avoid loops
+      if (
+        url.includes("calendar_admin_get_events") ||
+        url.includes("calendar_admin_filters")
+      )
+        return;
+      debounceRefresh("ajax-success");
+    });
+
+    // Intercept fetch API to auto-refresh on POST/PUT/PATCH
+    const originalFetch = window.fetch;
+    window.fetch = function (...args) {
+      const request = args[0];
+      const options = args[1] || {};
+
+      // Get URL from request or args
+      const url = typeof request === "string" ? request : request.url || "";
+      const method = (options.method || "GET").toUpperCase();
+
+      // Only intercept POST/PUT/PATCH to customplugin endpoints
+      if (
+        (method === "POST" || method === "PUT" || method === "PATCH") &&
+        url.includes("/local/customplugin/ajax/")
+      ) {
+        // Skip calendar fetch endpoints to avoid loops
+        if (
+          url.includes("calendar_admin_get_events") ||
+          url.includes("calendar_admin_filters") ||
+          url.includes("get_cohort_details") ||
+          url.includes("get_teacher_availability")
+        ) {
+          return originalFetch.apply(this, args);
+        }
+
+        // Call original fetch and auto-refresh on success
+        return originalFetch.apply(this, args).then((response) => {
+          // Clone response so we can read it
+          const clonedResponse = response.clone();
+
+          // Check if response is successful
+          if (response.ok) {
+            // Try to parse as JSON to verify success
+            clonedResponse
+              .json()
+              .then((data) => {
+                // Check various success indicators
+                if (
+                  data &&
+                  (data.ok === true ||
+                    data.success === true ||
+                    data.status === "success" ||
+                    data.error === false ||
+                    data.error === null ||
+                    data.error === undefined)
+                ) {
+                  debounceRefresh("fetch-success");
+                }
+              })
+              .catch(() => {
+                // If JSON parse fails, still refresh for successful responses
+                debounceRefresh("fetch-success");
+              });
+          }
+
+          return response;
+        });
+      }
+
+      // For non-POST/PUT/PATCH or non-customplugin URLs, use original fetch
+      return originalFetch.apply(this, args);
+    };
+  })();
 
   // ---------------- Wire week navigation ----------------
 

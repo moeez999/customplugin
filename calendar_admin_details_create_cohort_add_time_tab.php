@@ -690,6 +690,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // submit → console
     const form = parent.querySelector('#addTimeForm');
     if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const initialAddTimeState = {
+            teacher: {
+                id: teacherTrigger.dataset.userid || '',
+                name: teacherTrigger.dataset.name || teacherNameEl?.textContent?.trim() || '',
+                img: teacherTrigger.dataset.img || teacherAvatar?.src || ''
+            },
+            title: parent.querySelector('.addtime-title-input')?.value || '',
+            from: {
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn')?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text')?.textContent?.trim() || '',
+                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_row .time-input')?.value || ''
+            },
+            until: {
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn')?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text')?.textContent?.trim() || '',
+                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_row .time-input')?.value || ''
+            },
+            allDay: parent.querySelector('#addTimeAllDay')?.checked || false
+        };
+
+        const toggleLoader = (on) => {
+            if (on) {
+                if (window.showGlobalLoader) window.showGlobalLoader();
+                else {
+                    const el = document.getElementById('loader');
+                    if (el) el.style.display = 'flex';
+                }
+            } else {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                else {
+                    const el = document.getElementById('loader');
+                    if (el) el.style.display = 'none';
+                }
+            }
+        };
+
+        const notify = (msg, type = 'info') => {
+            if (typeof showToast === 'function') showToast(msg, type);
+            else alert(msg);
+        };
+
         form.addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -788,6 +830,43 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             console.log('✅ Add Time form payload:', payload);
+
+            toggleLoader(true);
+            if (submitBtn) submitBtn.disabled = true;
+
+                    $.ajax({
+            url: M.cfg.wwwroot + "/local/customplugin/ajax/teacher_timeoff_add.php",
+            type: "POST",
+            data: JSON.stringify(payload),
+            contentType: "application/json",
+            success: function (response) {
+                console.log("Time Off Response:", response);
+
+                if (response.status === "success") {
+                    notify("Teacher time off scheduled successfully!", "success");
+                    resetAddTimeForm(parent, initialAddTimeState);
+                    $("#manage-session-modal").fadeOut(300);
+                    
+                    // Refresh calendar
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('teacher-timeoff-add');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    }
+                } else {
+                    notify("Failed: " + response.error, "error");
+                }
+            },
+            error: function (xhr) {
+                console.error("Error:", xhr.responseText);
+                notify("Something went wrong.", "error");
+            },
+            complete: function () {
+                toggleLoader(false);
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        });
+
         });
 
 

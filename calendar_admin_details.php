@@ -84,7 +84,7 @@
                 <ul class="legend-list session-status-list">
                     <li class="legend-item">
                         <img class="legend-icon" src="./img/confirmed.svg" alt="Confirmed icon">
-                        <span class="legend-label">Confirmed</span>
+                        <span class="legend-label">Taught</span>
                     </li>
                     <li class="legend-item">
                         <img class="legend-icon" src="./img/cancelled.svg" alt="Cancelled icon">

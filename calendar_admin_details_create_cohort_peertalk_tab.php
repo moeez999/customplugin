@@ -1054,6 +1054,12 @@
                         alert('🎉 Peer Talk created successfully!');
                     }
 
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('create-peertalk');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    }
+
                     // Reset peer talk form
                     resetPeerTalkForm();
                 } else if (successCount > 0) {
@@ -1063,6 +1069,11 @@
                             'warning');
                     } else {
                         alert(`⚠️ ${successCount} of ${results.length} Peer Talk events created`);
+                    }
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('create-peertalk-partial');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
                     }
                 } else {
                     // Complete failure

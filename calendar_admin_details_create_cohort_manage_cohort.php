@@ -1926,6 +1926,12 @@ $(document).ready(function() {
 
                     console.log('✅ cohort_update_cohort OK:', json);
 
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('update-cohort');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    }
+
                     // Reset form after 1 second
                     setTimeout(() => {
                         resetManageCohortFields();

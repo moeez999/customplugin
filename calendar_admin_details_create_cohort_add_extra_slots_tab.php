@@ -560,6 +560,46 @@ document.addEventListener('DOMContentLoaded', function() {
     // form submit with validation
     const form = parent.querySelector('#addTimeFormExtraSlots');
     if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const initialExtraSlotsState = {
+            teacher: {
+                id: teacherTrigger.dataset.userid || '',
+                name: teacherTrigger.dataset.name || teacherNameEl?.textContent?.trim() || '',
+                img: teacherTrigger.dataset.img || teacherAvatar?.src || ''
+            },
+            from: {
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn')?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text')?.textContent?.trim() || '',
+                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_row .time-input')?.value || ''
+            },
+            until: {
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn')?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text')?.textContent?.trim() || '',
+                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_row .time-input')?.value || ''
+            }
+        };
+
+        const toggleLoader = (on) => {
+            if (on) {
+                if (window.showGlobalLoader) window.showGlobalLoader();
+                else {
+                    const el = document.getElementById('loader');
+                    if (el) el.style.display = 'flex';
+                }
+            } else {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                else {
+                    const el = document.getElementById('loader');
+                    if (el) el.style.display = 'none';
+                }
+            }
+        };
+
+        const notify = (msg, type = 'info') => {
+            if (typeof showToast === 'function') showToast(msg, type);
+            else alert(msg);
+        };
+
         form.addEventListener('submit', e => {
             e.preventDefault();
 
@@ -647,6 +687,46 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             console.log('✅ Add Extra Slots form payload:', payload);
+
+            toggleLoader(true);
+            if (submitBtn) submitBtn.disabled = true;
+
+            $.ajax({
+                url: M.cfg.wwwroot + "/local/customplugin/ajax/add_extra_slot.php",
+                type: "POST",
+                data: JSON.stringify(payload), // payload is your JS object
+                contentType: "application/json",
+                success: function(response) {
+                    console.log("Extra Slot Created:", response);
+
+                    if (response.ok) {
+                        notify("Extra slot added successfully!", "success");
+                        resetAddTimeFormExtraSlots(parent, initialExtraSlotsState);
+                    } else {
+                        notify("Failed: " + response.error, "error");
+                    }
+
+                    // Close modal if you have one
+                    $("#addExtraSlotModal").fadeOut(300);
+
+                    // Refresh calendar
+                    if (window.refetchCustomPluginData) {
+                        window.refetchCustomPluginData('add-extra-slot');
+                    } else if (window.fetchCalendarEvents) {
+                        window.fetchCalendarEvents();
+                    } else if (typeof loadAdminCalendarEvents === "function") {
+                        loadAdminCalendarEvents();
+                    }
+                },
+                error: function(xhr) {
+                    console.error("Extra Slot Error:", xhr.responseText);
+                    notify("Something went wrong while adding extra slot.", "error");
+                },
+                complete: function () {
+                    toggleLoader(false);
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
         });
     }
 

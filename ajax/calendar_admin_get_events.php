@@ -480,6 +480,25 @@ $add_one2one_events = function() use (
                 $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
             }
 
+            // ---- Determine cohort group for 1:1 student ----
+            $groupName = null;
+            if (!empty($studentIds)) {
+                $sid = $studentIds[0];
+
+                $cohortRow = $DB->get_record_sql(
+                    "SELECT c.shortname
+                    FROM {cohort_members} cm
+                    JOIN {cohort} c ON c.id = cm.cohortid
+                    WHERE cm.userid = :uid
+                    LIMIT 1",
+                    ['uid' => $sid]
+                );
+
+                if ($cohortRow) {
+                    $groupName = $cohortRow->shortname;
+                }
+            }
+
             $events[] = [
                 'id'            => '1to1-' . $e->id,
                 'eventid'       => (int)$e->id,
@@ -504,12 +523,46 @@ $add_one2one_events = function() use (
                 'studentnames'  => $studentNames,
                 'cohortids'     => [],
 
-                'class_type'    => $classType,   // 'one2one_single' | 'one2one_weekly'
+                'group'         => $groupName,   // <-- NEW FIELD
+
+                'class_type'    => $classType,
                 'is_recurring'  => $isrecurring,
 
                 'meetingurl'    => $meetingurl,
                 'viewurl'       => $viewurl,
             ];
+
+
+            // $events[] = [
+            //     'id'            => '1to1-' . $e->id,
+            //     'eventid'       => (int)$e->id,
+            //     'main_event_id' => (int)$mainEventId,
+            //     'is_parent'     => ((int)$e->id === $mainEventId),
+            //     'sequence'      => $seq++,
+
+            //     'source'        => 'one2one',
+            //     'courseid'      => $courseid_one2one,
+            //     'cmid'          => (int)$cm->id,
+            //     'googlemeetid'  => (int)$gm->id,
+            //     'title'         => (string)$gm->name,
+
+            //     'start_ts'      => $eventStart,
+            //     'end_ts'        => $eventEnd,
+            //     'start'         => $fmt_iso($eventStart),
+            //     'end'           => $fmt_iso($eventEnd),
+
+            //     'teacherids'    => $teacherIdsForEvent,
+            //     'teachernames'  => $teacherNames,
+            //     'studentids'    => $studentIds,
+            //     'studentnames'  => $studentNames,
+            //     'cohortids'     => [],
+
+            //     'class_type'    => $classType,   // 'one2one_single' | 'one2one_weekly'
+            //     'is_recurring'  => $isrecurring,
+
+            //     'meetingurl'    => $meetingurl,
+            //     'viewurl'       => $viewurl,
+            // ];
         }
     }
 };
@@ -1568,6 +1621,103 @@ try {
 
 
 
+
+
+
+
+// ----------------------------------------------------------
+// TEACHER WEEKLY AVAILABILITY (GLOBAL – NOT DATE-BASED)
+// ----------------------------------------------------------
+$teacherAvailability = [];
+
+try {
+
+    foreach ($allTeacherIds as $tid) {
+
+        // Fetch ALL availability for this teacher (no time-window filtering)
+        $records = $DB->get_records(
+            'local_teacher_availability',
+            ['teacherid' => $tid],
+            'weekday ASC, starttime ASC'
+        );
+
+        $list = [];
+
+        foreach ($records as $r) {
+
+            // Convert weekday → day name
+            $dayName = date('l', strtotime("Sunday +{$r->weekday} days"));
+
+            // Convert unix startdate → Y-m-d
+            $startDateStr = $r->startdate ? date("Y-m-d", (int)$r->startdate) : null;
+
+            // Build exact UI payload-like structure
+            $list[] = [
+                'id'        => (int)$r->id,
+                'day'       => $dayName,            // "Monday"
+                'startTime' => $r->starttime,       // "14:30"
+                'endTime'   => $r->endtime,         // "16:30"
+                'startDate' => $startDateStr,       // "2025-11-24"
+                'raw'       => json_decode($r->rawjson, true) ?? null
+            ];
+        }
+
+        $teacherAvailability[$tid] = $list;
+    }
+
+} catch (Throwable $e) {
+    $teacherAvailability = [];
+}
+
+
+
+
+// ----------------------------------------------------------
+// TEACHER EXTRA SLOTS
+// ----------------------------------------------------------
+$teacherExtraSlots = [];
+
+try {
+    foreach ($allTeacherIds as $tid) {
+
+        $records = $DB->get_records_select(
+            'local_teacher_extra_slots',
+            'teacherid = :tid
+             AND end_ts >= :winstart
+             AND start_ts <= :winend',
+            [
+                'tid'      => $tid,
+                'winstart' => $startts,
+                'winend'   => $endts
+            ],
+            'start_ts ASC'
+        );
+
+        $list = [];
+
+        foreach ($records as $r) {
+            $list[] = [
+                'id'        => (int)$r->id,
+                'teacherid' => (int)$r->teacherid,
+                'title'     => $r->title,
+                'start_ts'  => (int)$r->start_ts,
+                'end_ts'    => (int)$r->end_ts,
+                'start'     => $fmt_iso((int)$r->start_ts),
+                'end'       => $fmt_iso((int)$r->end_ts),
+            ];
+        }
+
+        $teacherExtraSlots[$tid] = $list;
+    }
+} catch (Throwable $e) {
+    $teacherExtraSlots = [];
+}
+
+
+
+
+
+
     echo json_encode([
         'ok'      => true,
         'filters' => [
@@ -1582,7 +1732,9 @@ try {
         'events'   => array_values($filtered),
         'peertalk' => array_values($peertalkEvents),
         'conference' => array_values($conferenceEvents),
-        'teacher_timeoff' => $teacherTimeoff
+        'teacher_timeoff' => $teacherTimeoff,
+        'teacher_extra_slots' => $teacherExtraSlots,
+        'teacher_availability'=> $teacherAvailability
     ]);
 
 } catch (Exception $e) {

@@ -36,7 +36,7 @@ body {
 }
 .calendar_admin_main_wrapper {
   display: flex;
-  max-height: 80vh;
+  max-height: 84vh;
   background: var(--calendar-admin-bg);
 }
 .calendar_admin_sidebar {
@@ -565,8 +565,8 @@ body {
 }
 
 /* Dropdowns */
-.dropdown-menu,
-.profile-menu {
+.calendar_admin_main_wrapper .dropdown-menu,
+.calendar_admin_main_wrapper .profile-menu {
   position: fixed !important;
   background: #fff;
   box-shadow: 0 4px 16px 0 rgba(60, 60, 60, 0.14);
@@ -696,7 +696,7 @@ body {
   overflow: auto; /* or scroll if needed */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* Internet Explorer and Edge (legacy) */
-  max-height: 69vh !important;
+  max-height: 73vh !important;
   height: auto !important;
 }
 
@@ -1340,7 +1340,13 @@ body {
 .student-cohort-header:first-child {
   margin-top: 0;
 }
-
+.wrapper-course {
+  width: 100%;
+  padding: 24px 16px !important;
+  background-color: #fff;
+  border-radius: 7px;
+  transition: all 0.2s ease-in-out;
+}
 .student-option {
   border-radius: 10px;
   transition: background 0.2s;
