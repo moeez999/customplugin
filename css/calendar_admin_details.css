@@ -700,7 +700,7 @@ body {
   overflow: auto; /* or scroll if needed */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* Internet Explorer and Edge (legacy) */
-  max-height: 73.5vh !important;
+  max-height: 72.5vh !important;
   height: auto !important;
 }
 
