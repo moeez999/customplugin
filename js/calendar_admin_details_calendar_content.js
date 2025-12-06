@@ -1246,7 +1246,7 @@ $(function () {
           openMenuOptionsDropdown(e, this);
           return;
         }
-        // If it's a 1:1 lesson, do nothing (no dropdown)
+        // If it's a 1:1 lesson, do nothing - the .event.e-green handler in lesson_information.php will handle it
       }
     });
 
@@ -1347,6 +1347,9 @@ $(function () {
     menuContainer.style.left = left + "px";
     menuContainer.style.top = top + "px";
   }
+
+  // Expose function globally for agenda tab
+  window.openMenuOptionsDropdown = openMenuOptionsDropdown;
 
   // Function to close menu options dropdown
   window.closeMenuOptionsDropdown = function () {

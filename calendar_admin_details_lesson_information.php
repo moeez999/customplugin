@@ -2691,5 +2691,10 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
         }
     });
 
+    // Expose functions globally for agenda tab and other components
+    window.populateModalWithEventData = populateModalWithEventData;
+    window.openLessonInfo = openLessonInfo;
+    window.closeAll = closeAll;
+
 })(jQuery);
 </script>
