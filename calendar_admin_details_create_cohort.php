@@ -1290,12 +1290,14 @@
             <div class="calendar_admin_details_create_cohort_calendar_modal" id="calendarDateModal">
                 <div class="calendar_admin_details_create_cohort_calendar_nav">
                     <button class="calendar_prev_month"><svg width="22" height="22" viewBox="0 0 24 24">
-                    <polyline points="15 19 8 12 15 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
-                </svg></button>
+                            <polyline points="15 19 8 12 15 5" fill="none" stroke="#111" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"></polyline>
+                        </svg></button>
                     <span id="calendarDateMonth"></span>
                     <button class="calendar_next_month"><svg width="22" height="22" viewBox="0 0 24 24">
-                    <polyline points="9 19 16 12 9 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
-                </svg></button>
+                            <polyline points="9 19 16 12 9 5" fill="none" stroke="#111" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"></polyline>
+                        </svg></button>
                 </div>
                 <div class="calendar_admin_details_create_cohort_calendar_days"></div>
                 <button class="calendar_admin_details_create_cohort_calendar_done_btn">Done</button>
@@ -1315,7 +1317,8 @@
 
         // Make sure only one cohort-related modal/backdrop is visible at a time
         function closeCohortOverlays() {
-            $('#customRecurrenceModalBackdrop, #calendarDateModalBackdrop, #monthly_cal_modal_backdrop, #timePickerModalBackdrop').fadeOut(0);
+            $('#customRecurrenceModalBackdrop, #calendarDateModalBackdrop, #monthly_cal_modal_backdrop, #timePickerModalBackdrop')
+                .fadeOut(0);
         }
         // expose for other scripts (e.g. calendar_admin_details_calendar_content.js)
         window.closeCohortOverlays = closeCohortOverlays;
@@ -1382,6 +1385,56 @@
             setTimeout(() => {
                 scrollToActiveCohortTab();
             }, 100);
+
+            // Auto-select teacher from sessionStorage
+            setTimeout(() => {
+                const savedTeacherId = sessionStorage.getItem('selectedTeacherId');
+                if (!savedTeacherId) return;
+
+                const teacherIdInt = parseInt(savedTeacherId, 10);
+                let $teacherItem = null;
+
+                switch (tabName) {
+                    case 'cohort':
+                        $teacherItem = $(
+                            '#mainModalContent #teacher1DropdownList li.teacher-option[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                    case 'manage':
+                        // Don't auto-select on manage cohort tab
+                        break;
+                    case 'conference':
+                        $teacherItem = $(
+                            '#conferenceTeachersDropdownList li.conference_teacher_item[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                    case 'peertalk':
+                        $teacherItem = $(
+                            '#peertalkTeachersDropdownList li.peertalk_teacher_item[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                    case 'class':
+                        $teacherItem = $(
+                            '#classTabContent .calendar_admin_details_create_cohort_class_tab_item[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                    case 'manage_class':
+                        $teacherItem = $(
+                            '#manageclassTabContent .calendar_admin_details_create_cohort_manage_class_tab_item[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                    case 'addtime':
+                    case 'extraslots':
+                        $teacherItem = $('#addtimeTeacherList .addtime-teacher-item[data-userid="' +
+                            teacherIdInt + '"]');
+                        break;
+                }
+
+                if ($teacherItem && $teacherItem.length > 0) {
+                    console.log('Auto-selecting teacher in ' + tabName + ' tab:', teacherIdInt);
+                    $teacherItem.trigger('click');
+                }
+            }, 400);
         }
 
         // Modal open with cohort tab
@@ -1516,11 +1569,11 @@
         $(document).on('click', '.conference_modal_date_btn', function(e) {
             e.preventDefault();
             calendarDateTargetBtn = $(this);
-            
+
             // Get the current date from the button if available
             const rawDate = $(this).data('raw-date');
             let initialDate;
-            
+
             if (rawDate) {
                 // Parse YYYY-MM-DD format
                 const parts = rawDate.split('-');
@@ -1531,12 +1584,12 @@
             } else {
                 initialDate = new Date();
             }
-            
+
             calendarModalMonth = {
                 year: initialDate.getFullYear(),
                 month: initialDate.getMonth()
             };
-            
+
             selectedCalendarDate = null;
             renderCalendarModal();
             $('#calendarDateModalBackdrop').fadeIn();
@@ -1612,19 +1665,22 @@
                     month: 'short',
                     year: 'numeric'
                 });
-                
+
                 // Format date as YYYY-MM-DD for raw-date
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
                 const rawDate = `${year}-${month}-${day}`;
-                
+
                 calendarDateTargetBtn.text(nice);
                 calendarDateTargetBtn.data('raw-date', rawDate);
                 calendarDateTargetBtn.attr('data-raw-date', rawDate);
-                
-                console.log('Updated date button:', {displayDate: nice, rawDate: rawDate});
-                
+
+                console.log('Updated date button:', {
+                    displayDate: nice,
+                    rawDate: rawDate
+                });
+
                 $('#calendarDateModalBackdrop').fadeOut();
             }
         });

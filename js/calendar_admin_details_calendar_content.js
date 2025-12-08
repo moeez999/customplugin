@@ -208,7 +208,78 @@ $(function () {
     $("#manage_cohort_tab_content").css("display", "none");
     $("#mainModalContent").css("display", "block");
     $("#classTabContent").css("display", "none");
+
+    // Auto-select teacher from sessionStorage in create cohort (teacher1DropdownList)
+    const savedTeacherId = sessionStorage.getItem("selectedTeacherId");
+    if (savedTeacherId) {
+      setTimeout(() => {
+        const teacherIdInt = parseInt(savedTeacherId, 10);
+        const $teacherItem = $("#teacher1DropdownList").find(
+          `.teacher-option[data-userid="${teacherIdInt}"]`
+        );
+        if ($teacherItem.length) {
+          console.log("Auto-selecting teacher in create cohort:", teacherIdInt);
+          $teacherItem.trigger("click");
+        }
+      }, 300);
+    }
   }
+
+  // Helper function to auto-select teacher in various tabs based on their dropdown structure
+  function autoSelectTeacherInTab(tabId) {
+    const savedTeacherId = sessionStorage.getItem("selectedTeacherId");
+    if (!savedTeacherId) return;
+
+    setTimeout(() => {
+      const teacherIdInt = parseInt(savedTeacherId, 10);
+
+      // Different selectors for different tabs
+      let $teacherItem;
+
+      if (tabId === "classTabContent") {
+        // 1:1 Class tab uses calendar_admin_details_create_cohort_class_tab_item
+        $teacherItem = $(`#${tabId}`).find(
+          `.calendar_admin_details_create_cohort_class_tab_item[data-userid="${teacherIdInt}"]`
+        );
+      } else if (tabId === "manageclassTabContent") {
+        // Manage Class tab uses calendar_admin_details_create_cohort_manage_class_tab_item
+        $teacherItem = $(`#${tabId}`).find(
+          `.calendar_admin_details_create_cohort_manage_class_tab_item[data-userid="${teacherIdInt}"]`
+        );
+      } else if (
+        tabId === "addTimeTabContent" ||
+        tabId === "addExtraSlotsTabContent"
+      ) {
+        // Add time tabs use addtime-teacher-item
+        $teacherItem = $(`#${tabId}`).find(
+          `.addtime-teacher-item[data-userid="${teacherIdInt}"]`
+        );
+      }
+
+      if ($teacherItem && $teacherItem.length) {
+        console.log(`Auto-selecting teacher in ${tabId}:`, teacherIdInt);
+        $teacherItem.trigger("click");
+      }
+    }, 300);
+  }
+
+  // Monitor tab clicks and auto-select teacher when tabs open
+  $(document).on(
+    "click",
+    ".calendar_admin_details_create_cohort_tab",
+    function () {
+      const tabName = $(this).data("tab");
+      if (tabName === "addtime") {
+        autoSelectTeacherInTab("addTimeTabContent");
+      } else if (tabName === "extraslots") {
+        autoSelectTeacherInTab("addExtraSlotsTabContent");
+      } else if (tabName === "manage_class") {
+        autoSelectTeacherInTab("manageclassTabContent");
+      } else if (tabName === "class") {
+        autoSelectTeacherInTab("classTabContent");
+      }
+    }
+  );
 
   /* ========= Open PeerTalk Modal With Event Data ========= */
   function openPeerTalkModalWithData(eventData) {
@@ -1475,10 +1546,30 @@ $(function () {
       }
     }
 
-    // Populate teacher if available
-    if (eventData.teacherId) {
-      console.log("Event teacher ID:", eventData.teacherId);
-      // Teacher selection will be handled by the manage cohort modal's existing logic
+    // Populate teacher if available - check eventData or sessionStorage
+    const savedTeacherId = sessionStorage.getItem("selectedTeacherId");
+    const teacherIdToSelect =
+      eventData.teacherId ||
+      (savedTeacherId ? parseInt(savedTeacherId, 10) : null);
+
+    if (teacherIdToSelect) {
+      console.log("Event/Saved teacher ID:", teacherIdToSelect);
+      // Wait for modal to fully load, then select teacher from first teacher dropdown
+      setTimeout(() => {
+        const $teacherItem = $("#teacher1DropdownList").find(
+          `.teacher-option[data-userid="${teacherIdToSelect}"]`
+        );
+        if ($teacherItem.length) {
+          console.log("Found teacher in dropdown:", $teacherItem.text().trim());
+          // Trigger click to select the teacher
+          $teacherItem.trigger("click");
+        } else {
+          console.warn(
+            "Teacher not found in teacher1DropdownList:",
+            teacherIdToSelect
+          );
+        }
+      }, 200);
     }
 
     // Populate date and time if available
