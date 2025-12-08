@@ -85,7 +85,7 @@ body {
 .gutter {
   position: sticky;
   left: 0;
-  z-index: 5;
+  z-index: 3;
   background: #fff;
   border-right: 1px solid var(--col-border);
 }

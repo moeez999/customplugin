@@ -305,7 +305,7 @@
             <div class="calendar_admin_details_create_cohort_add_time_tab_row"
                 id="calendar_admin_details_create_cohort_add_time_tab_from_row">
                 <button type="button" class="calendar_admin_details_create_cohort_add_time_tab_date_btn"
-                    id="calendar_admin_details_create_cohort_add_time_tab_from_btn" data-iso="2025-08-05">
+                    id="calendar_admin_details_create_cohort_add_time_tab_from_btn">
                     <span id="calendar_admin_details_create_cohort_add_time_tab_from_text">Select date</span>
                     <img src="./img/dropdown-arrow-down.svg" alt="dropdown">
 
@@ -325,7 +325,7 @@ transform: translateY(-50%);" src="./img/dropdown-arrow-down.svg" alt="dropdown"
             <div class="calendar_admin_details_create_cohort_add_time_tab_row"
                 id="calendar_admin_details_create_cohort_add_time_tab_until_row">
                 <button type="button" class="calendar_admin_details_create_cohort_add_time_tab_date_btn"
-                    id="calendar_admin_details_create_cohort_add_time_tab_until_btn" data-iso="2025-08-05">
+                    id="calendar_admin_details_create_cohort_add_time_tab_until_btn">
                     <span id="calendar_admin_details_create_cohort_add_time_tab_until_text">Select date</span>
                     <img src="./img/dropdown-arrow-down.svg" alt="dropdown">
 
@@ -354,7 +354,7 @@ transform: translateY(-50%);" src="./img/dropdown-arrow-down.svg" alt="dropdown"
                         </svg>
                     </button>
                     <div class="calendar_admin_details_create_cohort_add_time_tab_month_label"
-                        id="calendar_admin_details_create_cohort_add_time_tab_month_label">August 2025</div>
+                        id="calendar_admin_details_create_cohort_add_time_tab_month_label"></div>
                     <button type="button" class="calendar_admin_details_create_cohort_add_time_tab_navbtn"
                         id="calendar_admin_details_create_cohort_add_time_tab_next">
                         <svg width="22" height="22" viewBox="0 0 24 24">
@@ -492,6 +492,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const grid = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_grid');
         const label = parent.querySelector(
             '#calendar_admin_details_create_cohort_add_time_tab_month_label');
+
+        // Initialize the calendar label with current month
+        function initializeCalendarLabel() {
+            const today = new Date();
+            const monthName = today.toLocaleString(undefined, {
+                month: 'long'
+            });
+            label.textContent = monthName + ' ' + today.getFullYear();
+        }
+        initializeCalendarLabel();
 
         function openCalendar(target, seed) {
             activeTarget = target;
@@ -699,14 +709,22 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             title: parent.querySelector('.addtime-title-input')?.value || '',
             from: {
-                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn')?.getAttribute('data-iso') || '',
-                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text')?.textContent?.trim() || '',
-                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_row .time-input')?.value || ''
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn')
+                    ?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text')
+                    ?.textContent?.trim() || '',
+                time: parent.querySelector(
+                        '#calendar_admin_details_create_cohort_add_time_tab_from_row .time-input')?.value ||
+                    ''
             },
             until: {
-                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn')?.getAttribute('data-iso') || '',
-                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text')?.textContent?.trim() || '',
-                time: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_row .time-input')?.value || ''
+                iso: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn')
+                    ?.getAttribute('data-iso') || '',
+                label: parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text')
+                    ?.textContent?.trim() || '',
+                time: parent.querySelector(
+                        '#calendar_admin_details_create_cohort_add_time_tab_until_row .time-input')
+                    ?.value || ''
             },
             allDay: parent.querySelector('#addTimeAllDay')?.checked || false
         };
@@ -834,38 +852,38 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleLoader(true);
             if (submitBtn) submitBtn.disabled = true;
 
-                    $.ajax({
-            url: M.cfg.wwwroot + "/local/customplugin/ajax/teacher_timeoff_add.php",
-            type: "POST",
-            data: JSON.stringify(payload),
-            contentType: "application/json",
-            success: function (response) {
-                console.log("Time Off Response:", response);
+            $.ajax({
+                url: M.cfg.wwwroot + "/local/customplugin/ajax/teacher_timeoff_add.php",
+                type: "POST",
+                data: JSON.stringify(payload),
+                contentType: "application/json",
+                success: function(response) {
+                    console.log("Time Off Response:", response);
 
-                if (response.status === "success") {
-                    notify("Teacher time off scheduled successfully!", "success");
-                    resetAddTimeForm(parent, initialAddTimeState);
-                    $("#manage-session-modal").fadeOut(300);
-                    
-                    // Refresh calendar
-                    if (window.refetchCustomPluginData) {
-                        window.refetchCustomPluginData('teacher-timeoff-add');
-                    } else if (window.fetchCalendarEvents) {
-                        window.fetchCalendarEvents();
+                    if (response.status === "success") {
+                        notify("Teacher time off scheduled successfully!", "success");
+                        resetAddTimeForm(parent, initialAddTimeState);
+                        $("#manage-session-modal").fadeOut(300);
+
+                        // Refresh calendar
+                        if (window.refetchCustomPluginData) {
+                            window.refetchCustomPluginData('teacher-timeoff-add');
+                        } else if (window.fetchCalendarEvents) {
+                            window.fetchCalendarEvents();
+                        }
+                    } else {
+                        notify("Failed: " + response.error, "error");
                     }
-                } else {
-                    notify("Failed: " + response.error, "error");
+                },
+                error: function(xhr) {
+                    console.error("Error:", xhr.responseText);
+                    notify("Something went wrong.", "error");
+                },
+                complete: function() {
+                    toggleLoader(false);
+                    if (submitBtn) submitBtn.disabled = false;
                 }
-            },
-            error: function (xhr) {
-                console.error("Error:", xhr.responseText);
-                notify("Something went wrong.", "error");
-            },
-            complete: function () {
-                toggleLoader(false);
-                if (submitBtn) submitBtn.disabled = false;
-            }
-        });
+            });
 
         });
 

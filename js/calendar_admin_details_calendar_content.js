@@ -1,7 +1,7 @@
 /* ====== CONFIG ====== */
 
 const START_H = 0,
-  END_H = 30,
+  END_H = 24,
   SLOT_MIN = 30;
 const SLOT_H =
   parseInt(
@@ -123,8 +123,8 @@ function pad2(n) {
 function fmt12(min) {
   let h = Math.floor(min / 60),
     m = min % 60;
-  // Wrap hours beyond 24
-  if (h >= 24) h -= 24;
+  // Normalize hours to 0-23 range for display (don't wrap beyond 24)
+  h = h % 24;
   // When h >= 12: PM, when h < 12: AM
   const ap = h >= 12 ? "PM" : "AM";
   const dispH = h % 12 || 12;
