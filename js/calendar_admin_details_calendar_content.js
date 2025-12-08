@@ -2856,7 +2856,7 @@ $(function () {
 
         const isSingleton = (ev._max || 1) === 1;
         const cssPos = isSingleton
-          ? { left: "0px", width: "calc(100% - 0px)" }
+          ? { left: "0px", width: "calc(96% - 0px)" }
           : (() => {
               const leftPx = ev.stackIndex * STACK_OFFSET;
               const rightPad = STACK_OFFSET; // small inset on the right for overlap
