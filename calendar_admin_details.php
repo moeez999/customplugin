@@ -345,7 +345,15 @@
         <div class="wrap" id="calendar_admin_calendar_flexrow">
             <div class="cal">
                 <div id="head" class="cal-head">
-                    <div class="gutter"></div>
+                    <div class="gutter">
+                        <div class="filter-toggle-container">
+                            <label class="filter-toggle-label">
+                                <input type="checkbox" id="filterToggle" class="filter-toggle-checkbox" checked>
+                                <span class="filter-toggle-switch"></span>
+
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div id="grid" class="grid calender-hide-scrollbar">
                     <div id="gutter" class="gutter"></div>

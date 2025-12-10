@@ -181,6 +181,10 @@ function isWhiteSlotFor(dayIndex, isoDate, minuteOfDay) {
   return false;
 }
 
+// Toggle whether to draw white-slot background layer (availability/extra slots)
+// Will be determined dynamically based on teacher selection
+let SHOW_WHITE_SLOTS = false;
+
 /* ====== STATE ====== */
 let currentWeekStart = mondayOf(new Date());
 
@@ -1223,10 +1227,19 @@ $(function () {
   $("#grid")
     .off("mousedown", ".event")
     .on("mousedown", ".event", function (e) {
+      // Ignore clicks on availability and extra slot events
+      const $clicked = $(this);
+      const clickedClassType = $clicked.data("class-type");
+      if (
+        clickedClassType === "availability" ||
+        clickedClassType === "extra_slot"
+      ) {
+        return; // Do nothing for availability/extra slot events
+      }
+
       e.preventDefault();
       e.stopPropagation();
 
-      const $clicked = $(this);
       const $day = $clicked.closest(".day-inner");
       const cs = +$clicked.data("start"),
         ce = +$clicked.data("end");
@@ -2460,17 +2473,39 @@ $(function () {
       })
       .data("class-value");
 
-    const selectedStartTime = $("#session-start-list li")
+    // Helper to parse 'h:mm AM/PM' to minutes
+    function parse12HourTime(str) {
+      const match = str.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const ap = match[3].toUpperCase();
+      if (ap === "PM" && h !== 12) h += 12;
+      if (ap === "AM" && h === 12) h = 0;
+      return h * 60 + m;
+    }
+
+    // Get selected start time: if not found in list, fallback to button text
+    let selectedStartTime = $("#session-start-list li")
       .filter(function () {
         return $(this).text().trim() === $("#session-start-btn").text().trim();
       })
       .data("time-value");
+    if (typeof selectedStartTime === "undefined") {
+      const btnText = $("#session-start-btn").text().trim();
+      selectedStartTime = parse12HourTime(btnText);
+    }
 
-    const selectedEndTime = $("#session-end-list li")
+    // Get selected end time: if not found in list, fallback to button text
+    let selectedEndTime = $("#session-end-list li")
       .filter(function () {
         return $(this).text().trim() === $("#session-end-btn").text().trim();
       })
       .data("time-value");
+    if (typeof selectedEndTime === "undefined") {
+      const btnText = $("#session-end-btn").text().trim();
+      selectedEndTime = parse12HourTime(btnText);
+    }
 
     const selectedDate = $("#session-event-date-btn").data("raw-date") || "";
 
@@ -2506,18 +2541,38 @@ $(function () {
     // ============================================================
     // BUILD PAYLOAD WITH FORMATTED TIMES
     // ============================================================
+    const newStartFormatted = formatTime(selectedStartTime);
+    const newEndFormatted = formatTime(selectedEndTime);
+    const oldStartFormatted = formatTime(oldStart);
+    const oldEndFormatted = formatTime(oldEnd);
+
+    // Check if any changes were made
+    const changesDetected =
+      oldTeacherId !== selectedTeacherId ||
+      oldDate !== selectedDate ||
+      oldStartFormatted !== newStartFormatted ||
+      oldEndFormatted !== newEndFormatted;
+
+    // Only send if changes were detected
+    if (!changesDetected) {
+      console.warn("No changes detected in session update");
+      if (window.showToast) {
+        window.showToast("No changes detected", "info");
+      }
+      return;
+    }
+
     const payload = {
-      status: "reschedule",
       eventid: eventId,
       googlemeetid: googleMeetId,
       oldTeacherId: oldTeacherId,
       newTeacherId: selectedTeacherId,
       oldDate: oldDate,
       newDate: selectedDate,
-      oldStart: formatTime(oldStart),
-      oldEnd: formatTime(oldEnd),
-      newStart: formatTime(selectedStartTime),
-      newEnd: formatTime(selectedEndTime),
+      oldStart: oldStartFormatted,
+      oldEnd: oldEndFormatted,
+      newStart: newStartFormatted,
+      newEnd: newEndFormatted,
     };
 
     console.log("Final Reschedule Payload:", payload);
@@ -2738,16 +2793,22 @@ $(function () {
 
   // Navigation
   $("#prev-week").on("click", () => {
+    clearDateFilter(); // Clear filter when changing weeks
+    clearTimeSlotFilter(); // Clear time slot filter when changing weeks
     currentWeekStart.setDate(currentWeekStart.getDate() - 7);
     renderWeek(true);
   });
   $("#next-week").on("click", () => {
+    clearDateFilter(); // Clear filter when changing weeks
+    clearTimeSlotFilter(); // Clear time slot filter when changing weeks
     currentWeekStart.setDate(currentWeekStart.getDate() + 7);
     renderWeek(true);
   });
 
   // Today button: jump to current week (Monday)
   $("#btnToday").on("click", () => {
+    clearDateFilter(); // Clear filter when jumping to today
+    clearTimeSlotFilter(); // Clear time slot filter when jumping to today
     currentWeekStart = mondayOf(new Date());
     renderWeek(true);
   });
@@ -2764,6 +2825,52 @@ $(function () {
 
   /* ====== RENDER ====== */
   function renderWeek(resetScroll = false) {
+    // Determine whether to show white slots based on teacher selection
+    const selectedTeachers = window.calendarFilterState
+      ? window.calendarFilterState.getSelectedTeachers()
+      : [];
+
+    // Show white slots as background only when exactly 1 teacher is selected
+    SHOW_WHITE_SLOTS = selectedTeachers.length === 1;
+
+    // Filter events based on teacher selection
+    let eventsToRender = window.events.filter((ev) => {
+      // When single teacher selected, exclude availability/extra slot events
+      if (selectedTeachers.length === 1) {
+        if (
+          ev.classType === "availability" ||
+          ev.source === "availability" ||
+          ev.classType === "extra_slot" ||
+          ev.source === "extra_slot"
+        ) {
+          return false; // Exclude availability/extra slot events
+        }
+      }
+      return true;
+    });
+
+    // When multiple teachers selected, add availability data as events
+    if (selectedTeachers.length > 1 && whiteSlotRules.length > 0) {
+      // Convert white slot rules to availability events for multiple teacher display
+      const availabilityEvents = whiteSlotRules.map((rule, index) => ({
+        availabilityId: `availability-${index}-${Date.now()}`,
+        date: rule.date,
+        classType: "availability",
+        source: "availability",
+        title: "Available",
+        start:
+          typeof rule.start === "string" ? minutes(rule.start) : rule.start,
+        end: typeof rule.end === "string" ? minutes(rule.end) : rule.end,
+        color: "e-availability",
+        teacherId: rule.teacherid,
+      }));
+      eventsToRender = [...eventsToRender, ...availabilityEvents];
+    }
+
+    // Temporarily replace window.events with modified list
+    const originalEvents = window.events;
+    window.events = eventsToRender;
+
     // Header
     const $head = $("#head");
     $head.find(".day-h").remove();
@@ -2801,11 +2908,12 @@ $(function () {
       const $inner = $('<div class="day-inner">').appendTo($col);
       $inner.attr("data-date", ymd(d));
 
-      // CREATE SLOTS with white background when matched
+      // CREATE SLOTS (white background layer is optional)
       const $slots = $('<div class="slots">').appendTo($inner);
       for (let r = 0; r < rows; r++) {
         const minuteOfDay = START_H * 60 + r * SLOT_MIN;
-        const makeWhite = isWhiteSlotFor(i, ymd(d), minuteOfDay);
+        const makeWhite =
+          SHOW_WHITE_SLOTS && isWhiteSlotFor(i, ymd(d), minuteOfDay);
         $("<div>").toggleClass("slot-white", makeWhite).appendTo($slots);
       }
 
@@ -2816,7 +2924,21 @@ $(function () {
     // Prepare per-day buckets
     const perDay = Array.from({ length: 7 }, () => []);
     console.log("Events to render:", events);
-    events.forEach((raw) => {
+
+    // Remove duplicate availability events by availabilityId
+    const seenAvailabilityIds = new Set();
+    const uniqueEvents = events.filter((raw) => {
+      if (raw.availabilityId && seenAvailabilityIds.has(raw.availabilityId)) {
+        return false; // Skip duplicate availability
+      }
+      if (raw.availabilityId) {
+        seenAvailabilityIds.add(raw.availabilityId);
+      }
+      return true;
+    });
+
+    console.log("Unique events to render:", uniqueEvents);
+    uniqueEvents.forEach((raw) => {
       // Check if event has reschedule_instant status with previous/current data
       const statusMeta = getActiveStatusMeta(raw.statuses);
       let hasRescheduleInstant = false;
@@ -2837,8 +2959,8 @@ $(function () {
           details.current.action === "reschedule_instant"
         ) {
           hasRescheduleInstant = true;
-          previousEvent = details.previous;
-          currentEvent = details.current;
+          previousEvent = raw.rescheduled.previous;
+          currentEvent = raw.rescheduled.current;
         }
       }
 
@@ -2968,25 +3090,44 @@ $(function () {
       }
     });
 
-    // Overlap logic (unchanged)
+    // Overlap logic - improved for consistent sequential stacking
     const MAX_LEFT = 0 + (STACK_CAP - 1) * STACK_OFFSET;
 
     perDay.forEach((list, di) => {
+      // Sort events by start time, then by end time for consistent ordering
       list.sort((a, b) => a.start - b.start || a.end - b.end);
 
+      // First pass: calculate _max (maximum concurrent events at any time)
       const active = [];
       list.forEach((ev) => {
+        // Remove events that ended before this one starts
         for (let i = active.length - 1; i >= 0; i--) {
           if (active[i].end <= ev.start) active.splice(i, 1);
         }
         active.push(ev);
 
         const conc = active.length;
+        // Update _max for all active events
         active.forEach((a) => {
           a._max = Math.max(a._max || 0, conc);
         });
+      });
 
-        ev.stackIndex = Math.min(conc - 1, STACK_CAP - 1);
+      // Second pass: assign stackIndex based on position in sorted order for overlaps
+      // This ensures events maintain sequential positions left-to-right
+      list.forEach((ev) => {
+        // Find all events that overlap with this one
+        const overlapping = list.filter((other) => {
+          // Check if events overlap in time
+          return !(other.end <= ev.start || other.start >= ev.end);
+        });
+
+        // Sort overlapping events by start time, then end time
+        overlapping.sort((a, b) => a.start - b.start || a.end - b.end);
+
+        // Find this event's position in the overlapping group
+        const position = overlapping.indexOf(ev);
+        ev.stackIndex = Math.min(position, STACK_CAP - 1);
       });
 
       list.forEach((ev) => {
@@ -2997,11 +3138,16 @@ $(function () {
         const cssPos = isSingleton
           ? { left: "0px", width: "calc(96% - 0px)" }
           : (() => {
+              // Calculate width - minimum 70% to ensure readability
+              const totalEvents = ev._max;
               const leftPx = ev.stackIndex * STACK_OFFSET;
-              const rightPad = STACK_OFFSET; // small inset on the right for overlap
+
+              // Each event should be at least 70% wide, offset by stackIndex
+              const eventWidth = "calc(70% - 0px)";
+
               return {
                 left: `${leftPx}px`,
-                width: `calc(100% - ${leftPx + rightPad}px)`,
+                width: eventWidth,
               };
             })();
 
@@ -3050,6 +3196,12 @@ $(function () {
         ) {
           classTypeClass = "class-type-timeoff";
           borderColorStyle = "border-color: rgba(253,216,48,0.7) !important;";
+        } else if (ev.classType === "availability") {
+          classTypeClass = "class-type-availability";
+          borderColorStyle = "border: 1px dashed #9aa7b8 !important;";
+        } else if (ev.classType === "extra_slot") {
+          classTypeClass = "class-type-extra-slot";
+          borderColorStyle = "border: 1px solid #7088ff !important;";
         }
 
         // Combine styles (include any custom inline style from the event object)
@@ -3102,9 +3254,9 @@ $(function () {
           isShortEvent ? " short-event" : ""
         }${fadedClass}" style="${combinedStyle}${fadedStyle}" data-start="${
           ev.start
-        }" data-end="${ev.end}" data-date="${ev.date || ""}" data-title="${(
-          ev.title || ""
-        ).replace(/"/g, "&quot;")}" ${
+        }" data-end="${ev.end}" data-date="${ev.date || ""}" data-event-date="${
+          ev.date || ""
+        }" data-title="${(ev.title || "").replace(/"/g, "&quot;")}" ${
           ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""
         }${ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""}${
           ev.part ? ` data-part="${ev.part}"` : ""
@@ -3273,8 +3425,232 @@ $(function () {
       }
     }
     drawNow();
+
+    // Restore original events array
+    window.events = originalEvents;
   }
   window.renderWeek = renderWeek;
+
+  /* ====== DATE FILTER FUNCTIONALITY ====== */
+  // Global state for calendar date filter
+  let selectedDateFilter = null; // stores the selected date in YYYY-MM-DD format
+  let selectedTimeSlotFilter = null; // stores the selected time slot in minutes from midnight
+  let filteringEnabled = true; // toggle state for filters
+
+  // Function to filter events by selected date
+  function filterEventsByDate(selectedDate) {
+    if (!selectedDate) {
+      // Clear filter - show all events
+      $(".event").show();
+      $(".time-row").show();
+      selectedDateFilter = null;
+      // Remove highlight from all day headers
+      $("#head .day-h").removeClass("date-filter-active");
+      return;
+    }
+
+    // Hide all events first
+    $(".event").hide();
+
+    // Show only events for the selected date
+    $(".event").each(function () {
+      const eventDate = $(this).data("event-date");
+      if (eventDate === selectedDate) {
+        $(this).show();
+      }
+    });
+
+    // Hide empty time rows (rows with no visible events)
+    // Only hide rows that have no events at all on this date, or hide all and show only relevant ones
+    const $grid = $("#grid");
+    let hasAnyEvent = false;
+    $(".event:visible").each(function () {
+      hasAnyEvent = true;
+    });
+
+    // Update state
+    selectedDateFilter = selectedDate;
+  }
+
+  // Function to reset date filter
+  function clearDateFilter() {
+    filterEventsByDate(null);
+  }
+
+  // Function to filter events by selected time slot
+  function filterEventsByTimeSlot(timeInMinutes) {
+    if (timeInMinutes === null) {
+      // Clear filter - show all events and time rows
+      $(".event").show();
+      $(".time-row").removeClass("time-slot-filter-active");
+      selectedTimeSlotFilter = null;
+      console.log("Time slot filter cleared - all events shown");
+      return;
+    }
+
+    console.log("Filtering for time slot:", timeInMinutes, "minutes");
+
+    // Hide all events first
+    $(".event").hide();
+
+    // Remove highlight from all time rows
+    $(".time-row").removeClass("time-slot-filter-active");
+
+    let matchedCount = 0;
+
+    // Show only events that START exactly at the selected time
+    $(".event").each(function () {
+      const eventStart = parseInt($(this).data("start"));
+
+      if (!isNaN(eventStart)) {
+        console.log(
+          "Event start time:",
+          eventStart,
+          "Selected slot:",
+          timeInMinutes,
+          "Match:",
+          eventStart === timeInMinutes
+        );
+
+        // Show event if it starts at the selected time
+        if (eventStart === timeInMinutes) {
+          $(this).show();
+          matchedCount++;
+          console.log("Event shown");
+        }
+      }
+    });
+
+    console.log("Total events matched:", matchedCount);
+
+    // Highlight the clicked time row
+    $(".time-row").each(function () {
+      const $label = $(this).find(".time-label");
+
+      if ($label.length) {
+        try {
+          const rowTime = minutes($label.text().trim());
+          if (rowTime === timeInMinutes) {
+            $(this).addClass("time-slot-filter-active");
+            console.log("Highlighted time row:", $label.text().trim());
+          }
+        } catch (e) {
+          // Skip rows without valid time labels
+        }
+      }
+    });
+
+    // Update state
+    selectedTimeSlotFilter = timeInMinutes;
+  } // Function to clear time slot filter
+  function clearTimeSlotFilter() {
+    filterEventsByTimeSlot(null);
+  }
+
+  // Add click handler to calendar header date elements
+  $(document).on("click", "#head .day-h", function () {
+    // Check if filtering is enabled
+    if (!filteringEnabled) {
+      return;
+    }
+
+    const $dayHeader = $(this);
+    const dayIndex = $("#head .day-h").index($dayHeader);
+    const dayMonthDay = $dayHeader.find(".dt").text(); // Just the day number
+
+    // Get the actual full date for this day
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + dayIndex);
+    const fullDate = ymd(d); // Converts to YYYY-MM-DD format
+
+    // Clear time slot filter when changing date
+    if (selectedTimeSlotFilter !== null) {
+      clearTimeSlotFilter();
+    }
+
+    // Toggle: if clicking the same day, clear filter; otherwise apply new filter
+    if (selectedDateFilter === fullDate) {
+      clearDateFilter();
+      $dayHeader.removeClass("date-filter-active");
+    } else {
+      // Remove active class from all day headers
+      $("#head .day-h").removeClass("date-filter-active");
+      // Add active class to clicked header
+      $dayHeader.addClass("date-filter-active");
+      // Apply filter
+      filterEventsByDate(fullDate);
+    }
+  });
+
+  // Add click handler to time slot elements - improved version
+  $(document).on("click", ".time-label", function (event) {
+    event.stopPropagation();
+
+    // Check if filtering is enabled
+    if (!filteringEnabled) {
+      return;
+    }
+
+    console.log("TIME LABEL CLICKED - Handler triggered");
+
+    const $timeLabel = $(this);
+    const labelText = $timeLabel.text().trim();
+
+    console.log("Text content:", labelText);
+
+    // Parse time from text like "2:00 PM"
+    let timeMinutes = null;
+
+    // Remove any whitespace and special characters
+    const cleanText = labelText.replace(/\s+/g, " ");
+    console.log("Clean text:", cleanText);
+
+    // Extract hours, minutes, and period
+    const parts = cleanText.match(/(\d+):(\d+)\s+(AM|PM)/i);
+
+    if (parts && parts.length >= 4) {
+      let h = parseInt(parts[1], 10);
+      const m = parseInt(parts[2], 10);
+      const period = parts[3].toUpperCase();
+
+      console.log(
+        "Extracted: hours=" + h + ", minutes=" + m + ", period=" + period
+      );
+
+      // Convert to 24-hour format
+      if (period === "PM" && h !== 12) h += 12;
+      if (period === "AM" && h === 12) h = 0;
+
+      timeMinutes = h * 60 + m;
+      console.log("Converted to minutes:" + timeMinutes);
+    } else {
+      console.log("NO MATCH - could not parse time label");
+      return;
+    }
+
+    console.log("Final time minutes:", timeMinutes);
+
+    if (isNaN(timeMinutes)) {
+      console.error("ERROR: timeMinutes is NaN");
+      return;
+    }
+
+    const $timeRow = $timeLabel.closest(".time-row");
+
+    // Find the hour block (the time-row with the hour label at m % 60 === 0)
+    const $hourBlock = $timeRow;
+
+    // Check if same slot already selected
+    if (selectedTimeSlotFilter === timeMinutes) {
+      console.log("Same slot - clearing");
+      clearTimeSlotFilter();
+    } else {
+      console.log("New slot - filtering");
+      $(".time-row").removeClass("time-slot-filter-active");
+      $hourBlock.addClass("time-slot-filter-active");
+      filterEventsByTimeSlot(timeMinutes);
+    }
+  });
 
   function drawNow() {
     $(".now").remove();
@@ -3293,6 +3669,21 @@ $(function () {
     const dayInner = $("#grid .day .day-inner").eq(di);
     $('<div class="now">').css({ top: y }).appendTo(dayInner);
   }
+
+  // Toggle filter functionality
+  $(document).on("change", "#filterToggle", function () {
+    filteringEnabled = $(this).is(":checked");
+    console.log("Filtering enabled:", filteringEnabled);
+
+    // If disabling filters, clear all active filters
+    if (!filteringEnabled) {
+      clearDateFilter();
+      clearTimeSlotFilter();
+      $(".event").show();
+      $(".time-row").removeClass("time-slot-filter-active");
+      $("#head .day-h").removeClass("date-filter-active");
+    }
+  });
 });
 
 //from calender admin php
@@ -4432,7 +4823,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return 0;
     });
 
-    console.log("Students:", sortedList);
     sortedList.forEach((s) =>
       studentFieldset.appendChild(createStudentOption(s))
     );
@@ -5311,6 +5701,7 @@ document.addEventListener("DOMContentLoaded", () => {
           dayIndex,
           start: startMin,
           end: endMin,
+          teacherid: tid,
         });
       });
 
@@ -5345,9 +5736,178 @@ document.addEventListener("DOMContentLoaded", () => {
           dayIndex: (startDate.getDay() + 6) % 7,
           start: startMin,
           end: endMin,
+          teacherid: tid,
         });
       });
     });
+  }
+
+  function minutesToHHMM(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  function buildAvailabilityEvents(
+    availabilityMap = {},
+    activeTeacherIds = [],
+    weekStart,
+    weekEnd
+  ) {
+    const events = [];
+    const addedIds = new Set(); // Track added availability IDs to prevent duplicates
+    const teachers =
+      activeTeacherIds && activeTeacherIds.length > 0
+        ? activeTeacherIds
+        : Object.keys(availabilityMap);
+
+    if (!teachers || teachers.length === 0) return events;
+
+    const baseDate = weekStart || currentStart || new Date();
+
+    teachers.forEach((tid) => {
+      const slots = getSlotsForTeacher(availabilityMap, tid);
+      slots.forEach((slot) => {
+        // Skip if this availability ID was already added
+        if (slot.id && addedIds.has(slot.id)) {
+          return;
+        }
+
+        const startMin = normalizeMinutes(slot.startTime);
+        const endMin = normalizeMinutes(slot.endTime);
+        if (startMin === null || endMin === null) return;
+
+        // Determine the event date using the declared day; respect startDate as the earliest allowed occurrence.
+        const dateStr = (() => {
+          const startDateObj = slot.startDate
+            ? new Date(`${slot.startDate}T00:00:00`)
+            : null;
+
+          const dayIndex =
+            DAY_NAME_TO_INDEX[String(slot.day || "").toLowerCase()];
+          if (typeof dayIndex === "number") {
+            const candidate = new Date(baseDate);
+            candidate.setDate(baseDate.getDate() + dayIndex);
+
+            // If this candidate week is before the startDate, skip this week
+            if (startDateObj && candidate < startDateObj) return null;
+
+            return ymd(candidate);
+          }
+
+          // Fallback to startDate weekday if day is missing
+          if (startDateObj && !Number.isNaN(startDateObj.getTime())) {
+            const startDayIdx = (startDateObj.getDay() + 6) % 7;
+            const candidate = new Date(baseDate);
+            candidate.setDate(baseDate.getDate() + startDayIdx);
+            if (candidate < startDateObj) return null;
+            return ymd(candidate);
+          }
+
+          // Last resort: use base date
+          return ymd(baseDate);
+        })();
+
+        // If dateStr is null (week is before startDate), skip this slot for this week
+        if (!dateStr) return;
+
+        const startStr = minutesToHHMM(startMin);
+        const endStr = minutesToHHMM(endMin);
+
+        const teacherColor = getTeacherColor(tid);
+        const bg = teacherColor.replace("50%", "95%");
+
+        // Check if dateStr matches the day name
+        if (slot.day) {
+          const dateObj = new Date(dateStr);
+          const dayNames = [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+          ];
+          const actualDay = dayNames[dateObj.getDay()];
+          if (actualDay !== slot.day) {
+            console.warn(
+              `Availability slot day mismatch: dateStr=${dateStr} is ${actualDay}, but slot.day=${slot.day}`
+            );
+          }
+        }
+        events.push({
+          start: `${dateStr}T${startStr}:00`,
+          end: `${dateStr}T${endStr}:00`,
+          date: dateStr, // Ensure event.date matches slot.startDate
+          title: slot.title || "Availability",
+          classType: "availability",
+          source: "availability",
+          teacherids: [Number(tid) || tid],
+          teacherid: Number(tid) || tid,
+          color: "e-availability",
+          style: `border: 1px dashed ${teacherColor}; background-color: ${bg};`,
+          availabilityId: slot.id, // Store the availability ID
+          day: slot.day || null,
+        });
+
+        // Mark this availability ID as added
+        if (slot.id) {
+          addedIds.add(slot.id);
+        }
+      });
+    });
+
+    return events;
+  }
+
+  function buildExtraSlotEvents(
+    extraSlotMap = {},
+    activeTeacherIds = [],
+    weekStart,
+    weekEnd
+  ) {
+    const events = [];
+    const teachers =
+      activeTeacherIds && activeTeacherIds.length > 0
+        ? activeTeacherIds
+        : Object.keys(extraSlotMap);
+
+    if (!teachers || teachers.length === 0) return events;
+
+    const baseMs = (weekStart || currentStart || new Date()).getTime();
+    const weekEndMs =
+      weekEnd && weekEnd.getTime
+        ? weekEnd.getTime()
+        : baseMs + 6 * 24 * 60 * 60 * 1000;
+
+    teachers.forEach((tid) => {
+      const slots = getSlotsForTeacher(extraSlotMap, tid);
+      slots.forEach((slot) => {
+        const startMs = slot.start ? Date.parse(slot.start) : null;
+        const endMs = slot.end ? Date.parse(slot.end) : null;
+        if (!startMs || !endMs) return;
+        if (endMs <= startMs) return;
+        if (startMs < baseMs || startMs > weekEndMs) return;
+
+        const teacherColor = getTeacherColor(tid);
+        const bg = teacherColor.replace("50%", "92%");
+
+        events.push({
+          start: slot.start,
+          end: slot.end,
+          title: slot.title || "Extra Slot",
+          classType: "extra_slot",
+          source: "extra_slot",
+          teacherids: [Number(tid) || tid],
+          teacherid: Number(tid) || tid,
+          color: "e-extra-slot",
+          style: `border: 1px solid ${teacherColor}; background-color: ${bg};`,
+        });
+      });
+    });
+
+    return events;
   }
 
   // ---------------- API call ----------------
@@ -5409,7 +5969,7 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       );
 
-      // Merge regular events, peertalk events, conference events, and teacher time off
+      // Merge regular events, peertalk events, conference events, teacher time off, availability, and extra slots
       let allEvents = [];
       if (data.ok && Array.isArray(data.events)) {
         allEvents = [...data.events];
@@ -5445,6 +6005,23 @@ document.addEventListener("DOMContentLoaded", () => {
             });
           });
         });
+      }
+
+      // Availability and extra slots as events
+      if (data.ok) {
+        const availabilityEvents = buildAvailabilityEvents(
+          data.teacher_availability || {},
+          teacherids,
+          currentStart,
+          currentEnd
+        );
+        const extraSlotEvents = buildExtraSlotEvents(
+          data.teacher_extra_slots || {},
+          teacherids,
+          currentStart,
+          currentEnd
+        );
+        allEvents = [...allEvents, ...availabilityEvents, ...extraSlotEvents];
       }
 
       window.events = [];
@@ -5515,8 +6092,18 @@ document.addEventListener("DOMContentLoaded", () => {
             eventEnd = "23:59";
           }
         } else {
-          eventStart = startDate.toTimeString().slice(0, 5);
-          eventEnd = endDate.toTimeString().slice(0, 5);
+          // Extract time from ISO string to avoid timezone conversion issues
+          if (ev.start && ev.start.includes("T")) {
+            eventStart = ev.start.split("T")[1].slice(0, 5);
+          } else {
+            eventStart = startDate.toTimeString().slice(0, 5);
+          }
+
+          if (ev.end && ev.end.includes("T")) {
+            eventEnd = ev.end.split("T")[1].slice(0, 5);
+          } else {
+            eventEnd = endDate.toTimeString().slice(0, 5);
+          }
         }
         const eventObj = {
           date: startDate.toISOString().split("T")[0],
@@ -5565,6 +6152,7 @@ document.addEventListener("DOMContentLoaded", () => {
           rescheduled:
             typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
           faded: false,
+          availabilityId: ev.availabilityId || null, // Add availability ID to event data
         };
         window.events.push(eventObj);
 

@@ -1601,7 +1601,32 @@ body {
 /* calendar css */
 
 #grid .day .day-inner .slots > div.slot-white {
-  background: #fff !important;
+  background: var(--slot-white-color, #fff) !important;
+  border: 1px solid var(--slot-white-border, transparent);
+  box-sizing: border-box;
+}
+
+#grid .day .day-inner .slots > div.slot-white.slot-white-multi {
+  background: transparent !important;
+  border-style: dashed;
+}
+
+.event.class-type-availability {
+  background: color-mix(in srgb, #9aa7b8 18%, #fff);
+  border: 2px dashed #9aa7b8 !important;
+  color: #1f2a3a;
+  opacity: 0.85;
+}
+
+.event.class-type-availability .ev-title {
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.event.class-type-extra-slot {
+  background: color-mix(in srgb, #7088ff 14%, #fff);
+  border: 1px solid #7088ff;
+  color: #1f2a3a;
 }
 
 /* Cohort widget small styles to match tabbed UI */

@@ -780,6 +780,31 @@ $add_group_events = function() use (
 
         $teacherIdsSingle = $teacherIdDisplay ? [$teacherIdDisplay] : [];
 
+       
+
+
+// ----------------------------------------------------
+// ADD current teacher profile pic (same style as previous teacher)
+// ----------------------------------------------------
+$currentTeacherPicc = '';
+
+if ($teacherIdDisplay > 0) {
+ 
+   
+    if ($u22 = $DB->get_record('user', ['id' => $teacherIdDisplay])) {
+
+    global $PAGE;
+    if (!$PAGE) {
+        $PAGE = new moodle_page();
+        $PAGE->set_context(context_system::instance());
+    }
+
+    $picCurrr = new user_picture($u22);
+    $picCurrr->size = 50;
+    $currentTeacherPicc = $picCurrr->get_url($PAGE)->out(false);
+}
+}
+
         // Preload that specific teacher for name
         $teacherNames = [];
         if ($teacherIdDisplay) {
@@ -853,6 +878,7 @@ $events[] = [
     'end'           => $fmt_iso($eventEnd),
 
     'teacherids'    => $teacherIdsSingle,
+    'teacherpic'    => $currentTeacherPicc,
     'teachernames'  => $teacherNames,
 
     // ✅ UPDATED — all students from matched cohorts
@@ -1832,30 +1858,33 @@ $teacherFilter = (int)$teacheridsraw;
 $refiltered = [];
 
 // -------------------------------------------------------------
-// 1) LOAD ALL ACTIVE STATUS RECORDS
+// 1) LOAD ALL ACTIVE STATUS RECORDS (for scanning whole table)
 // -------------------------------------------------------------
 $allStatuses = $DB->get_records('local_gm_event_status', ['isactive' => 1]);
 
+// Index statuses by eventid for quick lookup
 $statusByEvent = [];
 foreach ($allStatuses as $s) {
     $statusByEvent[(int)$s->eventid][] = $s;
 }
 
+// Used to avoid duplicates when adding extra events
 $addedEventIds = [];
 
-
 // -------------------------------------------------------------
-// 2) PROCESS EXISTING $filtered EVENTS
+// 2) PROCESS EXISTING $filtered EVENTS (UPDATE + FILTER)
 // -------------------------------------------------------------
 foreach ($filtered as $ev) {
 
     $eid = (int)($ev['eventid'] ?? 0);
+    
     if ($eid <= 0) {
         continue;
     }
 
     $statuses = $statusByEvent[$eid] ?? [];
     if (!$statuses) {
+        // No status → keep as is
         $refiltered[] = $ev;
         continue;
     }
@@ -1867,19 +1896,47 @@ foreach ($filtered as $ev) {
 
         $details = json_decode($s->detailsjson ?? '', true);
         if (!is_array($details) || empty($details['current'])) {
-            continue;
-        }
 
-        $cur  = $details['current'];
-        $prev = $details['previous'] ?? null;
+    // Mark as NOT rescheduled
+    $updated['rescheduled'] = ['status' => 'no'];
+
+    continue;
+}
+
+        $cur = $details['current'];
 
         $newTeacher = (int)($cur['teacher'] ?? 0);
         $newDate    = $cur['date']  ?? null;
         $newStart   = $cur['start'] ?? null;
         $newEnd     = $cur['end']   ?? null;
 
+        // ---------------------------------------------------------
+        // NEW: BUILD CURRENT TEACHER PROFILE PIC
+        // ---------------------------------------------------------
+        $currentTeacherPic = null;
+        if ($newTeacher > 0) {
+            if ($u = $DB->get_record('user', ['id' => $newTeacher])) {
+                $pic = new user_picture($u);
+                $pic->size = 50;
+                $currentTeacherPic = $pic->get_url($PAGE)->out(false);
+            }
+        }
+
+        // ---------------------------------------------------------
+        // NEW: BUILD PREVIOUS TEACHER PROFILE PIC
+        // ---------------------------------------------------------
+        $previousTeacherPic = null;
+        if (!empty($details['previous']['teacher'])) {
+            $prevTid = (int)$details['previous']['teacher'];
+            if ($u2 = $DB->get_record('user', ['id' => $prevTid])) {
+                $pic2 = new user_picture($u2);
+                $pic2->size = 50;
+                $previousTeacherPic = $pic2->get_url($PAGE)->out(false);
+            }
+        }
+
         // -----------------------------------------------
-        // A) Update time/date always
+        // A) ALWAYS UPDATE TIME/DATE IF AVAILABLE
         // -----------------------------------------------
         if ($newDate && $newStart && $newEnd) {
             $tsStart = strtotime("$newDate $newStart");
@@ -1893,27 +1950,71 @@ foreach ($filtered as $ev) {
             }
         }
 
+        // -----------------------------------------------------
+        // ATTACH PROFILE PICS ALWAYS (NEW)
+        // -----------------------------------------------------
+        $updated['currentTeacherPic']  = $currentTeacherPic;
+        $updated['previousTeacherPic'] = $previousTeacherPic;
+
+
+        //---------------------------------------------
+// ADD PROFILE PIC FOR CURRENT + PREVIOUS
+//---------------------------------------------
+
+$currentTeacherPic = '';
+$previousTeacherPic = '';
+
+// 1) Current Teacher Profile
+$currentTid = (int)($cur['teacher'] ?? 0);
+if ($currentTid > 0) {
+    if ($uT = $DB->get_record('user', ['id' => $currentTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj = new user_picture($uT);
+        $picObj->size = 50;
+        $currentTeacherPic = $picObj->get_url($PAGE)->out(false);
+    }
+}
+
+// 2) Previous Teacher Profile
+$prevTid = 0;
+if (!empty($details['previous']['teacher'])) {
+    $prevTid = (int)$details['previous']['teacher'];
+}
+
+if ($prevTid > 0) {
+    if ($uPrev = $DB->get_record('user', ['id' => $prevTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj2 = new user_picture($uPrev);
+        $picObj2->size = 50;
+        $previousTeacherPic = $picObj2->get_url($PAGE)->out(false);
+    }
+}
+
+// Attach pics back to $details (so you can use it later)
+$details['current']['teacher_pic'] = $currentTeacherPic;
+$details['previous']['teacher_pic'] = $previousTeacherPic;
+
         // -----------------------------------------------
-        // B) TEACHER FILTER (UPDATED EXACTLY AS YOU ASKED)
+        // B) TEACHER FILTER (your modified logic)
         // -----------------------------------------------
         if ($teacherFilter > 0 && $newTeacher > 0) {
-
-            // If CURRENT teacher differs
             if ($newTeacher !== $teacherFilter) {
 
-                // ❗ Check PREVIOUS teacher
-                if (
-                    is_array($prev) &&
-                    isset($prev['teacher']) &&
-                    (int)$prev['teacher'] === $teacherFilter
-                ) {
-                    // KEEP & mark rescheduled
-                    $updated['rescheduled'] = "yes";
-                } else {
-                    // Remove event (old behaviour)
-                    $remove = true;
-                    break;
-                }
+                // You wanted to KEEP it if previous matches—your logic disabled here.
+               $updated['rescheduled'] = $details;  // <--- full details json stored here
+                continue; // keep, do not remove
             }
         }
     }
@@ -1924,9 +2025,8 @@ foreach ($filtered as $ev) {
     }
 }
 
-
 // -------------------------------------------------------------
-// 3) ADD EVENTS NOT PRESENT BUT MATCH STATUS
+// 3) ADD EVENTS NOT PRESENT IN $filtered BUT WITH STATUS MATCH
 // -------------------------------------------------------------
 foreach ($allStatuses as $s) {
 
@@ -1942,10 +2042,12 @@ foreach ($allStatuses as $s) {
     $newStart   = $cur['start'] ?? null;
     $newEnd     = $cur['end']   ?? null;
 
+    // Must match selected teacher
     if ($teacherFilter > 0 && $newTeacher !== $teacherFilter) {
         continue;
     }
 
+    // Must have all timing fields
     if (!$newDate || !$newStart || !$newEnd) {
         continue;
     }
@@ -1957,23 +2059,101 @@ foreach ($allStatuses as $s) {
         continue;
     }
 
+    // Must be inside requested calendar range
     if ($tsEnd < $startts || $tsStart > $endts) {
         continue;
     }
 
     $eid = (int)$s->eventid;
     if (isset($addedEventIds[$eid])) {
-        continue;
+        continue; // Already added
     }
 
+    // Base googlemeet_events record
     $base = $DB->get_record('googlemeet_events', ['id' => $eid], '*', IGNORE_MISSING);
     if (!$base) {
         continue;
     }
 
+    // Load googlemeet instance → ensures correct title
     $gm = $DB->get_record('googlemeet', ['id' => $base->googlemeetid], '*', IGNORE_MISSING);
     $title = $gm ? $gm->name : 'Class';
 
+    // ---------------------------------------------------------
+    // NEW: BUILD PROFILE PICS FOR ADDED EVENTS
+    // ---------------------------------------------------------
+
+    // Current teacher pic
+    $currentTeacherPic = null;
+    if ($u = $DB->get_record('user', ['id' => $newTeacher])) {
+        $pic = new user_picture($u);
+        $pic->size = 50;
+        $currentTeacherPic = $pic->get_url($PAGE)->out(false);
+    }
+
+    // Previous teacher pic
+    $previousTeacherPic = null;
+    if (!empty($details['previous']['teacher'])) {
+        $prevTid = (int)$details['previous']['teacher'];
+        if ($u2 = $DB->get_record('user', ['id' => $prevTid])) {
+            $pic2 = new user_picture($u2);
+            $pic2->size = 50;
+            $previousTeacherPic = $pic2->get_url($PAGE)->out(false);
+        }
+    }
+
+
+
+    //---------------------------------------------
+// ADD PROFILE PIC FOR CURRENT + PREVIOUS
+//---------------------------------------------
+
+$currentTeacherPic = '';
+$previousTeacherPic = '';
+
+// 1) Current Teacher Profile
+$currentTid = (int)($cur['teacher'] ?? 0);
+if ($currentTid > 0) {
+    if ($uT = $DB->get_record('user', ['id' => $currentTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj = new user_picture($uT);
+        $picObj->size = 50;
+        $currentTeacherPic = $picObj->get_url($PAGE)->out(false);
+    }
+}
+
+// 2) Previous Teacher Profile
+$prevTid = 0;
+if (!empty($details['previous']['teacher'])) {
+    $prevTid = (int)$details['previous']['teacher'];
+}
+
+if ($prevTid > 0) {
+    if ($uPrev = $DB->get_record('user', ['id' => $prevTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj2 = new user_picture($uPrev);
+        $picObj2->size = 50;
+        $previousTeacherPic = $picObj2->get_url($PAGE)->out(false);
+    }
+}
+
+// Attach pics back to $details (so you can use it later)
+$details['current']['teacher_pic'] = $currentTeacherPic;
+$details['previous']['teacher_pic'] = $previousTeacherPic;
+
+    // Build the fully updated event entry
     $refiltered[] = [
         'id'            => 'status-' . $eid,
         'eventid'       => $eid,
@@ -1998,12 +2178,17 @@ foreach ($allStatuses as $s) {
         'studentids'    => [],
         'studentnames'  => [],
         'cohortids'     => [],
+        'rescheduled'   => $details,
 
         'class_type'    => 'updated',
         'is_recurring'  => false,
 
         'meetingurl'    => $gm->meetingurl ?? '',
         'viewurl'       => (new moodle_url('/mod/googlemeet/view.php', ['id' => $gm->coursemodule ?? 0]))->out(false),
+
+        // NEW PROPERTIES:
+        'currentTeacherPic'  => $currentTeacherPic,
+        'previousTeacherPic' => $previousTeacherPic
     ];
 
     $addedEventIds[$eid] = true;
@@ -2014,6 +2199,8 @@ $filtered = $refiltered;
 // ======================================================================
 // END PATCH
 // ======================================================================
+
+
 
 
 
