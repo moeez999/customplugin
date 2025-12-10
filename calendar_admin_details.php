@@ -348,7 +348,7 @@
                     <div class="gutter">
                         <div class="filter-toggle-container">
                             <label class="filter-toggle-label">
-                                <input type="checkbox" id="filterToggle" class="filter-toggle-checkbox" checked>
+                                <input type="checkbox" id="filterToggle" class="filter-toggle-checkbox">
                                 <span class="filter-toggle-switch"></span>
 
                             </label>

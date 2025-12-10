@@ -3435,7 +3435,7 @@ $(function () {
   // Global state for calendar date filter
   let selectedDateFilter = null; // stores the selected date in YYYY-MM-DD format
   let selectedTimeSlotFilter = null; // stores the selected time slot in minutes from midnight
-  let filteringEnabled = true; // toggle state for filters
+  let filteringEnabled = false; // toggle state for filters - initially disabled
 
   // Function to filter events by selected date
   function filterEventsByDate(selectedDate) {
