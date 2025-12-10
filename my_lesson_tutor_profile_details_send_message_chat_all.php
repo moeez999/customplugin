@@ -1,65 +1,100 @@
-  <link rel="stylesheet" href="css/my_lesson_tutor_profile_details_send_message_chat_all.css">
+<link rel="stylesheet" href="css/my_lesson_tutor_profile_details_send_message_chat_all.css">
+<link rel="stylesheet" href="css/my_lessons_tutor_profile_details_send_message_chat_all_share_modal.css">
 
- <link rel="stylesheet" href="css/my_lessons_tutor_profile_details_send_message_chat_all_share_modal.css">
-  
+<div id="message_all_container">
+  <!-- LEFT SIDEBAR -->
+  <div id="message_all_sidebar">
+    <ul id="message_all_tabs">
+      <li class="active" data-tab="all">All</li>
+      <li data-tab="unread">
+        Unread
+        <span class="message_all_tab_badge">0</span>
+      </li>
+      <li data-tab="archived">Archived</li>
+    </ul>
+    <ul id="message_all_chat_list"></ul>
+  </div>
 
-  <div id="message_all_container">
-    <div id="message_all_sidebar">
-      <ul id="message_all_tabs">
-        <li class="active" data-tab="all">All</li>
-        <li data-tab="unread">Unread <span class="message_all_tab_badge">5</span></li>
-        <li data-tab="archived">Archived</li>
-      </ul>
-      <ul id="message_all_chat_list"></ul>
+  <!-- MIDDLE CHAT PANEL -->
+  <div id="message_all_chat_window">
+    <div id="message_all_chat_header">
+      <img src="" alt="">
+      <div class="message_all_name"></div>
+      <div class="message_all_actions" title="Archive">
+        <img src="img/my_students/header_archive_icon.svg"
+          class="message_all_header_icon"
+          alt="Archive"
+          style="width:17px; height:15px; border-radius: 0px !important;">
+      </div>
     </div>
-    <div id="message_all_chat_window">
-      <div id="message_all_chat_header">
-        <img src="">
-        <div class="message_all_name"></div>
-        <div class="message_all_actions">
-          <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="14" rx="3" stroke="#232323" stroke-width="2" fill="none"/><path d="M2 8h20" stroke="#232323" stroke-width="2"/></svg>
+
+    <!-- messages rendered dynamically by JS (scrolls independently) -->
+    <div id="message_all_messages"></div>
+
+    <!-- COMPOSE AREA (frozen at bottom of middle column) -->
+    <div id="message_all_compose">
+
+      <!-- Reply / Edit bar (hidden by default) -->
+      <div id="my_messages_details_edit_message_menu_reply_container" style="display:none;">
+        <div class="my_messages_details_edit_message_menu_reply_header">
+          <div class="my_messages_details_edit_message_menu_reply_texts">
+            <div id="my_messages_details_edit_message_menu_reply_title"
+              class="my_messages_details_edit_message_menu_reply_title">
+              <!-- Reply to Daniela / Edit Message -->
+            </div>
+            <div id="my_messages_details_edit_message_menu_reply_preview"
+              class="my_messages_details_edit_message_menu_reply_preview">
+              <!-- original message preview -->
+            </div>
+          </div>
+          <button type="button"
+            id="my_messages_details_edit_message_menu_reply_close"
+            class="my_messages_details_edit_message_menu_reply_close">
+            ×
+          </button>
         </div>
       </div>
-      <div id="message_all_messages"></div>
-      
-      
-      <div id="message_all_compose">
-  <textarea placeholder="Your message"></textarea>
-  <div class="message_all_compose_actions">
-    <!-- Attach Icon (Paperclip) -->
-    <svg viewBox="0 0 24 24" width="26" height="26">
-      <path d="M16.5 13.5l-6.9 6.9a5 5 0 1 1-7.1-7.1l13-13a5 5 0 1 1 7.1 7.1L10.5 19.5a3 3 0 1 1-4.2-4.2l12.5-12.5" stroke="#232323" stroke-width="2" fill="none"/>
-    </svg>
-    <!-- Emoji Icon -->
-    <svg viewBox="0 0 24 24" width="26" height="26">
-      <circle cx="12" cy="12" r="10" stroke="#232323" stroke-width="2" fill="none"/>
-      <circle cx="9" cy="10" r="1"/>
-      <circle cx="15" cy="10" r="1"/>
-      <path d="M8 15s1.5 2 4 2 4-2 4-2" stroke="#232323" stroke-width="2" fill="none"/>
-    </svg>
-    <!-- Microphone Icon (right-aligned) -->
-    <svg viewBox="0 0 24 24" width="26" height="26" style="margin-left:auto;">
-      <rect x="9" y="2" width="6" height="12" rx="3" stroke="#232323" stroke-width="2" fill="none"/>
-      <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="#232323" stroke-width="2" fill="none"/>
-    </svg>
-  </div>
-</div>
 
-      
-</div>
-    <!-- Details Panel -->
-    <div id="message_all_details_wrap">
-      <div id="message_all_details_scroll"></div>
-      <div id="message_all_details_btns"></div>
+      <textarea placeholder="Your message"></textarea>
+
+      <div class="message_all_compose_actions">
+        <img src="img/my_students/upload_icon.svg"
+          class="message_all_compose_icon"
+          alt="Attach">
+        <img src="img/my_students/emoji_icon.svg"
+          class="message_all_compose_icon"
+          alt="Emoji">
+        <img src="img/my_students/voice_icon.svg"
+          class="message_all_compose_icon message_all_compose_icon_right"
+          alt="Voice">
+
+        <!-- bottom-right X / ✓ buttons -->
+        <div class="my_messages_details_edit_message_menu_actions_btnwrap">
+          <button type="button"
+            id="my_messages_details_edit_message_menu_reply_cancel"
+            class="my_messages_details_edit_message_menu_reply_btn my_messages_details_edit_message_menu_reply_btn--cancel">
+            ×
+          </button>
+          <button type="button"
+            id="my_messages_details_edit_message_menu_reply_ok"
+            class="my_messages_details_edit_message_menu_reply_btn my_messages_details_edit_message_menu_reply_btn--ok">
+            ✓
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <?php require_once('my_lessons_tutor_profile_details_send_message_chat_all_share_modal.php');?>
+  <!-- RIGHT DETAILS PANEL -->
+  <div id="message_all_details_wrap">
+    <div id="message_all_details_header">Details</div>
+    <div id="message_all_details_scroll"></div>
+    <div id="message_all_details_btns"></div>
+  </div>
+</div>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<?php require_once('my_lessons_tutor_profile_details_send_message_chat_all_share_modal.php'); ?>
 
-  <script src="js/my_lessons_tutor_profile_details_send_message_chat_all.js"></script>
-  <script src="js/my_lessons_tutor_profile_details_send_message_chat_all_share_modal.js"></script>
-  
-
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="js/my_lessons_tutor_profile_details_send_message_chat_all.js"></script>
+<script src="js/my_lessons_tutor_profile_details_send_message_chat_all_share_modal.js"></script>
