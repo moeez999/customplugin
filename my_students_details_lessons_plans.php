@@ -27,13 +27,12 @@
         <!-- Logo -->
         <div class="flex items-center gap-3">
             <!-- Logo icon as image placeholder -->
-            <div class="w-9 h-9 flex items-center justify-center">
+            <div class="w-30 h-30 flex items-center justify-center">
                 <img
-                    src="images/logo-icon-placeholder.png"
+                    src="img/my_students/logo_header.svg"
                     alt="Latingles logo icon"
                     class="w-full h-full object-contain" />
             </div>
-            <span class="text-2xl font-semibold tracking-wide">LATINGLES</span>
         </div>
 
         <!-- Skip button -->
@@ -53,7 +52,7 @@
                     class="w-16 h-16 md:w-20 md:h-20 mx-auto overflow-hidden border border-gray-200 shadow-sm">
                     <!-- Avatar image placeholder -->
                     <img
-                        src="images/avatar-placeholder.png"
+                        src="img/my_students/profile_img.png"
                         alt="Wade Warren"
                         class="w-full h-full object-cover" />
                 </div>
@@ -81,7 +80,7 @@
                     data-rating="bad">
                     <!-- Icon placeholder -->
                     <img
-                        src="images/bad-icon-placeholder.png"
+                        src="img/my_students/dislike_icon.svg"
                         alt="Bad icon"
                         class="w-6 h-6 md:w-7 md:h-7 object-contain" />
                     <span class="text-sm md:text-base font-medium text-gray-800">
@@ -96,7 +95,7 @@
                     data-rating="okay">
                     <!-- Icon placeholder -->
                     <img
-                        src="images/okay-icon-placeholder.png"
+                        src="img/my_students/like_icon.svg"
                         alt="Okay icon"
                         class="w-6 h-6 md:w-7 md:h-7 object-contain" />
                     <span class="text-sm md:text-base font-medium text-gray-800">
@@ -105,19 +104,20 @@
                 </button>
 
                 <!-- Great -->
-                <button
-                    type="button"
-                    class="rating-card group w-full h-32 md:h-36 border border-gray-200 rounded-2xl bg-white flex flex-col items-start justify-center gap-3 px-6 hover:border-gray-400 hover:shadow-md transition"
-                    data-rating="great">
-                    <!-- Icon placeholder -->
-                    <img
-                        src="images/great-icon-placeholder.png"
-                        alt="Great icon"
-                        class="w-6 h-6 md:w-7 md:h-7 object-contain" />
-                    <span class="text-sm md:text-base font-medium text-gray-800">
-                        Great
-                    </span>
-                </button>
+                <a href="my_students_details_lessons_plans_step2.php"><button
+                        type="button"
+                        class="rating-card group w-full h-32 md:h-36 border border-gray-200 rounded-2xl bg-white flex flex-col items-start justify-center gap-3 px-6 hover:border-gray-400 hover:shadow-md transition"
+                        data-rating="great">
+                        <!-- Icon placeholder -->
+                        <img
+                            src="img/my_students/great_icon.svg"
+                            alt="Great icon"
+                            class="w-6 h-6 md:w-7 md:h-7 object-contain" />
+                        <span class="text-sm md:text-base font-medium text-gray-800">
+                            Great
+                        </span>
+                    </button>
+                </a>
             </div>
         </div>
     </main>
@@ -143,6 +143,7 @@
             });
         });
     </script>
+
 </body>
 
 </html>
