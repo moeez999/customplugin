@@ -3020,6 +3020,13 @@ $(function () {
           eCurr.teacherId = currentEvent.teacher || raw.teacherId;
           eCurr.isRescheduleCurrent = true;
 
+          // Check if teacher changed
+          const oldTeacherId = previousEvent.teacher;
+          const newTeacherId = currentEvent.teacher;
+          if (oldTeacherId !== newTeacherId) {
+            eCurr.isTeacherChanged = true;
+          }
+
           // Handle midnight-crossing for current event
           if (eCurr.end < eCurr.start) {
             const pairedId = `paired-curr-${Date.now()}-${Math.random()}`;
@@ -3221,7 +3228,19 @@ $(function () {
         const statusMeta = getActiveStatusMeta(ev.statuses);
         const statusIconHtml = (() => {
           // Hide status icon for current reschedule events (makeup icon shows instead)
-          if (ev.isRescheduleCurrent) return "";
+          if (ev.isRescheduleCurrent && !ev.isTeacherChanged) return "";
+
+          // Show covered icon if teacher changed
+          if (ev.isTeacherChanged) {
+            return `
+             <span class="ev-status-icon" style="position:absolute; top:6px; right:26px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+                <img style="border-radius:50%;" src=${ev.rescheduled.current.teacher_pic} alt="Teacher Changed" title="Teacher Changed" style="width:16px; height:16px;">
+              </span>
+            <span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+                <img src="./img/covered.svg" alt="Teacher Changed" title="Teacher Changed" style="width:16px; height:16px;">
+              </span>`;
+          }
+
           if (!statusMeta) return "";
           if (statusMeta.code === "cancel_reschedule_later") {
             return `<span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; pointer-events:none; z-index:2;">
@@ -3290,7 +3309,7 @@ $(function () {
               ${
                 isTimeOffEvent
                   ? ""
-                  : ev.isRescheduleCurrent
+                  : ev.isRescheduleCurrent && !ev.isTeacherChanged
                   ? `<span class="ev-makeup" title="Make-up Class"><img src="./img/makeup.svg" alt=""></span>`
                   : ev.repeat || !ev.repeat
                   ? `<span class="ev-repeat" title="Repeats"><img src="./img/ev-repeat.svg" alt=""></span>`

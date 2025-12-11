@@ -2031,6 +2031,116 @@ $details['previous']['teacher_pic'] = $previousTeacherPic;
 foreach ($allStatuses as $s) {
 
     $details = json_decode($s->detailsjson ?? '', true);
+
+    if($s->eventid === "32201"){
+        $a=1;
+    }
+
+
+// ------------------------------------------------------------
+// RESOLVE COHORT IDS FROM THE *SECTION* WHERE GOOGLE MEET EXISTS
+// ------------------------------------------------------------
+$cohortids = [1221];
+$classType = 'group'; // default class type
+
+$gm = $DB->get_record('googlemeet', ['id' => $s->googlemeetid], '*', IGNORE_MISSING);
+
+// ---------------------------------------
+// Extract cohort shortname from GM name
+// Example: "KY4-02132025-0107 Main Classes"
+// ---------------------------------------
+$cohortids = [];
+$classType = 'group';
+
+if (!empty($gm->name)) {
+    // Split at first dash
+    $parts = explode('-', $gm->name, 2);
+    $shortname = trim($parts[0]);   // KY4
+
+    if ($shortname !== '') {
+        // Fetch the cohort by shortname
+        $cohort = $DB->get_record('cohort', ['shortname' => $shortname], 'id');
+        if ($cohort) {
+            $cohortids = [(int)$cohort->id];
+        }
+    }
+
+    // Detect class type from name
+    if (stripos($gm->name, 'Main') !== false) {
+        $classType = 'main';
+    } elseif (stripos($gm->name, 'Practice') !== false || stripos($gm->name, 'Tutoring') !== false) {
+        $classType = 'tutoring';
+    }
+}
+
+
+$teacherids = [];
+$teachernames = [];
+$teacherpics = [];
+
+if (!empty($cohortids)) {
+    $cid = $cohortids[0];
+    $coh = $DB->get_record('cohort', ['id' => $cid]);
+
+    if ($coh) {
+        $mainT  = (int)$coh->cohortmainteacher;
+        $guideT = (int)$coh->cohortguideteacher;
+
+        $teacherids = array_filter([$mainT, $guideT]);
+
+        foreach ($teacherids as $tid) {
+            if ($u = $DB->get_record('user', ['id' => $tid])) {
+
+                // teacher name
+                $teachernames[] = fullname($u);
+
+                // teacher profile pic
+                $pic = new user_picture($u);
+                $pic->size = 50;
+                $teacherpics[$tid] = $pic->get_url($PAGE)->out(false);
+            }
+        }
+    }
+}
+
+$studentids = [];
+$studentnames = [];
+
+if (!empty($cohortids)) {
+    $cid = $cohortids[0];
+
+    $sqlStudents = "
+        SELECT u.*
+        FROM {cohort_members} cm
+        JOIN {user} u ON u.id = cm.userid
+        WHERE cm.cohortid = :cid
+          AND u.deleted = 0
+          AND u.suspended = 0
+    ";
+
+    $students = $DB->get_records_sql($sqlStudents, ['cid' => $cid]);
+
+    foreach ($students as $stu) {
+        $studentids[] = (int)$stu->id;
+        $studentnames[] = fullname($stu);
+    }
+}
+
+
+// // attach results to status row
+// $s->detected_cohortids  = $cohortids;
+// $s->detected_class_type = $classType;
+
+
+//--------------------------------------------------------
+// 3) Attach results into $s for use in your final output
+//--------------------------------------------------------
+
+
+
+
+
+
     if (!is_array($details) || empty($details['current'])) {
         continue;
     }
@@ -2153,6 +2263,16 @@ if ($prevTid > 0) {
 $details['current']['teacher_pic'] = $currentTeacherPic;
 $details['previous']['teacher_pic'] = $previousTeacherPic;
 
+
+
+$allStatusess = $DB->get_records('local_gm_event_status', ['isactive' => 1]);
+
+// Index statuses by eventid for quick lookup
+$statusByEventt = [];
+foreach ($allStatusess as $s) {
+    $statusByEventtt[$eid][] = $s;
+}
+
     // Build the fully updated event entry
     $refiltered[] = [
         'id'            => 'status-' . $eid,
@@ -2166,6 +2286,8 @@ $details['previous']['teacher_pic'] = $previousTeacherPic;
         'cmid'          => 0,
         'googlemeetid'  => (int)$base->googlemeetid,
         'title'         => $title,
+        'cohortids'     => $cohortids,
+        'class_type'    => $classType,
 
         'start_ts'      => $tsStart,
         'end_ts'        => $tsEnd,
@@ -2173,15 +2295,13 @@ $details['previous']['teacher_pic'] = $previousTeacherPic;
         'end'           => $fmt_iso($tsEnd),
 
         'teacherids'    => [$newTeacher],
-        'teachernames'  => [],
+        'teachernames'  => $teachernames,
 
-        'studentids'    => [],
-        'studentnames'  => [],
-        'cohortids'     => [],
+        'studentids'    => $studentids,
+        'studentnames'  => $studentnames,
         'rescheduled'   => $details,
-
-        'class_type'    => 'updated',
         'is_recurring'  => false,
+        'statuses'      => $statusByEventtt,
 
         'meetingurl'    => $gm->meetingurl ?? '',
         'viewurl'       => (new moodle_url('/mod/googlemeet/view.php', ['id' => $gm->coursemodule ?? 0]))->out(false),
@@ -2190,6 +2310,11 @@ $details['previous']['teacher_pic'] = $previousTeacherPic;
         'currentTeacherPic'  => $currentTeacherPic,
         'previousTeacherPic' => $previousTeacherPic
     ];
+
+
+    if($eid === 32201){
+        $a=1;
+    }
 
     $addedEventIds[$eid] = true;
 }
