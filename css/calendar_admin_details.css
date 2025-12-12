@@ -821,7 +821,6 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
 }
 
 .mini-teacher-pill {
@@ -852,7 +851,7 @@ body {
   align-items: center;
   position: relative;
   max-width: 120px;
-  overflow-y: auto;
+  overflow-x: auto;
   height: 22px;
 }
 .teacher-pill-container::-webkit-scrollbar,
@@ -928,8 +927,7 @@ body {
   font-size: 13px;
   color: #111;
   max-width: 120px;
-  overflow-x: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
   white-space: nowrap;
   display: inline-block;
   vertical-align: middle;

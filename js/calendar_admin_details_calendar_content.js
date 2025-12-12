@@ -4069,25 +4069,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ---------- Compact top summary (trigger view) ----------
-    const maxAvatars = 5; // show up to 5 profile images
-    const visibleTeachers = selectedTeacherIds.slice(0, maxAvatars);
+    // const maxAvatars = 5; // remove this
+    const visibleTeachers = selectedTeacherIds; // show all
 
     visibleTeachers.forEach((id, idx) => {
       const opt = teacherFieldset.querySelector(
         `.teacher-option[data-teacher-id="${id}"]`
       );
       if (!opt) return;
+
       const avatar = opt.dataset.teacherImg || "./img/default-avatar.svg";
       const img = document.createElement("img");
       img.src = avatar;
       img.alt = opt.dataset.teacherName || "";
       img.className = "teacher-summary-avatar";
-      img.style.zIndex = maxAvatars - idx;
+
+      // Higher z-index for earlier avatars (so they stack nicely)
+      img.style.zIndex = visibleTeachers.length - idx;
+
       // Use dynamic teacher color for border
       const teacherColor = getTeacherColor(id);
       img.style.borderColor = teacherColor;
+
       teacherPillsContainer.appendChild(img);
     });
+
     // Do NOT append initials or any text
   }
 
@@ -4261,7 +4267,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const fullText = namesList.join(", ");
         const text = document.createElement("div");
         text.className = "cohort-summary-names";
-        text.textContent = fullText;
+        // Create spans for each name, separated by commas
+        text.innerHTML = namesList
+          .map((name) => `<div>${name}</div>`)
+          .join(", ");
         text.title = fullText; // Show full text on hover
         cohortPillsContainer.appendChild(text);
       }
@@ -4803,22 +4812,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ---------- Compact top summary (trigger view) - Like Teachers ----------
-    const maxAvatars = 7; // show up to 7 avatars
-    const visibleStudents = selectedStudentIds.slice(0, maxAvatars);
+
+    const visibleStudents = selectedStudentIds;
 
     visibleStudents.forEach((id, idx) => {
       const opt = studentFieldset.querySelector(
         `.student-option[data-student-id="${id}"]`
       );
       if (!opt) return;
+
       const avatar = opt.dataset.studentImg || "./img/default-avatar.svg";
       const img = document.createElement("img");
       img.src = avatar;
       img.alt = opt.dataset.studentName || "";
       img.className = "student-summary-avatar";
-      img.style.zIndex = maxAvatars - idx;
+
+      // Optional stacking order
+      img.style.zIndex = visibleStudents.length - idx;
+
       studentPillsContainer.appendChild(img);
     });
+
     // Do NOT append ellipsis or initials
   }
 
