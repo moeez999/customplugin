@@ -4069,7 +4069,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ---------- Compact top summary (trigger view) ----------
-    const maxAvatars = 5; // show first two profile images
+    const maxAvatars = 5; // show up to 5 profile images
     const visibleTeachers = selectedTeacherIds.slice(0, maxAvatars);
 
     visibleTeachers.forEach((id, idx) => {
@@ -4088,32 +4088,7 @@ document.addEventListener("DOMContentLoaded", () => {
       img.style.borderColor = teacherColor;
       teacherPillsContainer.appendChild(img);
     });
-
-    // Build initials string for **all selected teachers**
-    const initialsList = selectedTeacherIds
-      .map((id) => {
-        const opt = teacherFieldset.querySelector(
-          `.teacher-option[data-teacher-id="${id}"]`
-        );
-        if (!opt) return "";
-        const name = opt.dataset.teacherName || "";
-        return getInitial(name);
-      })
-      .filter(Boolean);
-
-    if (initialsList.length) {
-      const initialsText = initialsList.join(", ");
-      const text = document.createElement("span");
-      text.className = "teacher-summary-initials";
-      text.textContent = initialsText;
-      teacherPillsContainer.appendChild(text);
-    }
-
-    function getInitial(name) {
-      const parts = name.trim().split(" ");
-      if (parts.length === 0) return "";
-      return parts[0][0].toUpperCase();
-    }
+    // Do NOT append initials or any text
   }
 
   async function loadTeachers() {
@@ -4828,7 +4803,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ---------- Compact top summary (trigger view) - Like Teachers ----------
-    const maxAvatars = 7; // show first 7 avatars
+    const maxAvatars = 7; // show up to 7 avatars
     const visibleStudents = selectedStudentIds.slice(0, maxAvatars);
 
     visibleStudents.forEach((id, idx) => {
@@ -4844,41 +4819,7 @@ document.addEventListener("DOMContentLoaded", () => {
       img.style.zIndex = maxAvatars - idx;
       studentPillsContainer.appendChild(img);
     });
-
-    // Show ellipsis if there are more students than visible
-    if (selectedStudentIds.length > maxAvatars) {
-      const ellipsis = document.createElement("span");
-      ellipsis.className = "student-summary-ellipsis";
-      ellipsis.textContent = "...";
-      studentPillsContainer.appendChild(ellipsis);
-    }
-
-    // Build initials string for **first 7 selected students only**
-    const initialsList = selectedStudentIds
-      .slice(0, maxAvatars)
-      .map((id) => {
-        const opt = studentFieldset.querySelector(
-          `.student-option[data-student-id="${id}"]`
-        );
-        if (!opt) return "";
-        const name = opt.dataset.studentName || "";
-        return getInitial(name);
-      })
-      .filter(Boolean);
-
-    if (initialsList.length) {
-      const initialsText = initialsList.join(", ");
-      const text = document.createElement("span");
-      text.className = "student-summary-initials";
-      text.textContent = initialsText;
-      studentPillsContainer.appendChild(text);
-    }
-
-    function getInitial(name) {
-      const parts = name.trim().split(" ");
-      if (parts.length === 0) return "";
-      return parts[0][0].toUpperCase();
-    }
+    // Do NOT append ellipsis or initials
   }
 
   async function loadAllStudents() {
@@ -5248,18 +5189,22 @@ document.addEventListener("DOMContentLoaded", () => {
   async function fetchEventsForTeachers(teacherIds) {
     if (!teacherIds || !teacherIds.length) return [];
 
-    const params = new URLSearchParams();
-    const now = new Date();
-    const startDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - 30
-    );
-    const endDate = new Date(
-      now.getFullYear(),
-      now.getMonth() + 3,
-      now.getDate()
-    );
+    const rangeEl = document.getElementById("calendar-range");
+    if (!rangeEl) return [];
+
+    // Example: "December 8 - 14, 2025"
+    const text = rangeEl.textContent.trim();
+    const match = text.match(/^([A-Za-z]+)\s+(\d+)\s*-\s*(\d+),\s*(\d{4})$/);
+
+    if (!match) {
+      console.error("Invalid calendar range format:", text);
+      return [];
+    }
+
+    const [, monthName, startDay, endDay, year] = match;
+
+    const startDate = new Date(`${monthName} ${startDay}, ${year}`);
+    const endDate = new Date(`${monthName} ${endDay}, ${year}`);
 
     const formatYMD = (d) => {
       const y = d.getFullYear();
@@ -5268,6 +5213,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return `${y}-${m}-${day}`;
     };
 
+    const params = new URLSearchParams();
     params.set("start", formatYMD(startDate));
     params.set("end", formatYMD(endDate));
     params.set("teacherids", teacherIds.join(","));
@@ -5275,9 +5221,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const response = await fetch(
         `ajax/calendar_admin_get_events.php?${params.toString()}`,
-        {
-          credentials: "same-origin",
-        }
+        { credentials: "same-origin" }
       );
 
       if (!response.ok) return [];

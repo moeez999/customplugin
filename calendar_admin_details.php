@@ -555,6 +555,22 @@ $(function() {
 
 <script src="js/calendar_admin_details.js"></script>
 <script src="js/calendar_admin_details_calendar_content.js"></script>
+<script>
+// Remove initials and ellipsis from teacher and student pill containers after rendering
+function cleanUpPillContainers() {
+    // Remove initials and ellipsis spans for teachers
+    $('#teacher-pills .teacher-summary-initials').remove();
+    // Remove initials and ellipsis spans for students
+    $('#student-pills .student-summary-initials, #student-pills .student-summary-ellipsis').remove();
+}
+
+// Run cleanup after DOM ready and after any event that updates pills
+$(function() {
+    cleanUpPillContainers();
+    // If you have custom events that update pills, hook here:
+    $(document).on('teacherPillsUpdated studentPillsUpdated', cleanUpPillContainers);
+});
+</script>
 <?php require_once('calendar_admin_details_create_cohort.php'); ?>
 <script src="js/calendar_admin_details_create_cohort_tab_details.js"></script>
 <script src="js/calendar_admin_details_create_cohort_class_tab.js"></script>
