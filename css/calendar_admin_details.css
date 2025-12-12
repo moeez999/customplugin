@@ -761,11 +761,14 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
   max-width: 120px;
-  overflow: visible;
+  overflow-x: auto;
+  margin-bottom: -14px;
 }
-
+.cohort-pill-container p {
+  white-space: nowrap;
+  margin: 0 !important;
+}
 .cohort-pill-container::-webkit-scrollbar {
   width: 0px;
   background: transparent;
@@ -927,12 +930,30 @@ body {
   font-size: 13px;
   color: #111;
   max-width: 120px;
-  overflow-x: auto;
+
+  display: flex;
+  align-items: center; /* ⬅️ removes baseline gap */
+  flex-wrap: nowrap;
+
   white-space: nowrap;
-  display: inline-block;
-  vertical-align: middle;
-  cursor: help;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  line-height: 1; /* ⬅️ critical */
+  padding: 0; /* safety */
 }
+
+.cohort-summary-names div {
+  display: inline-flex; /* ⬅️ block → inline */
+  align-items: center;
+  white-space: nowrap;
+
+  margin: 0; /* safety */
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1; /* ⬅️ critical */
+}
+
 .cohort-summary-names::-webkit-scrollbar {
   width: 0px;
   background: transparent;
@@ -972,7 +993,7 @@ body {
   display: none;
   flex-direction: column;
   gap: 10px;
-  z-index: 99999;
+  z-index: 4;
 }
 .cohort-search-widget-container {
   position: fixed;
@@ -987,7 +1008,7 @@ body {
   display: none;
   flex-direction: column;
   gap: 10px;
-  z-index: 99999;
+  z-index: 4;
 }
 .widget-title {
   font-size: 20px;
@@ -1304,6 +1325,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  z-index: 3;
 }
 ..student-search-dropdown:hover {
   background: rgba(0, 0, 0, 0.03);

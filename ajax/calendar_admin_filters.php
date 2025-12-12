@@ -683,6 +683,22 @@ if ((int)$explicitTeacherId > 0 && !is_siteadmin($USER)) {
                                             $studentname = fullname($first, true);
                                         }
                                     }
+
+                                    $cohortShortName = null;
+                                    if (!empty($first) && !empty($first->id)) {
+                                        $sqlC = "
+                                            SELECT c.shortname
+                                            FROM {cohort_members} cm
+                                            JOIN {cohort} c ON c.id = cm.cohortid
+                                            WHERE cm.userid = :uid
+                                            LIMIT 1
+                                        ";
+                                        $rec = $DB->get_record_sql($sqlC, ['uid' => (int)$first->id]);
+                                        if ($rec && !empty($rec->shortname)) {
+                                            $cohortShortName = $rec->shortname;
+                                        }
+                                    }
+
                                     // --- END NEW ---
 
                                     // Label = googlemeet name (fallback to originalname)
@@ -695,14 +711,24 @@ if ((int)$explicitTeacherId > 0 && !is_siteadmin($USER)) {
                                         $label = 'Google Meet #' . $gm->id;
                                     }
 
+                                    // $data[] = [
+                                    //     // id is the googlemeet id here (used later for filtering one2one)
+                                    //     'id'           => (int)$gm->id,
+                                    //     'name'         => $label,
+                                    //     'mainteacher'  => (int)$tid,
+                                    //     'guideteacher' => 0,
+                                    //     'cohorttype'   => 'one1one', // type marker for 1:1 classes
+                                    //     'studentname'  => $studentname, // NEW PROP: 1:1 student name
+                                    // ];
+
                                     $data[] = [
-                                        // id is the googlemeet id here (used later for filtering one2one)
-                                        'id'           => (int)$gm->id,
-                                        'name'         => $label,
-                                        'mainteacher'  => (int)$tid,
-                                        'guideteacher' => 0,
-                                        'cohorttype'   => 'one1one', // type marker for 1:1 classes
-                                        'studentname'  => $studentname, // NEW PROP: 1:1 student name
+                                        'id'              => (int)$gm->id,
+                                        'name'            => $label,
+                                        'mainteacher'     => (int)$tid,
+                                        'guideteacher'    => 0,
+                                        'cohorttype'      => 'one1one',
+                                        'studentname'     => $studentname,
+                                        'cohortshortname' => $cohortShortName
                                     ];
                                 }
                             }

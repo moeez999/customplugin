@@ -4265,14 +4265,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (namesList.length) {
         const fullText = namesList.join(", ");
-        const text = document.createElement("div");
-        text.className = "cohort-summary-names";
+        const text = document.querySelector(".cohort-pill-container");
+
         // Create spans for each name, separated by commas
-        text.innerHTML = namesList
-          .map((name) => `<div>${name}</div>`)
-          .join(", ");
+        text.innerHTML = namesList.map((name) => `<p>${name}</p>`).join(", ");
         text.title = fullText; // Show full text on hover
-        cohortPillsContainer.appendChild(text);
       }
     }
   }
