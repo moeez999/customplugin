@@ -2563,11 +2563,18 @@ let closeAll;
     // ===== Cancel modal action (demo) =====
     $('#calendar_admin_cancel_confirm_btn').on('click', function() {
         const payload = {
-            reason: $('#calendar_admin_cancel_reason').val() || '',
+            reason: $('#resched_reason_step3').val() || '',
             message: $('#calendar_admin_cancel_message').val() || '',
-            acknowledged: $('#calendar_admin_cancel_ack').is(':checked')
+            acknowledged: $('#calendar_admin_cancel_ack').is(':checked'),
+            selectedDate: $('#resched_date').val() || '',
+            eventId: currentEventData ? currentEventData.eventid : '',
+            status: 'cancelled'
         };
-        console.log('Cancel payload', payload);
+
+        console.log('=== CANCEL LESSON PAYLOAD ===');
+        console.log('Payload:', payload);
+
+
         $(this).text('Canceled').prop('disabled', true);
         setTimeout(closeAll, 600);
     });

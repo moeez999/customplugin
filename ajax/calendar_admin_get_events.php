@@ -485,6 +485,18 @@ $add_one2one_events = function() use (
             }
         }
 
+        // Precompute student avatar URLs
+        global $PAGE; // ⭐ REQUIRED
+
+        $studentAvatars = [];
+        foreach ($studentIds as $sid) {
+            if (isset($studentUserMap[$sid])) {
+                $studentAvatars[] = (new user_picture($studentUserMap[$sid]))
+                    ->get_url($PAGE)
+                    ->out(false);
+            }
+        }
+
         // Build event entries
         $seq = 1;
         foreach ($allevents as $e) {
@@ -551,6 +563,7 @@ $add_one2one_events = function() use (
 
                 'meetingurl'    => $meetingurl,
                 'viewurl'       => $viewurl,
+                'studentavatar' => $studentAvatars, // ⭐ ADDED
             ];
 
 

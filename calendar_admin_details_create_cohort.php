@@ -1363,9 +1363,17 @@
                     break;
                 case 'conference':
                     $('#conferenceTabContent').show();
+                    // Reset conference form when opening from sidebar
+                    if (typeof resetConferenceForm === 'function') {
+                        resetConferenceForm();
+                    }
                     break;
                 case 'peertalk':
                     $('#peerTalkTabContent').show();
+                    // Reset peer talk form when opening from sidebar
+                    if (typeof resetPeerTalkForm === 'function') {
+                        resetPeerTalkForm();
+                    }
                     break;
                 case 'addtime':
                     $('#addTimeTabContent').show();

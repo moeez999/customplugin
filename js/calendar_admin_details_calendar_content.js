@@ -346,8 +346,22 @@ $(function () {
     $("#classTabContent").css("display", "none");
     $("#peerTalkTabContent").css("display", "block");
 
+    // Store event ID in form for update purposes
+    const $form = $("#peerTalkForm");
+    const $parent = $("#peerTalkTabContent");
+    if (eventData.eventid) {
+      $form.data("eventId", eventData.eventid);
+      $parent.find(".peertalk_modal_btn").text("Update Peer Talk");
+    } else {
+      $form.removeData("eventId");
+      $parent.find(".peertalk_modal_btn").text("Schedule Peer Talk");
+    }
+
     // Populate the peertalk form with event data and recurrence info
     populatePeerTalkForm(eventData, recurrenceEvents);
+    setTimeout(() => {
+      scrollToActiveCohortTab();
+    }, 100);
   }
 
   /* ========= Populate PeerTalk Form With Event Data ========= */
@@ -917,8 +931,22 @@ $(function () {
     $("#classTabContent").css("display", "none");
     $("#conferenceTabContent").css("display", "block");
 
+    // Store event ID in form for update purposes
+    const $form = $("#conferenceForm");
+    const $parent = $("#conferenceTabContent");
+    if (eventData.eventid) {
+      $form.data("eventId", eventData.eventid);
+      $parent.find(".conference_modal_btn").text("Update Conference");
+    } else {
+      $form.removeData("eventId");
+      $parent.find(".conference_modal_btn").text("Schedule Conference");
+    }
+
     // Populate the conference form with event data and recurrence info
     populateConferenceForm(eventData, recurrenceEvents);
+    setTimeout(() => {
+      scrollToActiveCohortTab();
+    }, 100);
   }
 
   /* ========= Populate Conference Form With Event Data ========= */
@@ -1015,10 +1043,10 @@ $(function () {
       setTimeout(function () {
         // Try both teacher lists (view 1 and view 2)
         const $teacherItem1 = $(
-          `#conferenceTeachersList li.conference_teacher_item[data-userid="${eventData.teacherId}"]`
+          `#conferenceTeachersList li.conference_teacher_item[data-id="${eventData.teacherId}"]`
         );
         const $teacherItem2 = $(
-          `#conferenceTeachersList2 li.conference_teacher_item[data-userid="${eventData.teacherId}"]`
+          `#conferenceTeachersList2 li.conference_teacher_item[data-id="${eventData.teacherId}"]`
         );
 
         if ($teacherItem1.length > 0) {
@@ -1093,127 +1121,37 @@ $(function () {
     // Build custom recurrence array from events with same eventid
     if (recurrenceEvents && recurrenceEvents.length > 0) {
       const customRecurrenceArray = recurrenceEvents.map(function (ev) {
-        const eventDate = ev.date;
-        const dateObj = new Date(eventDate);
-        const dayNames = [
-          "Sunday",
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-        ];
-        const dayName = dayNames[dateObj.getDay()];
+        console.log("Processing recurrence event:", ev);
 
-        function minutesToTime(mins) {
-          const h = Math.floor(mins / 60);
-          const m = mins % 60;
-          const hh = h.toString().padStart(2, "0");
-          const mm = m.toString().padStart(2, "0");
-          return `${hh}:${mm}`;
+        // Convert minutes (from midnight) to HH:MM format
+        function minutesToTime(minutes) {
+          if (minutes === undefined || minutes === null) return "00:00";
+          const h = Math.floor(minutes / 60);
+          const m = minutes % 60;
+          return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
         }
 
-        const startMins =
-          typeof ev.start === "number" ? ev.start : parseInt(ev.start);
-        const endMins = typeof ev.end === "number" ? ev.end : parseInt(ev.end);
-
-        const startTime = minutesToTime(startMins);
-        const endTime = minutesToTime(endMins);
-
         return {
-          date: eventDate,
-          day: dayName,
-          start_time: startTime,
-          end_time: endTime,
-          start_ts: ev.start_ts,
-          end_ts: ev.end_ts,
+          date: ev.date,
+          start: ev.start,
+          end: ev.end,
+          startTime: minutesToTime(ev.start),
+          endTime: minutesToTime(ev.end),
+          day: ev.day || "",
         };
       });
 
       console.log(
-        "Conference custom recurrence array built:",
+        "Custom recurrence array for conference:",
         customRecurrenceArray
       );
-
-      // Store the recurrence array globally for form submission
+      // Store for later use if needed
       window.conferenceRecurrenceData = customRecurrenceArray;
-
-      // Update the repeat button text
-      const $repeatBtn = $(".conference_repeat_btn");
-      if ($repeatBtn.length > 0) {
-        function formatTime12h(time24) {
-          let timeStr = String(time24).trim();
-          let hours, minutes;
-
-          // Check if already in 12-hour format (contains AM/PM)
-          if (timeStr.match(/\s*(am|pm)\s*$/i)) {
-            // Already 12-hour format, extract components
-            const match = timeStr.match(/^(\d+):?(\d{2})\s*(am|pm)$/i);
-            if (match) {
-              hours = parseInt(match[1], 10);
-              minutes = parseInt(match[2], 10);
-              const inputPeriod = match[3].toUpperCase();
-              // Convert to 24-hour internally for proper AM/PM logic
-              if (inputPeriod === "PM" && hours !== 12) {
-                hours = hours + 12;
-              } else if (inputPeriod === "AM" && hours === 12) {
-                hours = 0;
-              }
-            } else {
-              return timeStr; // Return as-is if can't parse
-            }
-          } else {
-            // 24-hour format
-            const parts = timeStr.split(":");
-            hours = parseInt(parts[0], 10);
-            minutes = parseInt(parts[1], 10);
-          }
-
-          const ampm = hours >= 12 ? "PM" : "AM";
-          let h = hours % 12 || 12;
-          return `${h < 10 ? "0" + h : h}:${
-            minutes < 10 ? "0" + minutes : minutes
-          } ${ampm}`;
-        }
-
-        const shortDays = {
-          Sunday: "Sun",
-          Monday: "Mon",
-          Tuesday: "Tue",
-          Wednesday: "Wed",
-          Thursday: "Thu",
-          Friday: "Fri",
-          Saturday: "Sat",
-        };
-
-        const dayTimeParts = customRecurrenceArray.map(function (item) {
-          const shortDay = shortDays[item.day] || item.day.substring(0, 3);
-          const time = formatTime12h(item.start_time);
-          return `${shortDay}(${time})`;
-        });
-
-        const repeatText = "Weekly on " + dayTimeParts.join(", ");
-
-        $repeatBtn.html(
-          repeatText + '<span style="float:right; font-size:1rem;">▼</span>'
-        );
-
-        console.log("Updated conference repeat button to:", repeatText);
-      }
     }
   }
 
   // Expose function globally for testing
   window.openConferenceModalWithData = openConferenceModalWithData;
-
-  // // Button → open same modal (kept your trigger class)
-  // $(".calendar_admin_details_create_cohort_open")
-  //   .off("click.openCohort")
-  //   .on("click.openCohort", function (e) {
-  //     e.preventDefault();
-  //     openCreateCohortModal();
-  //   });
 
   /* ====== CLICK: event -> bring to front + open menu ====== */
   let zSeed = 5000;
