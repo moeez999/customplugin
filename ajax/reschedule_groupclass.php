@@ -90,6 +90,20 @@ try {
             ];
         }
 
+    }else{
+
+        // FIRST TIME RESCHEDULING → store old values from payload
+            $previousFinal = [
+                'date'    => $json['oldDate']  ?? null,
+                'start'   => $json['oldStart'] ?? null,
+                'end'     => $json['oldEnd']   ?? null,
+                'teacher' => (int)($json['oldTeacherId'] ?? 0),
+                'eventid'      => $eventid,
+                'googlemeetid' => $googlemeetid,
+                'time'         => time(),
+                'action'       => 'reschedule_instant'
+            ];
+
     }
 
     // -----------------------------

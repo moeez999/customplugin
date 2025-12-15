@@ -504,14 +504,44 @@ $add_one2one_events = function() use (
             $eventdate_ts = (int)$e->eventdate;
 
             // --- STEP 2: combine that date + googlemeet time ---
-            $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-            if ($gmTimes) {
-                [$eventStart, $eventEnd] = $gmTimes;
-            } else {
-                // Fallback: old behaviour (eventdate + duration)
-                $eventStart = $eventdate_ts;
-                $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+            // if ($gmTimes) {
+            //     [$eventStart, $eventEnd] = $gmTimes;
+            // } else {
+            //     // Fallback: old behaviour (eventdate + duration)
+            //     $eventStart = $eventdate_ts;
+            //     $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // }
+
+
+            // ----------------------------------------------------
+            // Date from googlemeet_events.eventdate
+            // Time from googlemeet (starthour/startminute/endhour/endminute)
+            // ----------------------------------------------------
+
+            $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+            // Build start time
+            $eventStart = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->starthour,
+                (int)($gm->startminute ?? 0)
+            ));
+
+            // Build end time
+            $eventEnd = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->endhour,
+                (int)($gm->endminute ?? 0)
+            ));
+
+            // If end is before or equal start → crosses midnight
+            if ($eventEnd <= $eventStart) {
+                $eventEnd += 86400;
             }
+
 
             // ---- Determine cohort group for 1:1 student ----
             $groupName = null;
@@ -846,15 +876,45 @@ if ($teacherIdDisplay > 0) {
             // --- STEP 1: get the raw event date from googlemeet_events ---
             $eventdate_ts = (int)$e->eventdate;
 
-            // --- STEP 2: combine that date + googlemeet time ---
-            $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-            if ($gmTimes) {
-                [$eventStart, $eventEnd] = $gmTimes;
-            } else {
-                // Fallback: old behaviour (eventdate + duration)
-                $eventStart = $eventdate_ts;
-                $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // // --- STEP 2: combine that date + googlemeet time ---
+            // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+            // if ($gmTimes) {
+            //     [$eventStart, $eventEnd] = $gmTimes;
+            // } else {
+            //     // Fallback: old behaviour (eventdate + duration)
+            //     $eventStart = $eventdate_ts;
+            //     $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // }
+
+
+            // ----------------------------------------------------
+            // Date from googlemeet_events.eventdate
+            // Time from googlemeet (starthour/startminute/endhour/endminute)
+            // ----------------------------------------------------
+
+            $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+            // Build start time
+            $eventStart = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->starthour,
+                (int)($gm->startminute ?? 0)
+            ));
+
+            // Build end time
+            $eventEnd = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->endhour,
+                (int)($gm->endminute ?? 0)
+            ));
+
+            // If end is before or equal start → crosses midnight
+            if ($eventEnd <= $eventStart) {
+                $eventEnd += 86400;
             }
+
 
            // Build student list for these cohorts
 $studentIdsFinal = [];
@@ -1608,13 +1668,42 @@ try {
                         $eventdate_ts = (int)$ev->eventdate;
 
                         // combine date + gm time
-                        $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-                        if ($gmTimes) {
-                            [$eventStart, $eventEnd] = $gmTimes;
-                        } else {
-                            $eventStart = $eventdate_ts;
-                            $eventEnd   = $eventStart + max(60, (int)$ev->duration * 60);
+                        // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+                        // if ($gmTimes) {
+                        //     [$eventStart, $eventEnd] = $gmTimes;
+                        // } else {
+                        //     $eventStart = $eventdate_ts;
+                        //     $eventEnd   = $eventStart + max(60, (int)$ev->duration * 60);
+                        // }
+
+                        // ----------------------------------------------------
+                        // Date from googlemeet_events.eventdate
+                        // Time from googlemeet (starthour/startminute/endhour/endminute)
+                        // ----------------------------------------------------
+
+                        $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+                        // Build start time
+                        $eventStart = strtotime(sprintf(
+                            '%s %02d:%02d:00',
+                            $eventDate,
+                            (int)$gm->starthour,
+                            (int)($gm->startminute ?? 0)
+                        ));
+
+                        // Build end time
+                        $eventEnd = strtotime(sprintf(
+                            '%s %02d:%02d:00',
+                            $eventDate,
+                            (int)$gm->endhour,
+                            (int)($gm->endminute ?? 0)
+                        ));
+
+                        // If end is before or equal start → crosses midnight
+                        if ($eventEnd <= $eventStart) {
+                            $eventEnd += 86400;
                         }
+
 
                         $conferenceEvents[] = [
                             'id'            => 'conference-' . $ev->id,
