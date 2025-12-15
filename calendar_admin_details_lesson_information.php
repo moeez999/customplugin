@@ -1145,6 +1145,25 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     box-shadow: 0 10px 26px rgba(239, 45, 23, .25);
 }
 
+/* inline spinner used in confirm button */
+.calendar_admin_cancel_confirm .btn-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: ca-spin 1s linear infinite;
+}
+
+@keyframes ca-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* ===== Reschedule Modal (STEP 2) ===== */
 .calendar_admin_reschedule_modal {
     display: none;
@@ -2560,8 +2579,9 @@ let closeAll;
         }, 500); // Wait 500ms after student selection before clicking lesson type button
     }
 
-    // ===== Cancel modal action (demo) =====
+    // ===== Cancel modal action (uses global loader + toast) =====
     $('#calendar_admin_cancel_confirm_btn').on('click', function() {
+        const $btn = $(this);
         const payload = {
             reason: $('#resched_reason_step3').val() || '',
             message: $('#calendar_admin_cancel_message').val() || '',
@@ -2575,9 +2595,43 @@ let closeAll;
         console.log('=== CANCEL LESSON PAYLOAD ===');
         console.log('Payload:', payload);
 
+        // show the app-wide loader (defined in _loader_helpers.js)
+        if (window.showGlobalLoader) window.showGlobalLoader();
 
-        $(this).text('Canceled').prop('disabled', true);
-        setTimeout(closeAll, 600);
+        // disable button + show inline spinner
+        const origHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="btn-spinner"></span> Cancelling...');
+
+        fetch('ajax/cancel_one2one.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json().catch(() => ({
+                status: 'error',
+                error: 'Invalid JSON'
+            })))
+            .then(json => {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                if (json && json.status === 'success') {
+                    // use existing toast helper for lesson info modal
+                    showToast('1:1 session cancelled', json.message || '', 'Session Cancelled');
+                    setTimeout(closeAll, 500);
+                } else {
+                    const err = (json && (json.error || json.message)) || 'Cancel failed';
+                    showToast('Cancel failed', err, 'Error');
+                    $btn.prop('disabled', false).html(origHtml);
+                    if (window.hideGlobalLoader) window.hideGlobalLoader();
+                }
+            })
+            .catch(err => {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                showToast('Cancel failed', err && err.message ? err.message : 'Request failed',
+                'Error');
+                $btn.prop('disabled', false).html(origHtml);
+            });
     });
 
     // ===== Step 3: Confirm new time -> show toast + open Management modal =====

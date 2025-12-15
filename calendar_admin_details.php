@@ -762,45 +762,66 @@ $(function() {
 <script>
 // Position and behaviour for the Events Filter popover
 $(function() {
+    let filterPopoverVisible = false; // Track popover visibility state
+
     $('#extra-search-trigger').on('click', function(e) {
         e.stopPropagation();
 
         const $btn = $(this);
         const $popover = $('#search-extra .events-filter-popover');
 
-        // If visible, hide it
-        if ($popover.is(':visible')) {
-            $popover.hide();
-            return;
+        // Toggle visibility
+        filterPopoverVisible = !filterPopoverVisible;
+
+        if (filterPopoverVisible) {
+            // Append to body and position absolutely under the button
+            const off = $btn.offset();
+            const top = off.top + $btn.outerHeight() + 8;
+            const left = $btn.offset().left; // align left edge of popover with button
+
+            $popover.appendTo('body').css({
+                position: 'absolute',
+                top: top + 'px',
+                left: left + 'px',
+                zIndex: 9999,
+                display: 'block'
+            });
+        } else {
+            // Move back to original location and hide
+            $popover.appendTo('#search-extra').css('display', 'none');
         }
-
-        // Append to body and position absolutely under the button
-        const off = $btn.offset();
-        const top = off.top + $btn.outerHeight() + 8;
-        const left = off.left; // align left edge of popover with button
-
-        $popover.appendTo('body').css({
-            position: 'absolute',
-            top: top + 'px',
-            left: left + 'px',
-            zIndex: 9999,
-            display: 'block'
-        });
     });
 
     // Close when clicking outside
     $(document).on('click', function(e) {
-        if (!$(e.target).closest('.events-filter-popover, #extra-search-trigger').length) {
-            $('.events-filter-popover').hide();
+        const $target = $(e.target);
+
+        // Check if click is outside popover AND button
+        if (!$target.closest('.events-filter-popover').length && !$target.closest(
+                '#extra-search-trigger').length) {
+            // Close popover
+            if (filterPopoverVisible) {
+                const $popover = $('.events-filter-popover'); // Find it anywhere in DOM
+                $popover.hide();
+                $popover.appendTo('#search-extra'); // Move back to original location
+                filterPopoverVisible = false;
+            }
         }
+    });
+
+    // Prevent clicks inside popover from closing it
+    $(document).on('click', '.events-filter-popover', function(e) {
+        e.stopPropagation();
     });
 
     // Events Filter behaviours
     // Reset link
-    $(document).on('click', '#ef-reset', function() {
+    $(document).on('click', '#ef-reset', function(e) {
+        e.stopPropagation();
         $('.events-filter-popover').find('input.ef-input').prop('checked', false);
         $('#ef_select_all').prop('checked', false);
         $('#extra-search-trigger .filter-text').text('Filter');
+        applyEventTypeFilter();
     });
 
     // Select All behaviour
@@ -825,6 +846,103 @@ $(function() {
         } else {
             $('#extra-search-trigger .filter-text').text(checkedCount + ' selected');
         }
+
+        // Apply event type filter to rendered events
+        applyEventTypeFilter();
+    });
+
+    // Function to filter rendered events by type
+    function applyEventTypeFilter() {
+        const checkedFilters = [];
+        $('.events-filter-popover input.ef-input').not('#ef_select_all').each(function() {
+            if ($(this).is(':checked')) {
+                checkedFilters.push($(this).data('value'));
+            }
+        });
+
+        // If no filters selected, show all events
+        if (checkedFilters.length === 0) {
+            $('.event').show();
+            return;
+        }
+
+        // Filter events based on their type
+        $('.event').each(function() {
+            const $event = $(this);
+            const classType = $event.data('class-type') || '';
+            const source = $event.data('source') || '';
+
+            let shouldShow = false;
+
+            // Check each filter
+            if (checkedFilters.includes('cohorts')) {
+                // Show cohort main classes (not one2one, not peertalk, not conference, not timeoff, not availability, not extra_slot)
+                if (!classType || (
+                        classType !== 'one2one_weekly' &&
+                        classType !== 'one2one_single' &&
+                        classType !== 'peertalk' &&
+                        classType !== 'conference' &&
+                        classType !== 'teacher_timeoff' &&
+                        classType !== 'availability' &&
+                        classType !== 'extra_slot' &&
+                        source !== 'peertalk' &&
+                        source !== 'conference' &&
+                        source !== 'teacher_timeoff' &&
+                        source !== 'availability' &&
+                        source !== 'extra_slot'
+                    )) {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('one1')) {
+                if (classType === 'one2one_weekly' || classType === 'one2one_single') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('peertalk')) {
+                if (classType === 'peertalk' || source === 'peertalk') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('conference')) {
+                if (classType === 'conference' || source === 'conference') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('timeoff')) {
+                if (classType === 'teacher_timeoff' || source === 'teacher_timeoff') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('extraslots')) {
+                if (classType === 'extra_slot' || source === 'extra_slot') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('availability')) {
+                if (classType === 'availability' || source === 'availability') {
+                    shouldShow = true;
+                }
+            }
+
+            // Show or hide the event
+            if (shouldShow) {
+                $event.show();
+            } else {
+                $event.hide();
+            }
+        });
+    }
+
+    // Apply filter on reset
+    $(document).on('click', '#ef-reset', function() {
+        applyEventTypeFilter();
     });
 });
 </script>

@@ -2641,10 +2641,18 @@ $(function () {
         );
       });
 
-      if (isMenuOptionsOpen || isAnyDropdownOpen || isSearchDropdownOpen) {
+      // Check if filter popover is open
+      const isFilterPopoverOpen = $(".events-filter-popover").is(":visible");
+
+      if (
+        isMenuOptionsOpen ||
+        isAnyDropdownOpen ||
+        isSearchDropdownOpen ||
+        isFilterPopoverOpen
+      ) {
         if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         if (isAnyDropdownOpen) $(".custom-dropdown .dropdown-list").hide();
-        if (isSearchDropdownOpen) e.preventDefault();
+        if (isSearchDropdownOpen || isFilterPopoverOpen) e.preventDefault();
         e.stopPropagation();
         return;
       }
@@ -3253,7 +3261,9 @@ $(function () {
             : ""
         }${ev.eventid ? ` data-event-id="${ev.eventid}"` : ""}${
           ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
-        }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}
+        }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${
+          ev.source ? ` data-source="${ev.source}"` : ""
+        }
         ${ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""}${
           statusMeta ? ` data-status-code="${statusMeta.code}"` : ""
         }>
