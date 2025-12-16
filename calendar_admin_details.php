@@ -861,10 +861,54 @@ $(function() {
             }
         });
 
-        // If no filters selected, show all events
+        // Check how many teachers are selected
+        const selectedTeachers = window.calendarFilterState ? window.calendarFilterState.getSelectedTeachers() :
+            [];
+        const isSingleTeacher = selectedTeachers.length === 1;
+
+        // If no filters selected, show all events and white slots
         if (checkedFilters.length === 0) {
             $('.event').show();
+            // Show white slots only if single teacher is selected
+            if (isSingleTeacher) {
+                $('.slot-white').show();
+            }
             return;
+        }
+
+        // Handle white slot visibility (for single teacher: availability and extra slots render as white slots)
+        if (isSingleTeacher) {
+            console.log('Filtering white slots, checked filters:', checkedFilters);
+
+            // Check if availability or extraslots filters are in the checked filters
+            const hasAvailabilityFilter = checkedFilters.includes('availability');
+            const hasExtraslotsFilter = checkedFilters.includes('extraslots');
+
+            // If neither availability nor extraslots are checked, hide all white slots
+            if (!hasAvailabilityFilter && !hasExtraslotsFilter) {
+                $('.slot-white').hide();
+            } else {
+                // Filter white slots independently based on their source
+                $('.slot-white').each(function() {
+                    const $slot = $(this);
+                    const source = $slot.data('source') || '';
+
+                    let shouldShow = false;
+                    if (source === 'availability' && hasAvailabilityFilter) {
+                        shouldShow = true;
+                    }
+                    if (source === 'extra_slot' && hasExtraslotsFilter) {
+                        shouldShow = true;
+                    }
+
+                    if (shouldShow) {
+                        $slot.show();
+                    } else {
+                        $slot.hide();
+                    }
+                });
+            }
+            console.log('White slots filtered. Visible count:', $('.slot-white:visible').length);
         }
 
         // Filter events based on their type
@@ -921,15 +965,19 @@ $(function() {
             }
 
             if (checkedFilters.includes('extraslots')) {
-                if (classType === 'extra_slot' || source === 'extra_slot') {
+                // Multiple teachers: extra slots render as events, so show them
+                if (!isSingleTeacher && (classType === 'extra_slot' || source === 'extra_slot')) {
                     shouldShow = true;
                 }
+                // Single teacher: extra slots render as white slots, not events, so don't show event elements
             }
 
             if (checkedFilters.includes('availability')) {
-                if (classType === 'availability' || source === 'availability') {
+                // Multiple teachers: availability renders as events, so show them
+                if (!isSingleTeacher && (classType === 'availability' || source === 'availability')) {
                     shouldShow = true;
                 }
+                // Single teacher: availability renders as white slots, not events, so don't show event elements
             }
 
             // Show or hide the event

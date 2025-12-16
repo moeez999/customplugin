@@ -176,9 +176,10 @@ function isWhiteSlotFor(dayIndex, isoDate, minuteOfDay) {
     const s = toMin(rule.start),
       e = toMin(rule.end);
     if (s === null || e === null) continue;
-    if (minuteOfDay >= s && minuteOfDay < e) return true;
+    if (minuteOfDay >= s && minuteOfDay < e)
+      return rule.source || "availability";
   }
-  return false;
+  return null;
 }
 
 // Toggle whether to draw white-slot background layer (availability/extra slots)
@@ -2858,9 +2859,23 @@ $(function () {
       const $slots = $('<div class="slots">').appendTo($inner);
       for (let r = 0; r < rows; r++) {
         const minuteOfDay = START_H * 60 + r * SLOT_MIN;
-        const makeWhite =
-          SHOW_WHITE_SLOTS && isWhiteSlotFor(i, ymd(d), minuteOfDay);
-        $("<div>").toggleClass("slot-white", makeWhite).appendTo($slots);
+        const slotSource = SHOW_WHITE_SLOTS
+          ? isWhiteSlotFor(i, ymd(d), minuteOfDay)
+          : null;
+        const makeWhite = !!slotSource;
+        const $slot = $("<div>").toggleClass("slot-white", makeWhite);
+        if (slotSource) {
+          $slot.attr("data-source", slotSource);
+          if (r === 0 || minuteOfDay % 120 === 0) {
+            // Log occasionally to avoid spam
+            console.log("White slot created:", {
+              date: ymd(d),
+              minute: minuteOfDay,
+              source: slotSource,
+            });
+          }
+        }
+        $slot.appendTo($slots);
       }
 
       $grid.append($col);
@@ -5695,6 +5710,7 @@ document.addEventListener("DOMContentLoaded", () => {
           start: startMin,
           end: endMin,
           teacherid: tid,
+          source: "availability",
         });
       });
 
@@ -5730,6 +5746,7 @@ document.addEventListener("DOMContentLoaded", () => {
           start: startMin,
           end: endMin,
           teacherid: tid,
+          source: "extra_slot",
         });
       });
     });
