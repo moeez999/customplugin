@@ -672,12 +672,12 @@ function renderDetails(idx) {
   var chat = chats[idx];
   var details = chat.details;
   var ratingStars = "";
-  for (var i = 0; i < 5; i++) ratingStars += "☆";
+  for (var i = 0; i < 5; i++) ratingStars += "★";
 
   var detailsHTML = `
     <img class="details_profile_avatar" src="${chat.avatar}">
-    <div class="details_profile_name">${chat.name}</div>
-    <div class="details_profile_stars">${ratingStars}<span class="details_profile_reviews">(${details.reviews})</span></div>
+    <a href="my_lessons_tutor_profile.php" style="color:black;"><div class="details_profile_name">${chat.name}</div></a>
+    <div class="details_profile_stars">${ratingStars}<a href="my_lessons_tutor_profile.php#my_lessons_tutor_profile_reviews_section" style="color:black;"><span class="details_profile_reviews">(${details.reviews})</span></a></div>
     <div class="details_profile_price">${details.price}<span class="details_profile_perlesson">per lesson</span></div>
 
     <div class="details_profile_btnrow">

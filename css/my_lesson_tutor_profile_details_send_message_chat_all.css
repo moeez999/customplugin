@@ -754,6 +754,9 @@
   line-height: 1.1;
   letter-spacing: 1.1px;
 }
+.details_profile_name:hover {
+  color:red;
+}
 
 .details_profile_stars {
   text-align: center;

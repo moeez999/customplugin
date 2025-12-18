@@ -24,12 +24,14 @@
   <!-- Header (UNCHANGED / kept as you said ignore my header) -->
   <header class="w-full flex items-center justify-between px-6 pt-8">
     <div class="flex items-center gap-3">
-      <div class="w-30 h-30 flex items-center justify-center">
-        <img
-          src="img/my_students/logo_header.svg"
-          alt="Latingles logo icon"
-          class="w-full h-full object-contain" />
-      </div>
+      <a href="http://localhost/latingles_lms_v2/course/index.php">
+        <div class="w-30 h-30 flex items-center justify-center">
+          <img
+            src="img/my_students/logo_header.svg"
+            alt="Latingles logo icon"
+            class="w-full h-full object-contain" />
+        </div>
+      </a>
     </div>
 
     <!-- Close icon (replaces top-right button) -->
@@ -51,7 +53,7 @@
   <main
     id="my_students_details_lessons_plans_teacher_profiles_list_canvas"
     class="flex-1 flex items-start justify-center px-4 pb-12 pt-10 md:pt-14">
-    <div class="w-full max-w-3xl">
+    <div class="w-full max-w-2xl">
 
       <!-- Title -->
       <h1 class="text-3xl md:text-4xl font-semibold tracking-tight leading-tight text-gray-900 mb-5">
@@ -68,7 +70,7 @@
       <div class="w-full border border-gray-200 rounded-lg bg-white p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6 mb-10">
         <div class="flex items-center gap-3 min-w-0">
           <!-- Removed border radius from profile picture -->
-          <div class="w-11 h-11 overflow-hidden bg-gray-200 flex-shrink-0">
+          <div class="w-15 h-15 overflow-hidden bg-gray-200 flex-shrink-0">
             <img
               src="img/lessons_plans/lesson_plan_profile.png"
               alt="Wade"
@@ -93,7 +95,7 @@
         <button
           id="my_students_details_lessons_plans_teacher_profiles_list_keepBtn"
           type="button"
-          class="w-full md:w-auto md:min-w-[310px] px-5 py-3 rounded-lg bg-[#ff3b10] hover:bg-[#e3340f] text-white text-sm font-semibold transition border-2 border-black">
+          class="w-full md:w-auto md:min-w-[310px] px-5 py-2 rounded-lg bg-[#ff3b10] hover:bg-[#e3340f] text-white text-sm font-semibold transition border-2 border-black">
           Keep learning withWade Warren
         </button>
       </div>
@@ -107,21 +109,23 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Card 1 -->
         <div>
-          <div class="relative h-[170px] rounded-lg overflow-hidden bg-gray-200">
-            <img
-              src="img/lessons_plans/مريم ا..png"
-              alt="Gladys"
-              class="w-full h-full object-cover" />
-            <div class="absolute left-2.5 bottom-2.5 flex items-center gap-2 text-white font-semibold text-sm drop-shadow">
-              <span>Gladys</span>
-              <!-- Flag icon -->
-              <img
-                src="img/lessons_plans/Lebanon.svg"
-                alt="Lebanon flag"
-                class="w-4 h-3 rounded-[2px] object-cover shadow" />
-            </div>
-          </div>
 
+          <a href="my_lessons_tutor_profile.php">
+            <div class="relative h-[170px] rounded-lg overflow-hidden bg-gray-200">
+              <img
+                src="img/lessons_plans/مريم ا..png"
+                alt="Gladys"
+                class="w-full h-full object-cover" />
+              <div class="absolute left-2.5 bottom-2.5 flex items-center gap-2 text-white font-semibold text-sm drop-shadow">
+                <span>Gladys</span>
+                <!-- Flag icon -->
+                <img
+                  src="img/lessons_plans/Lebanon.svg"
+                  alt="Lebanon flag"
+                  class="w-4 h-3 rounded-[2px] object-cover shadow" />
+              </div>
+            </div>
+          </a>
           <div class="pt-3">
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-900 mb-2">
               <img
@@ -129,7 +133,8 @@
                 alt="Star"
                 class="w-3.5 h-3.5 object-contain -translate-y-[1px]" />
               <span>5</span>
-              <span class="text-gray-500 font-semibold">(11)</span>
+              <span class="text-gray-500 font-semibold"><a href="my_lessons_tutor_profile.php#my_lessons_tutor_profile_reviews_section">
+                  (11)</a></span>
             </div>
 
             <p class="text-[13px] leading-5 text-gray-900 font-normal mb-3 min-h-[42px]">
@@ -205,7 +210,7 @@
             </div>
 
             <p class="text-[13px] leading-5 text-gray-900 font-normal mb-3 min-h-[42px]">
-              Certified English Tutor with 5 years of experience
+              Certified English Tutor with 5 years of experience teaching English
             </p>
 
             <p class="text-[22px] leading-6 font-semibold text-gray-900">US$8</p>
@@ -241,7 +246,7 @@
             </div>
 
             <p class="text-[13px] leading-5 text-gray-900 font-normal mb-3 min-h-[42px]">
-              certified English teacher with 5years of experience
+              certified English teacher with 5years of experience teaching English
             </p>
 
             <p class="text-[22px] leading-6 font-semibold text-gray-900">US$20</p>
@@ -251,7 +256,7 @@
       </div>
     </div>
   </main>
-  
+
   <script>
     // JS only for functionality (prefix names kept)
     (function() {
