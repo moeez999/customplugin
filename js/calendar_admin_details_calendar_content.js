@@ -541,10 +541,8 @@ $(function () {
         let startTime, endTime;
 
         console.log(
-          `Event data - start: ${ev.start} (type: ${typeof ev.start}), end: ${
-            ev.end
-          } (type: ${typeof ev.end}), start_ts: ${ev.start_ts}, end_ts: ${
-            ev.end_ts
+          `Event data - start: ${ev.start} (type: ${typeof ev.start}), end: ${ev.end
+          } (type: ${typeof ev.end}), start_ts: ${ev.start_ts}, end_ts: ${ev.end_ts
           }`
         );
 
@@ -1169,8 +1167,14 @@ $(function () {
       // Ignore clicks on availability and extra slot events
       const $clicked = $(this);
       const clickedClassType = $clicked.data("class-type");
+      // if (
+      //   clickedClassType === "availability" ||
+      //   clickedClassType === "extra_slot"
+      // ) {
+      //   return; // Do nothing for availability/extra slot events
+      // }
+
       if (
-        clickedClassType === "availability" ||
         clickedClassType === "extra_slot"
       ) {
         return; // Do nothing for availability/extra slot events
@@ -1602,9 +1606,8 @@ $(function () {
           "Friday",
           "Saturday",
         ];
-        dateStr = `${dayNames[dateObj.getDay()]}, ${
-          monthNames[month - 1]
-        } ${day}`;
+        dateStr = `${dayNames[dateObj.getDay()]}, ${monthNames[month - 1]
+          } ${day}`;
       }
     }
 
@@ -1668,9 +1671,8 @@ $(function () {
           "Friday",
           "Saturday",
         ];
-        dateStr = `${dayNames[dateObj.getDay()]}, ${
-          monthNames[month - 1]
-        } ${day}`;
+        dateStr = `${dayNames[dateObj.getDay()]}, ${monthNames[month - 1]
+          } ${day}`;
       }
     }
 
@@ -2286,7 +2288,7 @@ $(function () {
     // Persist event data for downstream handlers (e.g., cancel click)
     try {
       $("#timeoff-modal").data("eventData", eventData || {});
-    } catch (e) {}
+    } catch (e) { }
     // Format date
     let dateStr = "";
     let dayStr = "";
@@ -2335,9 +2337,8 @@ $(function () {
       startMin != null && endMin != null ? Math.max(0, endMin - startMin) : 0;
     const durationStr =
       durationMin >= 60
-        ? `${Math.floor(durationMin / 60)} hour${
-            Math.floor(durationMin / 60) > 1 ? "s" : ""
-          }`
+        ? `${Math.floor(durationMin / 60)} hour${Math.floor(durationMin / 60) > 1 ? "s" : ""
+        }`
         : `${durationMin} min`;
 
     // Populate
@@ -2813,6 +2814,7 @@ $(function () {
       }));
       eventsToRender = [...eventsToRender, ...availabilityEvents];
     }
+    
 
     // Temporarily replace window.events with modified list
     const originalEvents = window.events;
@@ -2890,18 +2892,46 @@ $(function () {
     const perDay = Array.from({ length: 7 }, () => []);
     console.log("Events to render:", events);
 
-    // Remove duplicate availability events by availabilityId
-    const seenAvailabilityIds = new Set();
-    const uniqueEvents = events.filter((raw) => {
-      if (raw.availabilityId && seenAvailabilityIds.has(raw.availabilityId)) {
-        return false; // Skip duplicate availability
-      }
-      if (raw.availabilityId) {
-        seenAvailabilityIds.add(raw.availabilityId);
-      }
-      return true;
-    });
+function timeToMinutes(time) {
+  if (typeof time === "number") return time;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
 
+const eventMap = new Map();
+
+events.forEach((event) => {
+  const startMinutes = timeToMinutes(event.start);
+  const endMinutes = timeToMinutes(event.end);
+  const key = `${event.teacherId}-${event.date}-${startMinutes}-${endMinutes}`;
+
+  if (!eventMap.has(key)) {
+    eventMap.set(key, event);
+  } else {
+    const existing = eventMap.get(key);
+    // Prefer e-blue over other colors
+    if (event.color === "e-blue") {
+      eventMap.set(key, event);
+    } 
+    // else keep existing
+  }
+});
+
+const uniqueEvents = Array.from(eventMap.values());
+
+    // Remove duplicate availability events by availabilityId
+    // const seenAvailabilityIds = new Set();
+    // const uniqueEvents = events.filter((raw) => {
+    //   if (raw.availabilityId && seenAvailabilityIds.has(raw.availabilityId)) {
+    //     return false; // Skip duplicate availability
+    //   }
+    //   if (raw.availabilityId) {
+    //     seenAvailabilityIds.add(raw.availabilityId);
+    //   }
+    //   return true;
+    // });
+
+    
     console.log("Unique events to render:", uniqueEvents);
     uniqueEvents.forEach((raw) => {
       // Check if event has reschedule_instant status with previous/current data
@@ -3107,21 +3137,29 @@ $(function () {
         const h = (ev.end - ev.start) * PX_PER_MIN - 0;
 
         const isSingleton = (ev._max || 1) === 1;
-        const cssPos = isSingleton
-          ? { left: "0px", width: "calc(96% - 0px)" }
-          : (() => {
-              // Calculate width - minimum 70% to ensure readability
-              const totalEvents = ev._max;
-              const leftPx = ev.stackIndex * STACK_OFFSET;
+        const cssPos = (() => {
+        if (isSingleton) return { left: "0px", width: "100%" };
 
-              // Each event should be at least 70% wide, offset by stackIndex
-              const eventWidth = "calc(70% - 0px)";
+        const overlapping = perDay[di].filter(
+          other => !(other.end <= ev.start || other.start >= ev.end)
+        ).sort((a, b) => a.start - b.start || a.end - b.end);
 
-              return {
-                left: `${leftPx}px`,
-                width: eventWidth,
-              };
-            })();
+        const total = overlapping.length;
+        const position = overlapping.indexOf(ev);
+
+        const overlapPercent = 70; // % of slot width for horizontal overlap per event
+        const widthPercent = 100 / (total - (total - 1) * (overlapPercent / 100));
+        const leftPercent = position * (widthPercent - (widthPercent * (overlapPercent / 100)));
+
+        return {
+          left: `${leftPercent}%`,
+          width: `${widthPercent}%`,
+          opacity: `1`
+        };
+      })();
+
+
+
 
         // Get teacher color class and inline style for unlimited colors
         let teacherColorClass = "";
@@ -3138,9 +3176,8 @@ $(function () {
           const showTeacherDot =
             selectedTeachers.length > 1 && ev.classType !== "availability";
 
-          teacherColorClass = `teacher-${colorIndex}${
-            showTeacherDot ? " has-teacher-indicator" : ""
-          }`;
+          teacherColorClass = `teacher-${colorIndex}${showTeacherDot ? " has-teacher-indicator" : ""
+            }`;
 
           // Generate dynamic color for the ::after pseudo-element (teacher dot indicator)
           const teacherColor = getTeacherColor(ev.teacherId);
@@ -3193,9 +3230,8 @@ $(function () {
         }
 
         // Combine styles (include any custom inline style from the event object)
-        const combinedStyle = `${teacherColorStyle}${borderColorStyle}${
-          ev.style || ""
-        }`.trim();
+        const combinedStyle = `${teacherColorStyle}${borderColorStyle}${ev.style || ""
+          }`.trim();
 
         // Check if event is short (less than 1 hour)
         const eventDuration = ev.end - ev.start;
@@ -3244,135 +3280,111 @@ $(function () {
 
         // Build event HTML - hide details for short events
         const $ev = $(`
-          <div class="event ${
-            ev.color || "e-blue"
-          } ${teacherColorClass} ${classTypeClass}${
-          ev.isMidnightCrossing ? " midnight-crossing" : ""
-        }${
-          isShortEvent ? " short-event" : ""
-        }${fadedClass}" style="${combinedStyle}${fadedStyle}" data-start="${
-          ev.start
-        }" data-end="${ev.end}" data-date="${ev.date || ""}" data-event-date="${
-          ev.date || ""
-        }" data-title="${(ev.title || "").replace(/"/g, "&quot;")}" ${
-          ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""
-        }${ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""}${
-          ev.part ? ` data-part="${ev.part}"` : ""
-        }${
-          ev.studentids && ev.studentids.length > 0
+          <div class="event ${ev.color || "e-blue"
+          } ${teacherColorClass} ${classTypeClass}${ev.isMidnightCrossing ? " midnight-crossing" : ""
+          }${isShortEvent ? " short-event" : ""
+          }${fadedClass}" style="${combinedStyle}${fadedStyle}" data-start="${ev.start
+          }" data-end="${ev.end}" data-date="${ev.date || ""}" data-event-date="${ev.date || ""
+          }" data-title="${(ev.title || "").replace(/"/g, "&quot;")}" ${ev.teacherId ? `data-teacher-id="${ev.teacherId}"` : ""
+          }${ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""}${ev.part ? ` data-part="${ev.part}"` : ""
+          }${ev.studentids && ev.studentids.length > 0
             ? ` data-student-ids="${ev.studentids.join(",")}"`
             : ""
-        }${
-          ev.studentnames && ev.studentnames.length > 0
+          }${ev.studentnames && ev.studentnames.length > 0
             ? ` data-student-names="${ev.studentnames.join(",")}"`
             : ""
-        }${ev.avatar ? ` data-avatar="${ev.avatar}"` : ""}${
-          ev.cohortids && ev.cohortids.length > 0
+          }${ev.avatar ? ` data-avatar="${ev.avatar}"` : ""}${ev.cohortids && ev.cohortids.length > 0
             ? ` data-cohort-ids="${ev.cohortids.join(",")}"`
             : ""
-        }${ev.eventid ? ` data-event-id="${ev.eventid}"` : ""}${
-          ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
-        }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${
-          ev.source ? ` data-source="${ev.source}"` : ""
-        }
-        ${ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""}${
-          statusMeta ? ` data-status-code="${statusMeta.code}"` : ""
-        }>
-            ${
-              isShortEvent &&
-              ev.classType !== "availability" &&
-              ev.classType !== "extra_slot"
-                ? `
+          }${ev.eventid ? ` data-event-id="${ev.eventid}"` : ""}${ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
+          }${ev.classType ? ` data-class-type="${ev.classType}"` : ""}${ev.source ? ` data-source="${ev.source}"` : ""
+          }
+        ${ev.repeat !== undefined ? ` data-repeat="${ev.repeat}"` : ""}${statusMeta ? ` data-status-code="${statusMeta.code}"` : ""
+          }>
+            ${isShortEvent &&
+            ev.classType !== "availability" &&
+            ev.classType !== "extra_slot"
+            ? `
                 <div class=\"ev-when\" style=\"display:flex;align-items:center;gap:4px;\">
-                  ${
-                    ev.classType === "one2one_weekly" ||
-                    ev.classType === "one2one_single"
-                      ? `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
-                      : isTimeOffEvent
-                      ? ""
-                      : ev.isRescheduleCurrent && !ev.isTeacherChanged
-                      ? `<span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
-                      : ev.repeat
-                      ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span>`
-                      : `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
-                  }
+                  ${ev.classType === "one2one_weekly" ||
+              ev.classType === "one2one_single"
+              ? `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
+              : isTimeOffEvent
+                ? ""
+                : ev.isRescheduleCurrent && !ev.isTeacherChanged
+                  ? `<span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
+                  : ev.repeat
+                    ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span>`
+                    : `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
+            }
                   <span>${fmt12(ev.start)} – ${fmt12(ev.end)}</span>
                   ${statusIconHtml}
-                  ${
-                    ev.isMidnightCrossing
-                      ? `<span class=\"ev-midnight-icon\" title=\"Continues to next day\">↪</span>`
-                      : ""
-                  }
-                </div>
-                <div class=\"ev-title\">${
-                  (ev.classType === "one2one_weekly" ||
-                    ev.classType === "one2one_single") &&
-                  ev.studentnames &&
-                  ev.studentnames.length > 0
-                    ? ev.studentnames.join(", ")
-                    : ev.title || ""
-                }</div>
-                `
-                : `
-                  ${statusIconHtml}
-                  ${
-                    !isShortEvent &&
-                    ev.classType !== "availability" &&
-                    ev.classType !== "extra_slot"
-                      ? `<div class=\"ev-top\">
-                          <div class=\"ev-left\">${
-                            ev.avatar
-                              ? `<img class=\"ev-avatar\" src=\"${ev.avatar}\" alt=\"\">`
-                              : ""
-                          }</div>
-                          ${
-                            isTimeOffEvent
-                              ? ""
-                              : ev.isRescheduleCurrent &&
-                                !ev.isTeacherChanged &&
-                                ev.repeat
-                              ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span><span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
-                              : ev.isRescheduleCurrent && !ev.isTeacherChanged
-                              ? `<span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
-                              : ev.classType === "one2one_weekly" ||
-                                ev.classType === "one2one_single"
-                              ? `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
-                              : ev.repeat
-                              ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span>`
-                              : `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
-                          }
-                          ${
-                            ev.isMidnightCrossing
-                              ? `<span class=\"ev-midnight-icon\" title=\"Continues to next day\">↪</span>`
-                              : ""
-                          }
-                        </div>`
-                      : ""
-                  }
-                  ${
-                    ev.classType !== "availability" &&
-                    ev.classType !== "extra_slot"
-                      ? `<div class=\"ev-when\">${fmt12(ev.start)} – ${fmt12(
-                          ev.end
-                        )}</div>`
-                      : ""
-                  }
-                  ${
-                    !isShortEvent &&
-                    ev.classType !== "availability" &&
-                    ev.classType !== "extra_slot"
-                      ? `<div class=\"ev-title\">${
-                          (ev.classType === "one2one_weekly" ||
-                            ev.classType === "one2one_single") &&
-                          ev.studentnames &&
-                          ev.studentnames.length > 0
-                            ? ev.studentnames.join(", ")
-                            : ev.title || ""
-                        }</div>`
-                      : ""
-                  }
-                `
+                  ${ev.isMidnightCrossing
+              ? `<span class=\"ev-midnight-icon\" title=\"Continues to next day\">↪</span>`
+              : ""
             }
+                </div>
+                <div class=\"ev-title\">${(ev.classType === "one2one_weekly" ||
+              ev.classType === "one2one_single") &&
+              ev.studentnames &&
+              ev.studentnames.length > 0
+              ? ev.studentnames.join(", ")
+              : ev.title || ""
+            }</div>
+                `
+            : `
+                  ${statusIconHtml}
+                  ${!isShortEvent &&
+              ev.classType !== "availability" &&
+              ev.classType !== "extra_slot"
+              ? `<div class=\"ev-top\">
+                          <div class=\"ev-left\">${ev.avatar
+                ? `<img class=\"ev-avatar\" src=\"${ev.avatar}\" alt=\"\">`
+                : ""
+              }</div>
+                          ${isTimeOffEvent
+                ? ""
+                : ev.isRescheduleCurrent &&
+                  !ev.isTeacherChanged &&
+                  ev.repeat
+                  ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span><span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
+                  : ev.isRescheduleCurrent && !ev.isTeacherChanged
+                    ? `<span class=\"ev-makeup\" title=\"Make-up Class\"><img src=\"./img/makeup.svg\" alt=\"\"></span>`
+                    : ev.classType === "one2one_weekly" ||
+                      ev.classType === "one2one_single"
+                      ? `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
+                      : ev.repeat
+                        ? `<span class=\"ev-repeat\" title=\"Repeats\"><img src=\"./img/ev-repeat.svg\" alt=\"\"></span>`
+                        : `<span class=\"ev-single\" title=\"Single Session\"><img src=\"./img/single-lesson.svg\" alt=\"\"></span>`
+              }
+                          ${ev.isMidnightCrossing
+                ? `<span class=\"ev-midnight-icon\" title=\"Continues to next day\">↪</span>`
+                : ""
+              }
+                        </div>`
+              : ""
+            }
+                  ${ev.classType !== "availability" &&
+              ev.classType !== "extra_slot"
+              ? `<div class=\"ev-when\">${fmt12(ev.start)} – ${fmt12(
+                ev.end
+              )}</div>`
+              : ""
+            }
+                  ${!isShortEvent &&
+              ev.classType !== "availability" &&
+              ev.classType !== "extra_slot"
+              ? `<div class=\"ev-title\">${(ev.classType === "one2one_weekly" ||
+                ev.classType === "one2one_single") &&
+                ev.studentnames &&
+                ev.studentnames.length > 0
+                ? ev.studentnames.join(", ")
+                : ev.title || ""
+              }</div>`
+              : ""
+            }
+                `
+          }
           </div>
         `).css({ top: top + "px", height: h + "px", ...cssPos });
 
@@ -3390,14 +3402,13 @@ $(function () {
           const $tooltip = $(`
             <div class="event-tooltip">
               <div class="tooltip-header">
-                <strong>${
-                  (ev.classType === "one2one_weekly" ||
-                    ev.classType === "one2one_single") &&
-                  ev.studentnames &&
-                  ev.studentnames.length > 0
-                    ? ev.studentnames.join(", ")
-                    : ev.title || "Event"
-                }</strong>
+                <strong>${(ev.classType === "one2one_weekly" ||
+              ev.classType === "one2one_single") &&
+              ev.studentnames &&
+              ev.studentnames.length > 0
+              ? ev.studentnames.join(", ")
+              : ev.title || "Event"
+            }</strong>
               </div>
               <div class="tooltip-time">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3406,30 +3417,27 @@ $(function () {
                 </svg>
                 ${fmt12(ev.start)} – ${fmt12(ev.end)}
               </div>
-              ${
-                ev.avatar
-                  ? `
+              ${ev.avatar
+              ? `
                 <div class="tooltip-teacher">
                   <img src="${ev.avatar}" alt="" class="tooltip-avatar">
                   <span>Teacher</span>
                 </div>
               `
-                  : ""
-              }
+              : ""
+            }
               <div class="tooltip-type">
-                ${
-                  ev.repeat
-                    ? '<span class="tooltip-badge">Recurring Class</span>'
-                    : '<span class="tooltip-badge">Single Session</span>'
-                }
-                ${
-                  ev.classType === "one2one_weekly" ||
-                  ev.classType === "one2one_single"
-                    ? '<span class="tooltip-badge">1:1 Class</span>'
-                    : ev.classType === "tutoring"
-                    ? '<span class="tooltip-badge">Tutoring</span>'
-                    : '<span class="tooltip-badge">Main Class</span>'
-                }
+                ${ev.repeat
+              ? '<span class="tooltip-badge">Recurring Class</span>'
+              : '<span class="tooltip-badge">Single Session</span>'
+            }
+                ${ev.classType === "one2one_weekly" ||
+              ev.classType === "one2one_single"
+              ? '<span class="tooltip-badge">1:1 Class</span>'
+              : ev.classType === "tutoring"
+                ? '<span class="tooltip-badge">Tutoring</span>'
+                : '<span class="tooltip-badge">Main Class</span>'
+            }
               </div>
             </div>
           `);
@@ -3493,154 +3501,158 @@ $(function () {
 
   /* ====== DATE FILTER FUNCTIONALITY ====== */
   // Global state for calendar date filter
-  let selectedDateFilter = null; // stores the selected date in YYYY-MM-DD format
-  let selectedTimeSlotFilter = null; // stores the selected time slot in minutes from midnight
+  // let selectedDateFilter = null; // stores the selected date in YYYY-MM-DD format
+  // let selectedTimeSlotFilter = null; // stores the selected time slot in minutes from midnight
+  let selectedDateFilters = []; // array of YYYY-MM-DD
+  let selectedTimeSlotFilters = new Set(); // minutes
   let filteringEnabled = false; // toggle state for filters - initially disabled
-
-  // Function to filter events by selected date
-  function filterEventsByDate(selectedDate) {
-    if (!selectedDate) {
-      // Clear filter - show all events
-      $(".event").show();
-      $(".time-row").show();
-      selectedDateFilter = null;
-      // Remove highlight from all day headers
-      $("#head .day-h").removeClass("date-filter-active");
-      return;
-    }
-
-    // Hide all events first
+  function applyFilters() {
     $(".event").hide();
 
-    // Show only events for the selected date
+    const hasDateFilter = selectedDateFilters.length > 0;
+    const hasTimeFilter = selectedTimeSlotFilters.size > 0;
+
     $(".event").each(function () {
       const eventDate = $(this).data("event-date");
-      if (eventDate === selectedDate) {
-        $(this).show();
+      const eventStart = parseInt($(this).data("start"), 10);
+      const eventEnd = parseInt($(this).data("end"), 10);
+
+      if (isNaN(eventStart) || isNaN(eventEnd)) return;
+
+      // Check date filter
+      let dateMatch = !hasDateFilter || selectedDateFilters.includes(eventDate);
+
+      // Check time slot filter
+      let timeMatch = false;
+      if (!hasTimeFilter) {
+        timeMatch = true;
+      } else {
+        for (const slotStart of selectedTimeSlotFilters) {
+          const slotEnd = slotStart + 60; // 60 minutes per slot
+          if (eventStart < slotEnd && eventEnd > slotStart) {
+            timeMatch = true;
+            break;
+          }
+        }
       }
-    });
 
-    // Hide empty time rows (rows with no visible events)
-    // Only hide rows that have no events at all on this date, or hide all and show only relevant ones
-    const $grid = $("#grid");
-    let hasAnyEvent = false;
-    $(".event:visible").each(function () {
-      hasAnyEvent = true;
+      // Show event only if it matches both filters
+      if (dateMatch && timeMatch) $(this).show();
     });
-
-    // Update state
-    selectedDateFilter = selectedDate;
   }
+
+  // Function to filter events by selected date
+  // function filterEventsByDates(dates) {
+  //   // No date selected → show everything
+  //   if (!dates || dates.length === 0) {
+  //     $(".event").show();
+  //     $(".time-row").show();
+  //     selectedDateFilters = [];
+  //     $("#head .day-h").removeClass("date-filter-active");
+  //     return;
+  //   }
+
+  //   $(".event").hide();
+
+  //   $(".event").each(function () {
+  //     const eventDate = $(this).data("event-date");
+
+  //     if (dates.includes(eventDate)) {
+  //       $(this).show();
+  //     }
+  //   });
+  // }
+
 
   // Function to reset date filter
-  function clearDateFilter() {
-    filterEventsByDate(null);
-  }
+ function clearDateFilter() {
+  selectedDateFilters = [];
+  $("#head .day-h").removeClass("date-filter-active");
+  applyFilters();
+}
 
-  // Function to filter events by selected time slot
-  function filterEventsByTimeSlot(timeInMinutes) {
-    if (timeInMinutes === null) {
-      // Clear filter - show all events and time rows
-      $(".event").show();
-      $(".time-row").removeClass("time-slot-filter-active");
-      selectedTimeSlotFilter = null;
-      console.log("Time slot filter cleared - all events shown");
-      return;
-    }
+  //   // Function to filter events by selected time slot
+  //  function filterEventsByTimeSlots(slotStarts) {
+  //      clearDateFilter();
+  //      if (!slotStarts || slotStarts.length === 0) {
+  //         $(".event").show();
+  //         $(".time-row").removeClass("time-slot-filter-active");
+  //         selectedTimeSlotFilters.clear();
+  //         return;
+  //     }
 
-    console.log("Filtering for time slot:", timeInMinutes, "minutes");
+  //      const SLOT_DURATION = 60;
 
-    // Hide all events first
-    $(".event").hide();
+  //     $(".event").hide();
+  //     let matchedCount = 0;
 
-    // Remove highlight from all time rows
-    $(".time-row").removeClass("time-slot-filter-active");
+  //     $(".event").each(function () {
+  //         const eventStart = parseInt($(this).data("start"), 10);
+  //         const eventEnd   = parseInt($(this).data("end"), 10);
+  //         if (isNaN(eventStart) || isNaN(eventEnd)) return;
 
-    let matchedCount = 0;
+  //         let matches = false;
 
-    // Show only events that START exactly at the selected time
-    $(".event").each(function () {
-      const eventStart = parseInt($(this).data("start"));
+  //         for (const slotStart of slotStarts) {
+  //             const slotEnd = slotStart + SLOT_DURATION;
+  //             // ✅ STRICT overlap check
+  //             if (eventStart < slotEnd && eventEnd > slotStart) {
+  //                 matches = true;
+  //                 break;
+  //             }
+  //         }
 
-      if (!isNaN(eventStart)) {
-        console.log(
-          "Event start time:",
-          eventStart,
-          "Selected slot:",
-          timeInMinutes,
-          "Match:",
-          eventStart === timeInMinutes
-        );
+  //         if (matches) {
+  //             $(this).show();
+  //             matchedCount++;
+  //         }
+  //     });
 
-        // Show event if it starts at the selected time
-        if (eventStart === timeInMinutes) {
-          $(this).show();
-          matchedCount++;
-          console.log("Event shown");
-        }
-      }
-    });
 
-    console.log("Total events matched:", matchedCount);
+  //     console.log("Total events matched:", matchedCount);
+  // }
+  // Function to clear time slot filter
+  // function clearTimeSlotFilter() {
+  //   filterEventsByTimeSlots(null);
+  // }
 
-    // Highlight the clicked time row
-    $(".time-row").each(function () {
-      const $label = $(this).find(".time-label");
+  // function selectTimeSlots(slotStarts) {
+  //   selectedTimeSlotFilters.clear();
+  //   for (const slot of slotStarts) {
+  //     selectedTimeSlotFilters.add(slot);
+  //   }
 
-      if ($label.length) {
-        try {
-          const rowTime = minutes($label.text().trim());
-          if (rowTime === timeInMinutes) {
-            $(this).addClass("time-slot-filter-active");
-            console.log("Highlighted time row:", $label.text().trim());
-          }
-        } catch (e) {
-          // Skip rows without valid time labels
-        }
-      }
-    });
-
-    // Update state
-    selectedTimeSlotFilter = timeInMinutes;
-  } // Function to clear time slot filter
+  //   applyFilters();
+  // }
   function clearTimeSlotFilter() {
-    filterEventsByTimeSlot(null);
+    selectedTimeSlotFilters.clear();
+    $(".time-row").removeClass("time-slot-filter-active");
+    applyFilters();
   }
 
   // Add click handler to calendar header date elements
   $(document).on("click", "#head .day-h", function () {
-    // Check if filtering is enabled
-    if (!filteringEnabled) {
-      return;
-    }
+    if (!filteringEnabled) return;
 
     const $dayHeader = $(this);
     const dayIndex = $("#head .day-h").index($dayHeader);
-    const dayMonthDay = $dayHeader.find(".dt").text(); // Just the day number
-
-    // Get the actual full date for this day
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() + dayIndex);
-    const fullDate = ymd(d); // Converts to YYYY-MM-DD format
+    const fullDate = ymd(d); // YYYY-MM-DD
 
-    // Clear time slot filter when changing date
-    if (selectedTimeSlotFilter !== null) {
-      clearTimeSlotFilter();
-    }
-
-    // Toggle: if clicking the same day, clear filter; otherwise apply new filter
-    if (selectedDateFilter === fullDate) {
-      clearDateFilter();
+    const idx = selectedDateFilters.indexOf(fullDate);
+    if (idx > -1) {
+      selectedDateFilters.splice(idx, 1);
       $dayHeader.removeClass("date-filter-active");
     } else {
-      // Remove active class from all day headers
-      $("#head .day-h").removeClass("date-filter-active");
-      // Add active class to clicked header
+      selectedDateFilters.push(fullDate);
       $dayHeader.addClass("date-filter-active");
-      // Apply filter
-      filterEventsByDate(fullDate);
     }
+
+    applyFilters();
   });
+
+
 
   // Add click handler to time slot elements - improved version
   $(document).on("click", ".time-label", function (event) {
@@ -3701,15 +3713,18 @@ $(function () {
     const $hourBlock = $timeRow;
 
     // Check if same slot already selected
-    if (selectedTimeSlotFilter === timeMinutes) {
-      console.log("Same slot - clearing");
-      clearTimeSlotFilter();
+    if (selectedTimeSlotFilters.has(timeMinutes)) {
+      // TOGGLE OFF
+      selectedTimeSlotFilters.delete(timeMinutes);
+      $hourBlock.removeClass("time-slot-filter-active");
     } else {
-      console.log("New slot - filtering");
-      $(".time-row").removeClass("time-slot-filter-active");
+      // TOGGLE ON
+      selectedTimeSlotFilters.add(timeMinutes);
       $hourBlock.addClass("time-slot-filter-active");
-      filterEventsByTimeSlot(timeMinutes);
     }
+    applyFilters();
+
+
   });
 
   function drawNow() {
@@ -3888,15 +3903,12 @@ document.addEventListener("DOMContentLoaded", () => {
             <label class="teacher-label">
                 <div class="teacher-details">
                     <div class="teacher-avatar-container">
-                        <img class="teacher-avatar" src="${
-                          t.avatar || ""
-                        }" alt="${
-      t.name
-    }" style="border-color: ${teacherColor};">
+                        <img class="teacher-avatar" src="${t.avatar || ""
+      }" alt="${t.name
+      }" style="border-color: ${teacherColor};">
                     </div>
-                    <span class="teacher-name">${
-                      t.name
-                    }<span class="teacher-color-dot" style="--dot-color: ${teacherColor}; display: none;"></span></span>
+                    <span class="teacher-name">${t.name
+      }<span class="teacher-color-dot" style="--dot-color: ${teacherColor}; display: none;"></span></span>
                 </div>
                 <div class="radio-custom">
                     <div class="radio-custom-dot"></div>
@@ -4266,11 +4278,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <label class="cohort-label">
                 <div class="cohort-details">
                     <span class="cohort-name">${displayName}</span>
-                    ${
-                      c.cohorttype === "one1one"
-                        ? `<span class="cohort-shortname">${cohortLabel}</span>`
-                        : ""
-                    }
+                    ${c.cohorttype === "one1one"
+        ? `<span class="cohort-shortname">${cohortLabel}</span>`
+        : ""
+      }
                 </div>
                 <div class="radio-custom">
                     <div class="radio-custom-dot"></div>
@@ -4497,7 +4508,7 @@ document.addEventListener("DOMContentLoaded", () => {
             id: c.id,
             name: c.studentname || c.name,
           });
-        } catch (e) {}
+        } catch (e) { }
       });
     } else if (oneOnOneNoResults) {
       oneOnOneNoResults.style.display = "block";
@@ -4627,8 +4638,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohortShortName = s.cohortsname
       ? s.cohortsname.substring(0, 4)
       : s.cohortname
-      ? s.cohortname.substring(0, 4)
-      : "";
+        ? s.cohortname.substring(0, 4)
+        : "";
 
     // Check if this is a 1:1 cohort student
     const isOneOnOne = s.group === "1:1";
@@ -4637,22 +4648,19 @@ document.addEventListener("DOMContentLoaded", () => {
           <label class="student-label">
               <div class="student-details">
                   <div class="student-avatar-container">
-                      <img class="student-avatar" src="${
-                        s.avatar || ""
-                      }" alt="${s.name}">
+                      <img class="student-avatar" src="${s.avatar || ""
+      }" alt="${s.name}">
                   </div>
                   <div class="student-name-wrapper">
-                      ${
-                        cohortShortName
-                          ? `<span class="student-cohort-badge">${cohortShortName}</span>`
-                          : ""
-                      }
+                      ${cohortShortName
+        ? `<span class="student-cohort-badge">${cohortShortName}</span>`
+        : ""
+      }
                       <span class="student-name">${s.name}</span>
-                      ${
-                        isOneOnOne
-                          ? `<div class="cohort_label_teacher_avatar"><span class="student-type-badge">1:1</span><span class="student-type-badge"><img src="${s.teacheravatar}" alt="Teacher Avatar"></span></div>`
-                          : ""
-                      }
+                      ${isOneOnOne
+        ? `<div class="cohort_label_teacher_avatar"><span class="student-type-badge">1:1</span><span class="student-type-badge"><img src="${s.teacheravatar}" alt="Teacher Avatar"></span></div>`
+        : ""
+      }
                   </div>
               </div>
               <div class="radio-custom">
@@ -5655,6 +5663,16 @@ document.addEventListener("DOMContentLoaded", () => {
     saturday: 5,
     sunday: 6,
   };
+// for just bug
+ const DAY_NAME_TO_INDEX1= {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
 
   function normalizeMinutes(val) {
     if (typeof val === "number" && !Number.isNaN(val)) return val;
@@ -5701,7 +5719,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const availSlots = getSlotsForTeacher(availabilityMap, tid);
       availSlots.forEach((slot) => {
         const dayIndex =
-          DAY_NAME_TO_INDEX[String(slot.day || "").toLowerCase()];
+          DAY_NAME_TO_INDEX1[String(slot.day || "").toLowerCase()];
         if (typeof dayIndex !== "number") return;
 
         const dayDate = new Date(baseDate);
@@ -6066,10 +6084,10 @@ document.addEventListener("DOMContentLoaded", () => {
           let eventTeacherIds = Array.isArray(ev.teacherids)
             ? ev.teacherids
             : ev.teacher_id
-            ? [ev.teacher_id]
-            : ev.teacherid
-            ? [ev.teacherid]
-            : [];
+              ? [ev.teacher_id]
+              : ev.teacherid
+                ? [ev.teacherid]
+                : [];
           for (let tid of eventTeacherIds) {
             if (teacherIdSet.has(tid)) {
               teacherId = tid;
@@ -6139,10 +6157,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const localYMD =
           eventDateStr ||
           startDate.getFullYear() +
-            "-" +
-            String(startDate.getMonth() + 1).padStart(2, "0") +
-            "-" +
-            String(startDate.getDate()).padStart(2, "0");
+          "-" +
+          String(startDate.getMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(startDate.getDate()).padStart(2, "0");
 
         const eventObj = {
           date: localYMD,
@@ -6161,11 +6179,11 @@ document.addEventListener("DOMContentLoaded", () => {
             typeof teacherId !== "undefined" && teacherId !== null
               ? teacherId
               : ev.teacherId ||
-                ev.teacher_id ||
-                ev.teacherid ||
-                ev.teacher ||
-                (ev.teacherids && ev.teacherids[0]) ||
-                "",
+              ev.teacher_id ||
+              ev.teacherid ||
+              ev.teacher ||
+              (ev.teacherids && ev.teacherids[0]) ||
+              "",
           classType: ev.classType || ev.class_type || "",
           source: ev.source || "event",
           studentnames: ev.studentnames || [],
@@ -6176,8 +6194,8 @@ document.addEventListener("DOMContentLoaded", () => {
             typeof ev.timeoffid !== "undefined"
               ? ev.timeoffid
               : typeof ev.id !== "undefined"
-              ? ev.id
-              : null,
+                ? ev.id
+                : null,
           cmid: ev.cmid || 0,
           googlemeetid:
             typeof ev.googlemeetid !== "undefined" ? ev.googlemeetid : 0,
@@ -6253,23 +6271,23 @@ document.addEventListener("DOMContentLoaded", () => {
         typeof loadCohortsForTeachers === "function"
           ? loadCohortsForTeachers
           : typeof loadAllCohorts === "function"
-          ? loadAllCohorts
-          : () => Promise.resolve();
+            ? loadAllCohorts
+            : () => Promise.resolve();
       const loadStudentsForCohortsFn =
         typeof loadStudentsForCohorts === "function"
           ? loadStudentsForCohorts
           : typeof loadAllStudents === "function"
-          ? loadAllStudents
-          : () => Promise.resolve();
+            ? loadAllStudents
+            : () => Promise.resolve();
 
       const safeSelectedTeachers =
         typeof selectedTeacherIds !== "undefined" &&
-        Array.isArray(selectedTeacherIds)
+          Array.isArray(selectedTeacherIds)
           ? selectedTeacherIds
           : [];
       const safeSelectedCohorts =
         typeof selectedCohortIds !== "undefined" &&
-        Array.isArray(selectedCohortIds)
+          Array.isArray(selectedCohortIds)
           ? selectedCohortIds
           : [];
 
