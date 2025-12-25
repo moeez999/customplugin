@@ -1,7 +1,7 @@
 /* ====== CONFIG ====== */
 
 const START_H = 0,
-  END_H = 24,
+  END_H = 23,
   SLOT_MIN = 30;
 const SLOT_H =
   parseInt(
