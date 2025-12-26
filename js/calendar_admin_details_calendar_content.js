@@ -2683,10 +2683,17 @@ $(function () {
         }
       }
 
-      // Highlight the clicked slot
-      $slots.removeClass("cohort-slot-highlight");
-      $($slots[slotIndex]).addClass("cohort-slot-highlight");
-      window._lastCohortSlot = $($slots[slotIndex]);
+      // Highlight the clicked slot - store info before DOM changes
+      const $targetSlot = $($slots[slotIndex]);
+      window._lastCohortSlotInfo = {
+        date: dateStr,
+        index: slotIndex,
+      };
+
+      // Remove highlight from all slots across all days
+      $(".day-inner .slots > div").removeClass("cohort-slot-highlight");
+      $targetSlot.addClass("cohort-slot-highlight");
+      window._lastCohortSlot = $targetSlot;
 
       // Calculate start and end time in minutes
       const startMin =
@@ -2737,9 +2744,16 @@ $(function () {
     "click",
     "#calendar_admin_details_create_cohort_modal_backdrop .modal-close, #calendar_admin_details_create_cohort_modal_backdrop",
     function (e) {
-      if (window._lastCohortSlot) {
-        window._lastCohortSlot.removeClass("cohort-slot-highlight");
+      // Only remove highlight if clicking backdrop or close button, not modal content
+      if (
+        $(e.target).is(
+          "#calendar_admin_details_create_cohort_modal_backdrop"
+        ) ||
+        $(e.target).closest(".modal-close").length
+      ) {
+        $(".day-inner .slots > div").removeClass("cohort-slot-highlight");
         window._lastCohortSlot = null;
+        window._lastCohortSlotInfo = null;
       }
     }
   );
@@ -2781,6 +2795,19 @@ $(function () {
 
   /* ====== RENDER ====== */
   function renderWeek(resetScroll = false) {
+    // Save highlighted slot info before rebuilding grid
+    let highlightedSlotInfo = null;
+    if (window._lastCohortSlotInfo) {
+      highlightedSlotInfo = window._lastCohortSlotInfo;
+    } else if (window._lastCohortSlot && window._lastCohortSlot.length) {
+      const $dayInner = window._lastCohortSlot.closest(".day-inner");
+      if ($dayInner.length) {
+        const dateStr = $dayInner.data("date");
+        const slotIndex = window._lastCohortSlot.index();
+        highlightedSlotInfo = { date: dateStr, index: slotIndex };
+      }
+    }
+
     // Determine whether to show white slots based on teacher selection
     const selectedTeachers = window.calendarFilterState
       ? window.calendarFilterState.getSelectedTeachers()
@@ -3543,6 +3570,22 @@ $(function () {
       }
     }
     drawNow();
+
+    // Restore highlighted slot if it existed before render
+    if (highlightedSlotInfo) {
+      const $dayInner = $(
+        `.day-inner[data-date="${highlightedSlotInfo.date}"]`
+      );
+      if ($dayInner.length) {
+        const $slots = $dayInner.find(".slots > div");
+        const $targetSlot = $slots.eq(highlightedSlotInfo.index);
+        if ($targetSlot.length) {
+          $targetSlot.addClass("cohort-slot-highlight");
+          window._lastCohortSlot = $targetSlot;
+          window._lastCohortSlotInfo = highlightedSlotInfo;
+        }
+      }
+    }
 
     // Restore original events array
     window.events = originalEvents;

@@ -1625,6 +1625,13 @@ body {
   box-sizing: border-box;
 }
 
+/* Ensure clicked slots show highlight even on white availability slots */
+#grid .day .day-inner .slots > div.cohort-slot-highlight,
+#grid .day .day-inner .slots > div.slot-white.cohort-slot-highlight {
+  background: rgba(254, 46, 12, 0.15) !important;
+  position: relative;
+}
+
 #grid .day .day-inner .slots > div.slot-white.slot-extra {
   border: 1px dotted #9aa7b8 !important;
 }
