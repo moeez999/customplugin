@@ -3373,7 +3373,10 @@ $(function () {
                     ev.classType !== "extra_slot"
                       ? `<div class=\"ev-top\">
                           <div class=\"ev-left\">${
-                            ev.avatar
+                            ev.isTeacherChanged &&
+                            ev.rescheduled?.current?.teacher_pic
+                              ? `<img class=\"ev-avatar\" src=\"${ev.rescheduled.current.teacher_pic}\" alt=\"\">`
+                              : ev.avatar
                               ? `<img class=\"ev-avatar\" src=\"${ev.avatar}\" alt=\"\">`
                               : ""
                           }</div>

@@ -2294,7 +2294,10 @@ let closeAll;
     $('.calendar_admin_cancel_close').on('click', closeAll);
 
     // Reschedule Step 2 navigation
-    $('#calendar_admin_cancel_reschedule_btn').on('click', openRescheduleModal);
+    $('#calendar_admin_cancel_reschedule_btn').on('click', function() {
+        // Reuse Manage 1:1 flow with current event data instead of reschedule modal
+        $('#calendar_admin_details_1_1_class').trigger('click');
+    });
     $('.calendar_admin_reschedule_back').on('click', function() {
         $resched.hide();
         $cancel.show();
