@@ -1174,14 +1174,13 @@ $(function () {
       // Ignore clicks on availability and extra slot events
       const $clicked = $(this);
       const clickedClassType = $clicked.data("class-type");
-      // if (
-      //   clickedClassType === "availability" ||
-      //   clickedClassType === "extra_slot"
-      // ) {
-      //   return; // Do nothing for availability/extra slot events
-      // }
+      const clickedSource = $clicked.data("source");
 
-      if (clickedClassType === "extra_slot") {
+      if (
+        clickedClassType === "availability" ||
+        clickedSource === "availability" ||
+        clickedClassType === "extra_slot"
+      ) {
         return; // Do nothing for availability/extra slot events
       }
 

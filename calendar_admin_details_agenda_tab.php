@@ -430,6 +430,15 @@ function setupAgendaEventHandlers() {
         const source = $card.data('source');
         const dateStr = $card.data('date');
 
+        // Ignore clicks on availability and extra slot events
+        if (
+            classType === 'availability' ||
+            source === 'availability' ||
+            classType === 'extra_slot'
+        ) {
+            return; // Do nothing for availability/extra slot events
+        }
+
         console.log('Event data:', {
             eventId,
             cmid,

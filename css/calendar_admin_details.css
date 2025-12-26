@@ -1645,6 +1645,8 @@ body {
   /* Background and border set inline by JS with teacher color */
   color: #1f2a3a;
   opacity: 0.85;
+  cursor: default;
+  pointer-events: none;
 }
 
 .event.class-type-availability .ev-title {
@@ -1655,6 +1657,8 @@ body {
 .event.class-type-extra-slot {
   /* Background and border set inline by JS with teacher color */
   color: #1f2a3a;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* Cohort widget small styles to match tabbed UI */
