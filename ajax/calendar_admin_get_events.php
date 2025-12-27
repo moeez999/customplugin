@@ -621,6 +621,42 @@ if ($statusrow && !empty($statusrow->detailsjson)) {
 // =====================================================
 
 
+
+    $src   = 'one2one_single'; // default
+
+    $gm = $DB->get_record(
+        'googlemeet',
+        ['id' => (int)$gm->id],
+        '*',
+        MUST_EXIST
+    );
+
+    $isRecurring = false;
+
+    // days is JSON like {"Mon":"1","Wed":"1"}
+    if (!empty($gm->days)) {
+        $days = json_decode($gm->days, true);
+        if (is_array($days) && array_sum(array_map('intval', $days)) > 1) {
+            $isRecurring = true;
+        }
+    }
+
+    // addmultiply = 1 means repeating
+    if (!empty($gm->addmultiply) && (int)$gm->addmultiply === 1) {
+        $isRecurring = true;
+    }
+
+    // period > 1 also indicates recurrence
+    if (!empty($gm->period) && (int)$gm->period > 1) {
+        $isRecurring = true;
+    }
+
+    // ✅ FINAL DECISION
+    $src = $isRecurring ? 'one2one_weekly' : 'one2one_single';
+
+
+
+
                        $events[] = [
                 'id'            => '1to1-' . $e->id,
                 'eventid'       => (int)$e->id,
@@ -628,7 +664,7 @@ if ($statusrow && !empty($statusrow->detailsjson)) {
                 'is_parent'     => ((int)$e->id === $mainEventId),
                 'sequence'      => $seq++,
 
-                'source'        => 'one2one',
+                'source'        => $src,
                 'courseid'      => $courseid_one2one,
                 'cmid'          => (int)$cm->id,
                 'googlemeetid'  => (int)$gm->id,
@@ -646,7 +682,7 @@ if ($statusrow && !empty($statusrow->detailsjson)) {
                 'cohortids'     => [],
 
                 'group'         => $groupName,
-                'class_type'    => $classType,
+                'class_type'    => $src,
                 'is_recurring'  => $isrecurring,
 
                 'meetingurl'    => $meetingurl,
@@ -2290,9 +2326,41 @@ $classType = 'group'; // default class type
 $sourcee = 'group';
 
 if (strpos($s->statuscode, 'one2one') !== false) {
-       $classType = 'one2one'; // default class type
-       $sourcee = 'one2one';
+
+    $classType = 'one2one';
+    $sourcee   = 'one2one_single'; // default
+
+    $gm = $DB->get_record(
+        'googlemeet',
+        ['id' => (int)$s->googlemeetid],
+        '*',
+        MUST_EXIST
+    );
+
+    $isRecurring = false;
+
+    // days is JSON like {"Mon":"1","Wed":"1"}
+    if (!empty($gm->days)) {
+        $days = json_decode($gm->days, true);
+        if (is_array($days) && array_sum(array_map('intval', $days)) > 1) {
+            $isRecurring = true;
+        }
     }
+
+    // addmultiply = 1 means repeating
+    if (!empty($gm->addmultiply) && (int)$gm->addmultiply === 1) {
+        $isRecurring = true;
+    }
+
+    // period > 1 also indicates recurrence
+    if (!empty($gm->period) && (int)$gm->period > 1) {
+        $isRecurring = true;
+    }
+
+    // ✅ FINAL DECISION
+    $sourcee = $isRecurring ? 'one2one_weekly' : 'one2one_single';
+}
+
 
 $gm = $DB->get_record('googlemeet', ['id' => $s->googlemeetid], '*', IGNORE_MISSING);
 
@@ -2558,7 +2626,7 @@ foreach ($allStatusess as $s) {
         'googlemeetid'  => (int)$base->googlemeetid,
         'title'         => $title,
         'cohortids'     => $cohortids,
-        'class_type'    => $classType,
+        'class_type'    => $sourcee,
 
         'start_ts'      => $tsStart,
         'end_ts'        => $tsEnd,

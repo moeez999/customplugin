@@ -1978,6 +1978,7 @@ let closeAll;
     }
 
     function openLessonInfo() {
+        if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         openBackdrop();
         $modal.show();
         $cancel.hide();
@@ -1986,12 +1987,14 @@ let closeAll;
     }
 
     function openChatDrawer() {
+        if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         if (!$backdrop.hasClass('is-open')) openBackdrop();
         $drawer.addClass('is-open');
         setTimeout(() => $('.calendar_admin_details_lesson_information_textarea').trigger('focus'), 120);
     }
 
     function openCancelModal() {
+        if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         if (!$backdrop.hasClass('is-open')) openBackdrop();
         $modal.hide();
         $resched.hide();
@@ -2000,6 +2003,7 @@ let closeAll;
     }
 
     function openRescheduleModal() {
+        if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         if (!$backdrop.hasClass('is-open')) openBackdrop();
         $modal.hide();
         $cancel.hide();
@@ -2008,6 +2012,7 @@ let closeAll;
     }
 
     function openRescheduleConfirm() {
+        if (window.closeMenuOptionsDropdown) window.closeMenuOptionsDropdown();
         // copy values from Step 2 to Step 3 card
         const dateStr = $('#resched_date').val();
         const timeStr = $('#resched_time').val();

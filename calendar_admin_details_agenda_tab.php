@@ -9,6 +9,10 @@
     overflow-x: hidden;
 }
 
+.container-fluid .calendar_admin_agenda_bg {
+    border-top: 1.5px solid #e4dcdc;
+}
+
 #calendar_admin_agenda_content::-webkit-scrollbar {
     width: 0px;
 }

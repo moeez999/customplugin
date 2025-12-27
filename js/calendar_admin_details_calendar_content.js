@@ -2776,10 +2776,16 @@ $(function () {
 
   // Today button: jump to current week (Monday)
   $("#btnToday").on("click", () => {
-    clearDateFilter(); // Clear filter when jumping to today
-    clearTimeSlotFilter(); // Clear time slot filter when jumping to today
     currentWeekStart = mondayOf(new Date());
+    // First render the week layout to establish week dates
     renderWeek(true);
+    // Then fetch fresh events for this week
+    if (
+      window.fetchCalendarEvents &&
+      typeof window.fetchCalendarEvents === "function"
+    ) {
+      window.fetchCalendarEvents();
+    }
   });
 
   // Now line heartbeat
