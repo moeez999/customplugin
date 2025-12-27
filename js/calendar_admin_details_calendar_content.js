@@ -76,6 +76,11 @@ window.teacherExtraSlots = window.teacherExtraSlots || {};
 const STATUS_ICON_MAP = {
   scheduled: { icon: "./img/confirmed.svg", label: "Taught" },
 
+  cancel: {
+    icon: "./img/cancelled.svg",
+    label: "Cancelled",
+  },
+
   cancel_no_makeup: {
     icon: "./img/cancelled.svg",
     label: "Cancelled (No Makeup)",
@@ -1246,7 +1251,7 @@ $(function () {
           return;
         }
 
-        // Check if event is cancelled (cancel_no_makeup) - show reason modal
+        // Check if event is cancelled (cancel or cancel_no_makeup) - show reason modal
         const activeStatus = getActiveStatusMeta(
           currentClickedEvent.statuses || []
         );
@@ -1257,7 +1262,11 @@ $(function () {
           currentClickedEvent.statuses
         );
 
-        if (activeStatus && activeStatus.code === "cancel_no_makeup") {
+        if (
+          activeStatus &&
+          (activeStatus.code === "cancel" ||
+            activeStatus.code === "cancel_no_makeup")
+        ) {
           console.log(
             "Opening Reason of Cancellation modal for cancelled event",
             currentClickedEvent
@@ -3322,9 +3331,15 @@ $(function () {
               </span>`;
         })();
 
-        // Add faded styling for previous reschedule events
-        const fadedClass = ev.isFadedReschedule ? " faded-reschedule" : "";
-        const fadedStyle = ev.isFadedReschedule ? "filter: grayscale(1);" : "";
+        // Add faded styling for previous reschedule events and cancelled events
+        const isCancelled =
+          statusMeta &&
+          (statusMeta.code === "cancel" ||
+            statusMeta.code === "cancel_no_makeup");
+        const fadedClass =
+          ev.isFadedReschedule || isCancelled ? " faded-reschedule" : "";
+        const fadedStyle =
+          ev.isFadedReschedule || isCancelled ? "filter: grayscale(1);" : "";
 
         // Build event HTML - hide details for short events
         const $ev = $(`
