@@ -77,8 +77,33 @@ try {
         } 
         // Flat structure fallback
         else {
-            $previousFinal = $oldDetails;
+            // FIRST TIME RESCHEDULING → store old values from payload
+            $previousFinal = [
+                'date'    => $json['oldDate']  ?? null,
+                'start'   => $json['oldStart'] ?? null,
+                'end'     => $json['oldEnd']   ?? null,
+                'teacher' => (int)($json['oldTeacherId'] ?? 0),
+                'eventid'      => $eventid,
+                'googlemeetid' => $googlemeetid,
+                'time'         => time(),
+                'action'       => 'reschedule_instant'
+            ];
         }
+
+    }else{
+
+        // FIRST TIME RESCHEDULING → store old values from payload
+            $previousFinal = [
+                'date'    => $json['oldDate']  ?? null,
+                'start'   => $json['oldStart'] ?? null,
+                'end'     => $json['oldEnd']   ?? null,
+                'teacher' => (int)($json['oldTeacherId'] ?? 0),
+                'eventid'      => $eventid,
+                'googlemeetid' => $googlemeetid,
+                'time'         => time(),
+                'action'       => 'reschedule_instant'
+            ];
+
     }
 
     // -----------------------------
@@ -119,6 +144,7 @@ try {
     $event->eventdate    = $newDateTS;
     $event->duration     = max(1, (int)(($newEndTS - $newStartTS) / 60));
     $event->timemodified = time();
+    
 
     $DB->update_record('googlemeet_events', $event);
 

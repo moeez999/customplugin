@@ -68,12 +68,8 @@
     <div class="calendar_admin_cancel_modal" role="dialog" aria-modal="true" aria-labelledby="cancel_title">
         <div class="calendar_admin_cancel_header">
             <button type="button" class="calendar_admin_cancel_back" aria-label="Back to lesson info">
-                <svg width="22" height="22" viewBox="0 0 24 24">
-                    <polyline points="15 19 8 12 15 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                </svg>
+                <img src="./img/arrow-back.svg" alt="Back to lesson info">
             </button>
-            <h5 id="cancel_title" class="calendar_admin_cancel_title">Are You Sure You Want To Cancel?</h5>
             <button type="button" class="calendar_admin_cancel_close" aria-label="Close">
                 <svg width="22" height="22" viewBox="0 0 24 24">
                     <path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2" stroke-linecap="round" />
@@ -82,6 +78,8 @@
         </div>
 
         <div class="calendar_admin_cancel_body">
+            <h5 id="cancel_title" class="calendar_admin_cancel_title">Are You Sure You Want To Cancel?</h5>
+
             <p class="calendar_admin_cancel_note">
                 Please note that the lesson <strong>Tuesday , Sep 03 7:00 – 7:25 with jonas</strong> will be canceled
                 and will not be rescheduled.
@@ -95,7 +93,10 @@
                 <button type="button" class="ca_dd_btn" aria-haspopup="listbox" aria-expanded="false">
                     <span class="ca_dd_placeholder">Select Reason</span>
                     <span class="ca_dd_value" style="display:none;"></span>
-                    <span class="ca_dd_caret" aria-hidden="true">▾</span>
+                    <span class="ca_dd_caret" aria-hidden="true">
+
+                        <img src="./img/dropdown-arrow-down.svg" alt="dropdown arrow">
+                    </span>
                 </button>
 
                 <div class="ca_dd_menu" role="listbox" tabindex="-1">
@@ -116,7 +117,7 @@
             <textarea id="calendar_admin_cancel_message" class="form-control calendar_admin_cancel_textarea mb-3"
                 rows="3" placeholder="Message for Daniela"></textarea>
 
-            <div class="form-check mb-3">
+            <div class="form-check mb-3 d-flex align-items-start calendar_admin_cancel_ack_wrap">
                 <input class="form-check-input" type="checkbox" id="calendar_admin_cancel_ack">
                 <label class="form-check-label" for="calendar_admin_cancel_ack">
                     I know my position will decrease and fewer students will see
@@ -192,7 +193,8 @@
                             <button type="button" class="ca_dd_btn" aria-haspopup="listbox" aria-expanded="false">
                                 <span class="ca_dd_placeholder">50 Minutes ( Standard time )</span>
                                 <span class="ca_dd_value" style="display:none;"></span>
-                                <span class="ca_dd_caret" aria-hidden="true">▾</span>
+                                <span class="ca_dd_caret" aria-hidden="true"> <img src="./img/dropdown-arrow-down.svg"
+                                        alt="dropdown arrow"></span>
                             </button>
 
                             <div class="ca_dd_menu" role="listbox" tabindex="-1">
@@ -207,31 +209,73 @@
                         </div>
 
                         <div class="ca_res_row calendar_admin_reschedule_form_row">
-                            <!-- DATE FIELD (no dropdown) -->
+                            <!-- DATE FIELD (custom date picker that opens calendar) -->
                             <div class="ca_res_col">
-                                <div class="ca_res_selectwrap calendar_admin_reschedule_select_control">
-                                    <!-- Visible button that looks like your select -->
-                                    <button type="button" id="resched_date_field"
-                                        class="form-select calendar_admin_details_lesson_info_calendar_modal_field">
-                                        <span id="resched_date_label">Tue,Feb11</span>
-                                        <span class="ca_res_select_icon" aria-hidden="true">▾</span>
-                                    </button>
-
-                                    <!-- Hidden value used by your existing code: $('#resched_date').val() -->
-                                    <input type="hidden" id="resched_date" value="Tue, Feb11">
+                                <div class="resched-date-dropdown-display" id="reschedDateDropdownDisplay"
+                                    style="width:100%; padding:13px 14px; border-radius:10px; border:1.5px solid #dadada; background:#fff; font-size:1.05rem; color:#232323; margin-bottom:0px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                    <span id="reschedDateText">Tue, Feb11</span>
                                 </div>
+
+                                <!-- Hidden value used by your existing code: $('#resched_date').val() -->
+                                <input type="hidden" id="resched_date" value="Tue, Feb11">
                             </div>
 
-                            <!-- TIME (unchanged, still a normal dropdown) -->
+                            <!-- TIME (custom time picker) -->
                             <div class="ca_res_col">
-                                <div class="ca_res_selectwrap calendar_admin_reschedule_select_control">
-                                    <select class="form-select" id="resched_time">
-                                        <option selected>12:00 AM</option>
-                                        <option>12:30 AM</option>
-                                        <option>1:00 AM</option>
-                                        <option>1:30 AM</option>
-                                    </select>
-                                    <span class="ca_res_select_icon" aria-hidden="true">▾</span>
+                                <div class="resched-custom-time-pill">
+                                    <input type="text" class="form-control resched-time-input" value="12:00 AM"
+                                        autocomplete="off" style="background-color:#ffffff; height: 50px;width:100%;"
+                                        id="resched_time_input" readonly="readonly">
+                                    <div class="resched-custom-time-dropdown" style="display: none;">
+                                        <div class="resched-dropdown-item">12:00 AM</div>
+                                        <div class="resched-dropdown-item">12:30 AM</div>
+                                        <div class="resched-dropdown-item">1:00 AM</div>
+                                        <div class="resched-dropdown-item">1:30 AM</div>
+                                        <div class="resched-dropdown-item">2:00 AM</div>
+                                        <div class="resched-dropdown-item">2:30 AM</div>
+                                        <div class="resched-dropdown-item">3:00 AM</div>
+                                        <div class="resched-dropdown-item">3:30 AM</div>
+                                        <div class="resched-dropdown-item">4:00 AM</div>
+                                        <div class="resched-dropdown-item">4:30 AM</div>
+                                        <div class="resched-dropdown-item">5:00 AM</div>
+                                        <div class="resched-dropdown-item">5:30 AM</div>
+                                        <div class="resched-dropdown-item">6:00 AM</div>
+                                        <div class="resched-dropdown-item">6:30 AM</div>
+                                        <div class="resched-dropdown-item">7:00 AM</div>
+                                        <div class="resched-dropdown-item">7:30 AM</div>
+                                        <div class="resched-dropdown-item">8:00 AM</div>
+                                        <div class="resched-dropdown-item">8:30 AM</div>
+                                        <div class="resched-dropdown-item">9:00 AM</div>
+                                        <div class="resched-dropdown-item">9:30 AM</div>
+                                        <div class="resched-dropdown-item">10:00 AM</div>
+                                        <div class="resched-dropdown-item">10:30 AM</div>
+                                        <div class="resched-dropdown-item">11:00 AM</div>
+                                        <div class="resched-dropdown-item">11:30 AM</div>
+                                        <div class="resched-dropdown-item">12:00 PM</div>
+                                        <div class="resched-dropdown-item">12:30 PM</div>
+                                        <div class="resched-dropdown-item">1:00 PM</div>
+                                        <div class="resched-dropdown-item">1:30 PM</div>
+                                        <div class="resched-dropdown-item">2:00 PM</div>
+                                        <div class="resched-dropdown-item">2:30 PM</div>
+                                        <div class="resched-dropdown-item">3:00 PM</div>
+                                        <div class="resched-dropdown-item">3:30 PM</div>
+                                        <div class="resched-dropdown-item">4:00 PM</div>
+                                        <div class="resched-dropdown-item">4:30 PM</div>
+                                        <div class="resched-dropdown-item">5:00 PM</div>
+                                        <div class="resched-dropdown-item">5:30 PM</div>
+                                        <div class="resched-dropdown-item">6:00 PM</div>
+                                        <div class="resched-dropdown-item">6:30 PM</div>
+                                        <div class="resched-dropdown-item">7:00 PM</div>
+                                        <div class="resched-dropdown-item">7:30 PM</div>
+                                        <div class="resched-dropdown-item">8:00 PM</div>
+                                        <div class="resched-dropdown-item">8:30 PM</div>
+                                        <div class="resched-dropdown-item">9:00 PM</div>
+                                        <div class="resched-dropdown-item">9:30 PM</div>
+                                        <div class="resched-dropdown-item">10:00 PM</div>
+                                        <div class="resched-dropdown-item">10:30 PM</div>
+                                        <div class="resched-dropdown-item">11:00 PM</div>
+                                        <div class="resched-dropdown-item">11:30 PM</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -261,12 +305,8 @@
         aria-labelledby="resched_confirm_title">
         <div class="calendar_admin_reschedule_header">
             <button type="button" class="calendar_admin_reschedule_confirm_back" aria-label="Back to step 2">
-                <svg width="22" height="22" viewBox="0 0 24 24">
-                    <polyline points="15 19 8 12 15 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                </svg>
+                <img src="./img/arrow-back.svg" alt="back arrow">
             </button>
-            <h5 id="resched_confirm_title" class="calendar_admin_reschedule_title">Reschedule lesson</h5>
             <button type="button" class="calendar_admin_reschedule_close" aria-label="Close">
                 <svg width="22" height="22" viewBox="0 0 24 24">
                     <path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2" stroke-linecap="round" />
@@ -274,7 +314,9 @@
             </button>
         </div>
 
-        <div class="calendar_admin_reschedule_body">
+        <div class="calendar_admin_reschedule_body_sub">
+            <h5 id="resched_confirm_title" class="calendar_admin_reschedule_title">Reschedule lesson</h5>
+
             <span class="ca_res_chip">Updated lesson</span>
 
             <div class="calendar_admin_lite_card mb-3">
@@ -316,7 +358,10 @@
                     <option>Technical issues</option>
                     <option>Other</option>
                 </select>
-                <span class="ca_res_select_icon" aria-hidden="true">▾</span>
+                <span class="ca_res_select_icon" aria-hidden="true">
+
+                    <img src="./img/dropdown-arrow-down.svg" alt="dropdown arrow">
+                </span>
             </div>
 
             <label for="resched_message_step3" class="form-label fw-semibold mb-2">Message for Daniela •
@@ -452,9 +497,15 @@
     style="display:none;">
     <div class="calendar_admin_details_create_cohort_calendar_modal" id="rescheduleCalendarModal">
         <div class="calendar_admin_details_create_cohort_calendar_nav">
-            <button class="reschedule_calendar_prev">&lt;</button>
+            <button type="button" class="reschedule_calendar_prev"><svg width="22" height="22" viewBox="0 0 24 24">
+                    <polyline points="15 19 8 12 15 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round"></polyline>
+                </svg></button>
             <span id="rescheduleCalendarMonth"></span>
-            <button class="reschedule_calendar_next">&gt;</button>
+            <button type="button" class="reschedule_calendar_next"><svg width="22" height="22" viewBox="0 0 24 24">
+                    <polyline points="9 19 16 12 9 5" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round"></polyline>
+                </svg></button>
         </div>
         <div class="calendar_admin_details_create_cohort_calendar_days"></div>
         <button class="calendar_admin_details_create_cohort_calendar_done_btn">Done</button>
@@ -920,10 +971,10 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 /* ===== Cancel Modal (snapshot-accurate overrides) ===== */
 .calendar_admin_cancel_modal {
     width: 100%;
-    max-width: 530px;
+    max-width: 480px;
     background: #fff;
     border: 1px solid #e9e9f0;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 20px 50px rgba(0, 0, 0, .12);
     display: none;
@@ -934,8 +985,8 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 14px 16px;
-    border-bottom: 1px solid #f0f0f4;
+    padding: 14px 10px;
+
 }
 
 .calendar_admin_cancel_back,
@@ -951,19 +1002,17 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .calendar_admin_cancel_title {
-    /* margin:0; */
-    font-weight: 600;
-    font-size: 1.9rem;
+    font-weight: 700;
+    font-size: 2rem;
     line-height: 1.15;
     color: #111;
     text-align: left;
     flex: 1;
-    margin-left: 6px;
-    margin-top: 50px;
+
 }
 
 .calendar_admin_cancel_body {
-    padding: 18px 20px 20px;
+    padding: 0px 24px 20px;
 }
 
 .calendar_admin_cancel_note {
@@ -974,9 +1023,9 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .calendar_admin_cancel_body .form-label {
-    font-weight: 700;
     color: #232323;
     margin-bottom: 8px;
+    font-size: 14px;
 }
 
 .calendar_admin_cancel_selectwrap {
@@ -1006,16 +1055,51 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .calendar_admin_cancel_textarea {
     min-height: 66px;
-    border-radius: 12px;
+    border-radius: 8px !important;
     border: 1.6px solid #e1e3eb;
     padding: 14px 16px;
     font-size: 1.02rem;
+    box-shadow: none !important;
+}
+
+.calendar_admin_cancel_textarea:hover {
+    border: 1.6px solid #232323;
 }
 
 .form-check .form-check-input {
     width: 22px;
     height: 22px;
     margin-top: 2px;
+
+    /* remove default browser styling */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    /* custom look */
+    background-color: transparent;
+    border: 1px solid #232323;
+    /* choose a color */
+    border-radius: 6px;
+    /* adjust radius */
+    cursor: pointer;
+}
+
+/* checked state */
+.form-check-input:checked {
+    background-color: #232323;
+    /* fill color when checked */
+    border-color: #232323;
+}
+
+/* optional: checkmark */
+.form-check-input:checked::after {
+    content: "✔";
+    color: white;
+    font-size: 16px;
+    position: relative;
+    left: 2px;
+    top: -1px;
 }
 
 .form-check .form-check_input {
@@ -1028,16 +1112,20 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 .form-check .form-check-label {
     margin-left: 6px;
     line-height: 1.45;
-    color: #1f232b;
-    font-weight: 600;
+    color: #232323;
+
+    font-size: 14px;
 }
 
 .calendar_admin_cancel_resched {
-    height: 58px;
-    border-radius: 12px;
+
+    border-radius: 8px;
     border: 1.8px solid #e7e7ef;
     font-weight: 800;
     font-size: 1.05rem;
+    background: #ffffff;
+    color: #121117;
+    padding: 12px 16px;
 }
 
 .calendar_admin_cancel_resched:hover {
@@ -1045,8 +1133,8 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .calendar_admin_cancel_confirm {
-    height: 60px;
-    border-radius: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
     font-weight: 900;
     font-size: 1.08rem;
     letter-spacing: .2px;
@@ -1055,6 +1143,25 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     border: 0;
     padding: 12px 16px;
     box-shadow: 0 10px 26px rgba(239, 45, 23, .25);
+}
+
+/* inline spinner used in confirm button */
+.calendar_admin_cancel_confirm .btn-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: ca-spin 1s linear infinite;
+}
+
+@keyframes ca-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ===== Reschedule Modal (STEP 2) ===== */
@@ -1082,7 +1189,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 28px;
+
 }
 
 .calendar_admin_reschedule_title {
@@ -1102,10 +1209,24 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     line-height: 0;
 }
 
+.calendar_admin_reschedule_confirm_back {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    line-height: 0;
+}
+
 .calendar_admin_reschedule_body {
     display: flex;
     flex-direction: column;
     gap: 18px;
+}
+
+.calendar_admin_reschedule_body_sub {
+    display: flex;
+    flex-direction: column;
+
 }
 
 .calendar_admin_reschedule_label {
@@ -1213,7 +1334,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     font-weight: 500;
     font-size: 12px;
     line-height: 18px;
-    margin-bottom: -4px;
+
 }
 
 .calendar_admin_reschedule_select_control {
@@ -1291,8 +1412,8 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .ca_res_selectwrap:not(.calendar_admin_reschedule_select_control) .form-select {
     border: 2px solid rgba(0, 0, 0, 0.12);
-    border-radius: 8.93px;
-    padding: 0 12px;
+    border-radius: 8px;
+    padding: 14px 16px;
     height: 60px;
 }
 
@@ -1320,6 +1441,79 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .ca_res_col {
     flex: 1 1 0;
+}
+
+/* Custom Time Picker Styles for Reschedule Modal */
+.resched-custom-time-pill {
+    position: relative;
+    width: 100%;
+}
+
+.resched-time-input {
+    width: 100%;
+    min-height: auto !important;
+    padding: 0 12px !important;
+    border: 1px solid #ddd;
+    border-radius: 10px !important;
+    font-size: 14px;
+    cursor: pointer;
+    background-color: #ffffff !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+
+}
+
+.resched-time-input:focus {
+    outline: none;
+    border-color: #666;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.resched-custom-time-dropdown {
+    position: absolute;
+    top: 55px;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 10000;
+}
+
+.resched-dropdown-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    transition: background-color 0.15s ease;
+}
+
+.resched-dropdown-item:hover {
+    background-color: #f5f5f5;
+}
+
+.resched-dropdown-item.active {
+    background-color: #e8f0fe;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* Custom Date Display for Reschedule Modal */
+.resched-date-dropdown-display {
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.resched-date-dropdown-display:hover {
+    border-color: #999;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.resched-date-dropdown-display:active {
+    transform: scale(0.99);
 }
 
 .calendar_admin_reschedule_hint,
@@ -1372,24 +1566,26 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 /* ===== Reschedule Modal (STEP 3 — Confirm) ===== */
 .calendar_admin_reschedule_confirm_modal {
+    background-color: #ffffff;
+    border: 1px solid #f4f4f8;
+    border-radius: 8px;
+    box-shadow: 0px 8px 32px 0px rgba(18, 17, 23, 0.15), 0px 16px 48px 0px rgba(18, 17, 23, 0.15);
+    max-width: 500px;
     width: 100%;
-    max-width: 530px;
-    background: #fff;
-    border: 1px solid #e9e9f0;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, .12);
+    padding: 24px;
     display: none;
+    flex-direction: column;
 }
 
 .ca_res_chip {
     display: inline-block;
-    background: #eef1f6;
-    color: #2c313a;
+    background: #DCDCE5;
+    color: #232323;
     font-weight: 800;
     padding: 6px 12px;
-    border-radius: 9px;
+    border-radius: 8px;
     margin-bottom: 10px;
+    width: max-content;
 }
 
 .calendar_admin_lite_card {
@@ -1451,16 +1647,19 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .ca_res_confirm {
-    height: 60px;
-    border-radius: 12px;
-    font-weight: 900;
-    font-size: 1.08rem;
-    letter-spacing: .2px;
-    background: #ef2d17;
-    color: #fff;
-    border: 0;
-    padding: 12px 16px;
-    box-shadow: 0 10px 26px rgba(239, 45, 23, .25);
+
+    width: 100%;
+    background-color: #ff2500;
+    border: 2px solid #121117;
+    border-radius: 8px;
+    padding: 11px 20px;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 26px;
+    cursor: pointer;
+    text-align: center;
 }
 
 /* ===== States ===== */
@@ -1556,18 +1755,22 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
 .ca_dd_btn {
     width: 100%;
-    height: 58px;
+
     background: #fff;
     border: 1.6px solid #e1e3eb;
-    border-radius: 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
+    padding: 14px 12px;
     font-size: 1.05rem;
     line-height: 1.2;
     font-weight: 600;
-    box-shadow: 0 2px 10px rgba(20, 20, 20, .03);
+
+}
+
+.ca_dd_btn:hover {
+    border: 1.6px solid #232323;
 }
 
 .ca_dd_btn:focus {
@@ -1632,20 +1835,19 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.14);
 }
 
 .calendar_admin_details_create_cohort_calendar_modal {
     background: #fff;
-    border-radius: 13px;
+    border-radius: 15px;
     box-shadow: 0 10px 36px 0 rgba(0, 0, 0, .16);
-    width: 340px;
-    padding: 20px 18px 18px 18px;
+    max-width: 300px;
+    padding: 26px 24px 24px 24px;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    max-width: 96vw;
 }
 
 .calendar_admin_details_create_cohort_calendar_nav {
@@ -1658,55 +1860,66 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 
 .calendar_admin_details_create_cohort_calendar_nav button {
-    background: #fafafa;
+    background: none;
     border: none;
-    font-size: 1.45rem;
-    border-radius: 7px;
-    padding: 2px 13px;
+    font-size: 1.4rem;
     cursor: pointer;
-    color: #222;
-    transition: background .15s;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .calendar_admin_details_create_cohort_calendar_nav button:hover {
-    background: #ececec;
+    opacity: 0.7;
 }
 
 .calendar_admin_details_create_cohort_calendar_days {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
+    gap: 6px;
     text-align: center;
     font-size: 1.07rem;
     margin-bottom: 10px;
+    justify-items: center;
 }
 
 .calendar_admin_details_create_cohort_calendar_day_header {
     color: #b2b2b2;
     font-weight: 600;
     padding: 7px 0 4px 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.calendar_admin_details_create_cohort_calendar_day,
+.calendar_admin_details_create_cohort_calendar_day_res,
 .calendar_admin_details_create_cohort_calendar_day_inactive {
-    padding: 11px 0;
-    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
     cursor: pointer;
     font-size: 1.11rem;
     font-weight: 500;
-    transition: background .15s, color .15s, border .17s;
+    transition: background .15s, color .15s;
+    background: #fff;
 }
 
 .calendar_admin_details_create_cohort_calendar_day_inactive {
     color: #bdbdbd;
-    background: #fafafa;
+    background: #fff;
     cursor: not-allowed;
 }
 
-.calendar_admin_details_create_cohort_calendar_day.selected {
-    border: 2px solid #fe2e0c;
-    color: #fe2e0c;
-    background: #fff;
+.calendar_admin_details_create_cohort_calendar_day_res.selected,
+.calendar_admin_details_create_cohort_calendar_day_res:hover {
+    background: #fe2e0c;
+    color: #fff;
     font-weight: 700;
 }
 
@@ -1718,7 +1931,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     border: none;
     border-radius: 8px;
     padding: 12px 0;
-    margin-top: 14px;
+    margin-top: 19px;
     font-size: 1.12rem;
     cursor: pointer;
     box-shadow: 0 3px 11px 0 rgba(254, 46, 12, .07);
@@ -1733,6 +1946,11 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 </style>
 
 <script>
+// Pre-declare the functions to make them available globally
+let openLessonInfo;
+let populateModalWithEventData;
+let closeAll;
+
 (function($) {
     const $backdrop = $('#calendar_admin_details_lesson_information_backdrop');
     const $modal = $backdrop.find('.calendar_admin_details_lesson_information_modal');
@@ -1810,7 +2028,8 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     }
 
     function toMinutes(t) { // "1:30 AM" -> minutes from midnight
-        const m = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!t) return 0;
+        const m = String(t).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
         if (!m) return 0;
         let h = parseInt(m[1], 10) % 12;
         const min = parseInt(m[2], 10);
@@ -1830,8 +2049,9 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     }
 
     function to24(t) { // "1:30 PM" -> "01:30 PM" like your snapshot uses leading zero for hour <10?
-        const m = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (!m) return t;
+        if (!t) return '';
+        const m = String(t).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!m) return String(t);
         let h = parseInt(m[1], 10);
         return (h < 10 ? ('0' + h) : h) + ':' + m[2] + ' ' + m[3].toUpperCase();
     }
@@ -1957,6 +2177,58 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
     // Openers
     //$('.calendar_admin_details_lesson_information_btn').on('click', openLessonInfo);
+
+    // ===== Custom Time Picker for Reschedule Modal =====
+    const $reschedTimeInput = $('.resched-time-input');
+    const $reschedTimeDropdown = $('.resched-custom-time-dropdown');
+    const $reschedDropdownItems = $('.resched-dropdown-item');
+
+    // Toggle dropdown on input click
+    $reschedTimeInput.on('click', function() {
+        $reschedTimeDropdown.toggle();
+
+        // Highlight current selection
+        const currentValue = $reschedTimeInput.val();
+        $reschedDropdownItems.removeClass('active').each(function() {
+            if ($(this).text() === currentValue) {
+                $(this).addClass('active');
+                // Scroll to active item
+                $reschedTimeDropdown.scrollTop($(this).offset().top - $reschedTimeDropdown.offset()
+                    .top - 100);
+            }
+        });
+    });
+
+    // Handle dropdown item click
+    $reschedDropdownItems.on('click', function() {
+        const selectedTime = $(this).text();
+        $reschedTimeInput.val(selectedTime);
+
+        // Update the hidden resched_time input for backward compatibility
+        $('#resched_time').val(selectedTime);
+
+        // Hide dropdown
+        $reschedTimeDropdown.hide();
+
+        // Update active state
+        $reschedDropdownItems.removeClass('active');
+        $(this).addClass('active');
+    });
+
+    // Close dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.resched-custom-time-pill').length) {
+            $reschedTimeDropdown.hide();
+        }
+    });
+
+    // Update date display when date is selected in the calendar
+    $(document).on('change', '#resched_date', function() {
+        const selectedDate = $(this).val();
+        if (selectedDate) {
+            $('#reschedDateText').text(selectedDate);
+        }
+    });
 
     $(document).on('click', '.event.e-green', function(e) {
         e.preventDefault();
@@ -2307,16 +2579,59 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
         }, 500); // Wait 500ms after student selection before clicking lesson type button
     }
 
-    // ===== Cancel modal action (demo) =====
+    // ===== Cancel modal action (uses global loader + toast) =====
     $('#calendar_admin_cancel_confirm_btn').on('click', function() {
+        const $btn = $(this);
         const payload = {
-            reason: $('#calendar_admin_cancel_reason').val() || '',
+            reason: $('#resched_reason_step3').val() || '',
             message: $('#calendar_admin_cancel_message').val() || '',
-            acknowledged: $('#calendar_admin_cancel_ack').is(':checked')
+            acknowledged: $('#calendar_admin_cancel_ack').is(':checked'),
+            selectedDate: $('#resched_date').val() || '',
+            eventId: currentEventData ? currentEventData.eventid : '',
+            teacherId: currentEventData ? currentEventData.teacherId : '',
+            status: 'cancelled'
         };
-        console.log('Cancel payload', payload);
-        $(this).text('Canceled').prop('disabled', true);
-        setTimeout(closeAll, 600);
+
+        console.log('=== CANCEL LESSON PAYLOAD ===');
+        console.log('Payload:', payload);
+
+        // show the app-wide loader (defined in _loader_helpers.js)
+        if (window.showGlobalLoader) window.showGlobalLoader();
+
+        // disable button + show inline spinner
+        const origHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="btn-spinner"></span> Cancelling...');
+
+        fetch('ajax/cancel_one2one.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json().catch(() => ({
+                status: 'error',
+                error: 'Invalid JSON'
+            })))
+            .then(json => {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                if (json && json.status === 'success') {
+                    // use existing toast helper for lesson info modal
+                    showToast('1:1 session cancelled', json.message || '', 'Session Cancelled');
+                    setTimeout(closeAll, 500);
+                } else {
+                    const err = (json && (json.error || json.message)) || 'Cancel failed';
+                    showToast('Cancel failed', err, 'Error');
+                    $btn.prop('disabled', false).html(origHtml);
+                    if (window.hideGlobalLoader) window.hideGlobalLoader();
+                }
+            })
+            .catch(err => {
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                showToast('Cancel failed', err && err.message ? err.message : 'Request failed',
+                'Error');
+                $btn.prop('disabled', false).html(origHtml);
+            });
     });
 
     // ===== Step 3: Confirm new time -> show toast + open Management modal =====
@@ -2487,19 +2802,13 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     console.log('Calendar backdrop exists:', $('#rescheduleCalendarBackdrop').length);
     console.log('==========================================');
 
-    // Open calendar when clicking date button in reschedule modal
-    // Using wildcard selector to catch clicks on button AND all its children (spans)
-    $(document).on('click', '#resched_date_field, #resched_date_field *', function(e) {
+    // Open calendar when clicking date display in reschedule modal (custom date picker)
+    // This handler initializes and displays the calendar modal
+    $('#reschedDateDropdownDisplay').on('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('✓ Date button clicked!');
-        console.log('Clicked element:', this);
-        console.log('Element ID:', $(this).attr('id'));
-        console.log('Target type:', this.tagName);
-
-        rescheduleCalendarTargetBtn = $('#resched_date_label');
-        console.log('Target button found:', rescheduleCalendarTargetBtn.length);
+        rescheduleCalendarTargetBtn = $('#reschedDateText');
 
         let now = new Date();
         rescheduleCalendarMonth = {
@@ -2508,24 +2817,14 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
         };
         rescheduleSelectedDate = null;
 
-        console.log('Rendering calendar for:', rescheduleCalendarMonth);
-
+        // Render the calendar
         renderRescheduleCalendar();
 
-        const $backdrop = $('#rescheduleCalendarBackdrop');
-        console.log('Backdrop found:', $backdrop.length);
-        console.log('Backdrop display before:', $backdrop.css('display'));
-
-        $backdrop.fadeIn(150);
-
-        setTimeout(function() {
-            console.log('Backdrop display after:', $backdrop.css('display'));
-            console.log('Is visible:', $backdrop.is(':visible'));
-        }, 200);
-    });
-
-    // Previous month
+        // Show the backdrop
+        $('#rescheduleCalendarBackdrop').show();
+    }); // Previous month
     $(document).on('click', '.reschedule_calendar_prev', function() {
+        if (!rescheduleCalendarMonth) return;
         rescheduleCalendarMonth.month--;
         if (rescheduleCalendarMonth.month < 0) {
             rescheduleCalendarMonth.month = 11;
@@ -2536,6 +2835,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
     // Next month
     $(document).on('click', '.reschedule_calendar_next', function() {
+        if (!rescheduleCalendarMonth) return;
         rescheduleCalendarMonth.month++;
         if (rescheduleCalendarMonth.month > 11) {
             rescheduleCalendarMonth.month = 0;
@@ -2546,6 +2846,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 
     // Render calendar
     function renderRescheduleCalendar() {
+        if (!rescheduleCalendarMonth) return;
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
             "October", "November", "December"
         ];
@@ -2576,7 +2877,7 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
                 rescheduleSelectedDate.getFullYear() === y &&
                 rescheduleSelectedDate.getMonth() === m &&
                 rescheduleSelectedDate.getDate() === d ? ' selected' : '';
-            html += '<div class="calendar_admin_details_create_cohort_calendar_day' + sel + '" data-day="' + d +
+            html += '<div class="calendar_admin_details_create_cohort_calendar_day_res' + sel + '" data-day="' + d +
                 '">' + d + '</div>';
         }
 
@@ -2591,9 +2892,15 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
     }
 
     // Select a day
-    $(document).on('click', '#rescheduleCalendarBackdrop .calendar_admin_details_create_cohort_calendar_day',
+    $(document).on('click', '#rescheduleCalendarBackdrop .calendar_admin_details_create_cohort_calendar_day_res',
         function() {
-            $('#rescheduleCalendarBackdrop .calendar_admin_details_create_cohort_calendar_day').removeClass(
+            // If the calendar has not been initialized, bail out to avoid null access
+            if (!rescheduleCalendarMonth) {
+                console.warn('Reschedule calendar month not initialized; ignoring day click');
+                return;
+            }
+
+            $('#rescheduleCalendarBackdrop .calendar_admin_details_create_cohort_calendar_day_res').removeClass(
                 'selected');
             $(this).addClass('selected');
             let day = parseInt($(this).attr('data-day'));
@@ -2614,16 +2921,22 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
                 rescheduleCalendarTargetBtn.text(nice);
                 $('#resched_date').val(nice);
 
-                $('#rescheduleCalendarBackdrop').fadeOut(150);
+                $('#rescheduleCalendarBackdrop').hide();
             }
         });
 
     // Click outside to close
     $(document).on('click', '#rescheduleCalendarBackdrop', function(e) {
         if (e.target === this) {
-            $(this).fadeOut(150);
+            $(this).hide();
         }
     });
+
+    // Expose functions globally for agenda tab and other components
+    // Assign to the pre-declared variables so they're available immediately
+    window.populateModalWithEventData = populateModalWithEventData;
+    window.openLessonInfo = openLessonInfo;
+    window.closeAll = closeAll;
 
 })(jQuery);
 </script>

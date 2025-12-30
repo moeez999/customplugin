@@ -48,6 +48,65 @@
     margin-top: 10px;
 }
 
+/* Event color classes - match main calendar */
+.calendar_admin_agenda_event_card.e-blue {
+    --event-border-color: #7c96ff;
+    border-color: var(--event-border-color);
+    background: color-mix(in srgb, #7c96ff 10%, #ffffff);
+}
+
+.calendar_admin_agenda_event_card.e-green {
+    --event-border-color: #2faa7f;
+    border-color: var(--event-border-color);
+    background: color-mix(in srgb, #2faa7f 10%, #ffffff);
+}
+
+.calendar_admin_agenda_event_card.e-purple {
+    --event-border-color: #b535ff;
+    border-color: rgba(181, 53, 255, 0.7) !important;
+    background: color-mix(in srgb, #b535ff 10%, #ffffff) !important;
+    border-bottom-color: rgba(181, 53, 255, 0.7) !important;
+}
+
+.calendar_admin_agenda_event_card.e-orange {
+    --event-border-color: #ff8a06;
+    border-color: rgba(255, 138, 6, 0.7) !important;
+    background: color-mix(in srgb, #ff8a06 10%, #ffffff) !important;
+    border-bottom-color: rgba(255, 138, 6, 0.7) !important;
+}
+
+.calendar_admin_agenda_event_card.e-timeoff {
+    --event-border-color: rgba(253, 216, 48, 0.7);
+    border-color: rgba(253, 216, 48, 0.7);
+    background: color-mix(in srgb, #fdd830 10%, #ffffff);
+}
+
+/* Hover effect: slightly darken the background for each color class */
+.calendar_admin_agenda_event_card:hover {
+    filter: brightness(0.96);
+    transition: filter 0.18s;
+}
+
+.calendar_admin_agenda_event_card.e-blue:hover {
+    background: color-mix(in srgb, #7c96ff 18%, #ffffff);
+}
+
+.calendar_admin_agenda_event_card.e-green:hover {
+    background: color-mix(in srgb, #2faa7f 18%, #ffffff);
+}
+
+.calendar_admin_agenda_event_card.e-purple:hover {
+    background: color-mix(in srgb, #b535ff 18%, #ffffff) !important;
+}
+
+.calendar_admin_agenda_event_card.e-orange:hover {
+    background: color-mix(in srgb, #ff8a06 18%, #ffffff) !important;
+}
+
+.calendar_admin_agenda_event_card.e-timeoff:hover {
+    background: color-mix(in srgb, #fdd830 18%, #ffffff);
+}
+
 .calendar_admin_agenda_title {
     font-weight: 600 !important;
     /* lighter bold */
@@ -280,9 +339,23 @@ function renderAgendaView() {
                 eventTitle = event.studentnames.join(', ');
             }
 
-            // Create event card
+            // Get status icon (same logic as main calendar)
+            let statusIconHTML = '';
+            if (event.statuses && Array.isArray(event.statuses) && event.statuses.length > 0 &&
+                typeof getActiveStatusMeta === 'function') {
+                const statusMeta = getActiveStatusMeta(event.statuses);
+                if (statusMeta && statusMeta.icon) {
+                    statusIconHTML = `
+                        <span style="display: inline-flex; align-items: center; margin-left: 8px;" title="${statusMeta.label || ''}">
+                            <img src="${statusMeta.icon}" alt="${statusMeta.label || ''}" style="width: 16px; height: 16px; opacity: 0.85;">
+                        </span>
+                    `;
+                }
+            }
+
+            // Create event card with color class
             const $eventCard = $(`
-                <div class="calendar_admin_agenda_event_card " 
+                <div class="calendar_admin_agenda_event_card ${colorClass}" 
                      style="${teacherColorStyle} cursor: pointer;"
                      data-event-id="${event.eventid || ''}"
                      data-cmid="${event.cmid || ''}"
@@ -306,6 +379,7 @@ function renderAgendaView() {
                             ` : ''}
                         </div>
                     </div>
+                    ${statusIconHTML}
                     ${event.repeat ? `
                         <span style="opacity: 0.6; margin-left: 8px;" title="Recurring event">
                             <img src="./img/ev-repeat.svg" alt="repeat" style="width: 16px; height: 16px;">
@@ -335,7 +409,202 @@ function renderAgendaView() {
     setupAgendaEventHandlers();
 }
 
+// Setup click handlers for agenda event cards
+function setupAgendaEventHandlers() {
+    console.log('Setting up agenda event handlers');
 
+    // Remove any existing handlers first
+    $(document).off('click', '.calendar_admin_agenda_event_card');
+
+    // Add click handler for agenda event cards
+    $(document).on('click', '.calendar_admin_agenda_event_card', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('Agenda event card clicked');
+
+        const $card = $(this);
+        const eventId = $card.data('event-id');
+        const cmid = $card.data('cmid');
+        const classType = $card.data('class-type');
+        const source = $card.data('source');
+        const dateStr = $card.data('date');
+
+        console.log('Event data:', {
+            eventId,
+            cmid,
+            classType,
+            source,
+            dateStr
+        });
+
+        // Find the full event data from window.events
+        if (window.events && window.events.length > 0) {
+            let eventData = null;
+
+            // Try to find exact match by eventid and date
+            if (eventId) {
+                eventData = window.events.find(ev =>
+                    ev.eventid === eventId && ev.date === dateStr
+                );
+            }
+
+            // If not found by eventid, try by cmid
+            if (!eventData && cmid) {
+                eventData = window.events.find(ev =>
+                    ev.cmid === cmid && ev.date === dateStr
+                );
+            }
+
+            // If still not found, try by date and other properties
+            if (!eventData) {
+                eventData = window.events.find(ev =>
+                    ev.date === dateStr &&
+                    ev.classType === classType &&
+                    (ev.source === source || ev.classType === source)
+                );
+            }
+
+            console.log('Found event data:', eventData);
+
+            if (eventData) {
+                // Store the current event data globally (needed for dropdown menu)
+                window.currentClickedEvent = eventData;
+
+                // === REPLICATE EXACT MAIN CALENDAR LOGIC ===
+
+                // 1. Teacher time off: open Time Off modal
+                if (classType === 'teacher_timeoff' || source === 'teacher_timeoff') {
+                    console.log('Opening Time Off modal for teacher busy time');
+                    if (typeof window.openTimeOffModal === 'function') {
+                        window.openTimeOffModal(eventData);
+                    }
+                    return;
+                }
+
+                // 2. Check if event is cancelled (cancel_no_makeup) - show reason modal
+                const activeStatus = typeof getActiveStatusMeta === 'function' ?
+                    getActiveStatusMeta(eventData.statuses || []) :
+                    null;
+                console.log('Active status for clicked event:', activeStatus, 'Statuses:', eventData.statuses);
+
+                if (activeStatus && activeStatus.code === 'cancel_no_makeup') {
+                    console.log('Opening Reason of Cancellation modal for cancelled event', eventData);
+                    if (typeof window.openReasonOfCancellationModal === 'function') {
+                        window.openReasonOfCancellationModal(eventData);
+                    } else {
+                        console.error('openReasonOfCancellationModal function not found');
+                    }
+                    return;
+                }
+
+                // 3. Check if it's a peertalk event
+                if (classType === 'peertalk' || source === 'peertalk') {
+                    console.log('Opening PeerTalk modal for event:', eventData);
+                    if (typeof window.openPeerTalkModalWithData === 'function') {
+                        window.openPeerTalkModalWithData(eventData);
+                    }
+                    return;
+                }
+
+                // 4. Check if it's a conference event
+                if (classType === 'conference' || source === 'conference') {
+                    console.log('Opening Conference modal for event:', eventData);
+                    if (typeof window.openConferenceModalWithData === 'function') {
+                        window.openConferenceModalWithData(eventData);
+                    }
+                    return;
+                }
+
+                // 5. Check if it's NOT a 1:1 lesson (for regular group lessons)
+                if (classType !== 'one2one_weekly' && classType !== 'one2one_single') {
+                    console.log('Opening menu dropdown for group lesson');
+                    // This is a group lesson, open the dropdown menu
+                    if (typeof window.openMenuOptionsDropdown === 'function') {
+                        window.openMenuOptionsDropdown(e, $card[0]);
+                    } else {
+                        console.error('openMenuOptionsDropdown function not found');
+                    }
+                    return;
+                }
+
+                // 6. If it's a 1:1 lesson, create a synthetic event to trigger the lesson info handler
+                if (classType === 'one2one_weekly' || classType === 'one2one_single') {
+                    console.log('Creating synthetic event for 1:1 lesson to trigger lesson info handler');
+
+                    // Convert time format from HH:MM to minutes from midnight
+                    function timeToMinutes(timeStr) {
+                        if (!timeStr) return 540;
+                        const parts = timeStr.split(':');
+                        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                    }
+
+                    const startMins = timeToMinutes(eventData.start);
+                    const endMins = timeToMinutes(eventData.end);
+
+                    // Create a synthetic event element with all data attributes
+                    const $syntheticEvent = $('<div class="event e-green" style="display:none;"></div>')
+                        .attr('data-date', eventData.date)
+                        .attr('data-start', String(startMins).padStart(4, '0'))
+                        .attr('data-end', String(endMins).padStart(4, '0'))
+                        .attr('data-title', eventData.title)
+                        .attr('data-teacher-id', eventData.teacherId)
+                        .attr('data-event-id', eventData.eventid)
+                        .attr('data-cm-id', eventData.cmid)
+                        .attr('data-googlemeet-id', eventData.googlemeetid || eventData.cmid)
+                        .attr('data-class-type', eventData.classType)
+                        .attr('data-repeat', eventData.repeat ? 'true' : 'false')
+                        .attr('data-student-ids', (eventData.studentids || []).join(','))
+                        .attr('data-student-names', (eventData.studentnames || []).join(','))
+                        .attr('data-cohort-ids', (eventData.cohortids || []).join(','))
+                        .attr('data-avatar', eventData.avatar ||
+                            'https://randomuser.me/api/portraits/men/32.jpg');
+
+                    // Add title element for student name extraction
+                    $syntheticEvent.append($('<span class="ev-title"></span>').text(
+                        eventData.studentnames && eventData.studentnames.length > 0 ?
+                        eventData.studentnames[0] :
+                        eventData.title
+                    ));
+
+                    // Append to body temporarily
+                    $('body').append($syntheticEvent);
+
+                    // Wait for the .event.e-green handler to be attached
+                    let attempts = 0;
+                    const maxAttempts = 50; // 2.5 seconds max wait
+
+                    function triggerClickWhenReady() {
+                        attempts++;
+
+                        // After max attempts, trigger anyway
+                        if (attempts > maxAttempts) {
+                            console.warn('Event handler not ready after max attempts, triggering anyway');
+                        }
+
+                        // Try to click
+                        $syntheticEvent.click();
+
+                        // Remove the synthetic element after a short delay
+                        setTimeout(function() {
+                            $syntheticEvent.remove();
+                        }, 100);
+                    }
+
+                    // Small delay to ensure handlers are ready
+                    setTimeout(triggerClickWhenReady, 100);
+
+                    return;
+                }
+
+            } else {
+                console.warn('Could not find event data for clicked card');
+            }
+        } else {
+            console.warn('No events available in window.events');
+        }
+    });
+}
 
 // Expose function globally so calendar can trigger updates
 window.refreshAgendaView = function() {

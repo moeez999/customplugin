@@ -43,15 +43,33 @@ function is_only_student_role($userid) {
     return ($studentRoles > 0 && $totalRoles == $studentRoles);
 }
 
-function is_cohort_teacher_exist_oly($userid) {
+function is_cohort_teacher_exist_only($userid) {
     global $DB;
 
     $sql = "SELECT 1
             FROM {cohort}
-            WHERE cohortmainteacher = :uid
-               OR cohortguideteacher = :uid";
+            WHERE cohortmainteacher = :uid1
+               OR cohortguideteacher = :uid2";
 
-    return $DB->record_exists_sql($sql, ['uid' => (int)$userid]);
+    return $DB->record_exists_sql($sql, [
+        'uid1' => (int)$userid,
+        'uid2' => (int)$userid
+    ]);
+}
+
+function is_only_student_only($userid) {
+    global $DB;
+
+    $studentroleid = 5;
+
+    // Count total number of roles assigned to the user
+    $totalRoles = $DB->count_records('role_assignments', ['userid' => $userid]);
+
+    // Count number of student role assignments
+    $studentRoles = $DB->count_records('role_assignments', ['userid' => $userid, 'roleid' => $studentroleid]);
+
+    // User has only student role if total == student role count and there’s at least one
+    return ($studentRoles > 0 && $totalRoles == $studentRoles);
 }
 
 // -----------------------------
@@ -77,6 +95,11 @@ if (is_siteadmin($USER)) {
 // Store in localStorage
 $PAGE->requires->js_init_code("
     localStorage.setItem('role', '{$role}');
+");
+
+// Store in localStorage
+$PAGE->requires->js_init_code("
+    localStorage.setItem('teacherId', '{$USER->id}');
 ");
 
 echo $OUTPUT->header();

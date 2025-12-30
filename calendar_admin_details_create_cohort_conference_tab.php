@@ -623,7 +623,6 @@
             isValid = false;
         }
         if (scheduleArray.length === 0) isValid = false;
-
         // ✅ Date validation
         let dateText = $parent.find('.conference_modal_date_btn').last().text().trim();
         let parsedDate = new Date(dateText);
@@ -710,6 +709,13 @@
             submittedAt: new Date().toISOString()
         };
 
+        // Check if this is an update (editing existing event)
+        const eventId = $form.data('eventId');
+        if (eventId) {
+            payload.id = eventId;
+            payload.action = 'update';
+        }
+
         console.log('✅ Conference Payload:', payload);
 
         // ================================
@@ -732,21 +738,23 @@
                 console.log("📌 Conference API Response:", res);
 
                 if (!response.ok || !res.success) {
+                    const action = eventId ? 'update' : 'create';
                     if (typeof showToast === 'function') {
-                        showToast("Failed to create conference: " + (res.message ||
+                        showToast("Failed to " + action + " conference: " + (res.message ||
                             "Unknown error"), 'error');
                     } else {
-                        alert("❌ Failed to create conference: " + (res.message ||
+                        alert("❌ Failed to " + action + " conference: " + (res.message ||
                             "Unknown error"));
                     }
                     return;
                 }
 
                 // Success: show toast and reset form
+                const successMessage = eventId ? 'Conference updated successfully!' : 'Conference created successfully!';
                 if (typeof showToast === 'function') {
-                    showToast('Conference created successfully!', 'success');
+                    showToast(successMessage, 'success');
                 } else {
-                    alert("🎉 Conference created successfully!");
+                    alert("🎉 " + successMessage);
                 }
 
                 if (window.refetchCustomPluginData) {
@@ -779,7 +787,7 @@
         });
 
     // Reset Conference Form
-    function resetConferenceForm() {
+    window.resetConferenceForm = function resetConferenceForm() {
         // Reset title
         $parent.find('.addtime-title-input').val('Conference Title');
 
@@ -809,14 +817,12 @@
             'Does not repeat <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg" alt=""></span>'
         );
 
-        // Reset to view 1
-        $view2.hide();
-        $view1.show();
-        $cohortlist.show();
-        $studentlist.hide();
+        // Reset button text and clear event ID
+        $form.removeData('eventId');
+        $parent.find('.conference_modal_btn').text('Schedule Conference');
 
         console.log('✅ Conference form reset');
-    }
+    };
 })();
 </script>
 

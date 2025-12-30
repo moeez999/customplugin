@@ -928,14 +928,17 @@
 
         const payloads = [];
 
+        // Check if this is an update (editing existing event)
+        const eventId = $form.data('eventId');
+
         if (classType === 'single') {
             const slot = scheduleArray[0];
             const startISO = buildISODateTime(startDateISO, slot.startTime, offsetMinutes);
             const finishISO = buildISODateTime(startDateISO, slot.endTime, offsetMinutes);
 
             const payload = {
-                edit: false,
-                id: null,
+                edit: eventId ? true : false,
+                id: eventId ? eventId : null,
                 startTimeEvent: startISO,
                 finishTimeEvent: finishISO,
                 color: color,
@@ -968,8 +971,8 @@
             }
 
             const payload = {
-                edit: false,
-                id: null,
+                edit: eventId ? true : false,
+                id: eventId ? eventId : null,
                 startTimeEvent: startISO,
                 finishTimeEvent: finishISO,
                 color: color,
@@ -988,8 +991,8 @@
                 const finishISO = buildISODateTime(startDateISO, slot.endTime, offsetMinutes);
 
                 const payload = {
-                    edit: false,
-                    id: null,
+                    edit: eventId ? true : false,
+                    id: eventId ? eventId : null,
                     startTimeEvent: startISO,
                     finishTimeEvent: finishISO,
                     color: color,
@@ -1048,10 +1051,11 @@
 
                 if (allSuccess) {
                     // Success: show toast and reset form
+                    const successMessage = eventId ? 'Peer Talk updated successfully!' : 'Peer Talk created successfully!';
                     if (typeof showToast === 'function') {
-                        showToast('Peer Talk created successfully!', 'success');
+                        showToast(successMessage, 'success');
                     } else {
-                        alert('🎉 Peer Talk created successfully!');
+                        alert('🎉 ' + successMessage);
                     }
 
                     if (window.refetchCustomPluginData) {
@@ -1103,7 +1107,7 @@
     });
 
     // Reset PeerTalk Form
-    function resetPeerTalkForm() {
+    window.resetPeerTalkForm = function resetPeerTalkForm() {
         // Reset date button
         $parent.find('.peertalk_modal_date_btn').text('Select Date');
 
@@ -1127,8 +1131,12 @@
             'Does not repeat <span style="float:right; font-size:1rem;"><img src="./img/dropdown-arrow-down.svg" alt=""></span>'
         );
 
+        // Reset button text and clear event ID
+        $form.removeData('eventId');
+        $parent.find('.peertalk_modal_btn').text('Schedule Peer Talk');
+
         console.log('✅ PeerTalk form reset');
-    }
+    };
 })();
 </script>
 

@@ -52,7 +52,8 @@ $endraw        = required_param('end', PARAM_RAW_TRIMMED);
 $teacherid     = optional_param('teacherid', 0, PARAM_INT);              // legacy
 $teacheridsraw = optional_param('teacherids', '', PARAM_RAW_TRIMMED);    // new: multi
 $cohortid      = optional_param('cohortid', 0, PARAM_INT);
-$studentid     = optional_param('studentid', 0, PARAM_INT);
+$studentid     = optional_param('studentid', 0, PARAM_INT);              // legacy
+$studentidsraw = optional_param('studentids', '', PARAM_RAW_TRIMMED);    // new: multi
 // specific googlemeet id filter for 1:1
 $one2onegmid   = optional_param('one2one_gmid', 0, PARAM_INT);
 
@@ -64,6 +65,16 @@ if ($teacheridsraw) {
 } elseif ($teacherid) {
     // Fallback to single teacherid for backward compatibility
     $teacherids = [$teacherid];
+}
+
+// Parse multiple student IDs if provided (comma-separated)
+$studentids = [];
+if ($studentidsraw) {
+    $ids = array_map('intval', explode(',', $studentidsraw));
+    $studentids = array_filter($ids);
+} elseif ($studentid) {
+    // Fallback to single studentid for backward compatibility
+    $studentids = [$studentid];
 }
 
 // Parse dates → timestamps
@@ -81,9 +92,9 @@ if (!$startts || !$endts || $endts <= $startts) {
 
 // Permission check (tune as needed)
 $syscontext = context_system::instance();
-if (!is_siteadmin($USER) && !has_capability('moodle/site:config', $syscontext)) {
-    require_capability('moodle/course:view', $syscontext);
-}
+// if (!is_siteadmin($USER) && !has_capability('moodle/site:config', $syscontext)) {
+//     require_capability('moodle/course:view', $syscontext);
+// }
 
 // ---- Helpers ----
 
@@ -272,6 +283,7 @@ $add_one2one_events = function() use (
     $teacherids,
     $teacherEmails,
     $studentid,
+    $studentids,
     $one2onegmid,
     $cohortid,
     $teacherEmailLower,
@@ -370,8 +382,17 @@ $add_one2one_events = function() use (
         }
         $studentIds = array_values(array_unique($studentIds));
 
-        if ($studentid && !in_array($studentid, $studentIds, true)) {
-            continue;
+        // Student filter: support both new (studentids array) and legacy (single studentid)
+        if (!empty($studentids)) {
+            // New: multiple student filter - require at least one match
+            if (!array_intersect($studentids, $studentIds)) {
+                continue;
+            }
+        } elseif ($studentid) {
+            // Legacy: single student filter
+            if (!in_array($studentid, $studentIds, true)) {
+                continue;
+            }
         }
 
         // Load full student user records for names (for this CM)
@@ -464,6 +485,18 @@ $add_one2one_events = function() use (
             }
         }
 
+        // Precompute student avatar URLs
+        global $PAGE; // ⭐ REQUIRED
+
+        $studentAvatars = [];
+        foreach ($studentIds as $sid) {
+            if (isset($studentUserMap[$sid])) {
+                $studentAvatars[] = (new user_picture($studentUserMap[$sid]))
+                    ->get_url($PAGE)
+                    ->out(false);
+            }
+        }
+
         // Build event entries
         $seq = 1;
         foreach ($allevents as $e) {
@@ -471,14 +504,44 @@ $add_one2one_events = function() use (
             $eventdate_ts = (int)$e->eventdate;
 
             // --- STEP 2: combine that date + googlemeet time ---
-            $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-            if ($gmTimes) {
-                [$eventStart, $eventEnd] = $gmTimes;
-            } else {
-                // Fallback: old behaviour (eventdate + duration)
-                $eventStart = $eventdate_ts;
-                $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+            // if ($gmTimes) {
+            //     [$eventStart, $eventEnd] = $gmTimes;
+            // } else {
+            //     // Fallback: old behaviour (eventdate + duration)
+            //     $eventStart = $eventdate_ts;
+            //     $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // }
+
+
+            // ----------------------------------------------------
+            // Date from googlemeet_events.eventdate
+            // Time from googlemeet (starthour/startminute/endhour/endminute)
+            // ----------------------------------------------------
+
+            $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+            // Build start time
+            $eventStart = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->starthour,
+                (int)($gm->startminute ?? 0)
+            ));
+
+            // Build end time
+            $eventEnd = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->endhour,
+                (int)($gm->endminute ?? 0)
+            ));
+
+            // If end is before or equal start → crosses midnight
+            if ($eventEnd <= $eventStart) {
+                $eventEnd += 86400;
             }
+
 
             // ---- Determine cohort group for 1:1 student ----
             $groupName = null;
@@ -499,7 +562,66 @@ $add_one2one_events = function() use (
                 }
             }
 
-            $events[] = [
+
+            // =====================================================
+// PATCH: APPLY 1:1 STATUS (reschedule / cancel) PER EVENT
+// =====================================================
+
+
+$statusrow = $DB->get_record(
+    'local_gm_event_status',
+    [
+        'eventid' => (int)$e->id,
+        'isactive' => 1
+    ],
+    'id, statuscode, detailsjson',
+    IGNORE_MISSING
+);
+
+if ($statusrow && !empty($statusrow->detailsjson)) {
+
+    $details = json_decode($statusrow->detailsjson, true);
+
+    // -------------------------------
+    // RESCHEDULE LOGIC
+    // -------------------------------
+    if (!empty($details['current'])) {
+
+        $cur = $details['current'];
+
+        // Override time
+        if (!empty($cur['start_ts']) && !empty($cur['end_ts'])) {
+            $eventStart = (int)$cur['start_ts'];
+            $eventEnd   = (int)$cur['end_ts'];
+        }
+
+        // Override teacher if changed
+        if (!empty($cur['teacher'])) {
+            $teacherIdsForEvent = [(int)$cur['teacher']];
+
+            // rebuild teacher names
+            $teacherNames = [];
+            if (isset($teacherUserMap[$cur['teacher']])) {
+                $teacherNames[] = fullname($teacherUserMap[$cur['teacher']], true);
+            }
+        }
+    }
+
+    // -------------------------------
+    // CANCEL LOGIC
+    // -------------------------------
+    if (($details['action'] ?? '') === 'cancelled') {
+        // Skip this event completely
+        continue;
+    }
+}
+
+// =====================================================
+// END PATCH
+// =====================================================
+
+
+                       $events[] = [
                 'id'            => '1to1-' . $e->id,
                 'eventid'       => (int)$e->id,
                 'main_event_id' => (int)$mainEventId,
@@ -523,14 +645,61 @@ $add_one2one_events = function() use (
                 'studentnames'  => $studentNames,
                 'cohortids'     => [],
 
-                'group'         => $groupName,   // <-- NEW FIELD
-
+                'group'         => $groupName,
                 'class_type'    => $classType,
                 'is_recurring'  => $isrecurring,
 
                 'meetingurl'    => $meetingurl,
                 'viewurl'       => $viewurl,
+                'studentavatar' => $studentAvatars,
+                'previous'      => $details['previous'],
+                'current'       => $details['current'],
             ];
+
+            // =====================================================
+            // PATCH: Attach 1:1 cancel / reschedule status
+            // =====================================================
+
+            $lastIndex = count($events) - 1;
+            $currentEventId = (int)$e->id;
+
+            $statusRows = $DB->get_records_select(
+                'local_gm_event_status',
+                'eventid = :eid AND isactive = 1',
+                ['eid' => $currentEventId],
+                'timecreated ASC'
+            );
+
+            $events[$lastIndex]['statuses'] = [];
+
+            foreach ($statusRows as $sr) {
+                $details = $sr->detailsjson ? json_decode($sr->detailsjson, true) : null;
+
+                $events[$lastIndex]['statuses'][] = [
+                    'statuscode' => $sr->statuscode,
+                    'details'    => $details,
+                    'time'       => (int)$sr->timecreated,
+                ];
+
+                // Cancel support
+                if (($details['action'] ?? '') === 'cancelled') {
+                    $events[$lastIndex]['is_cancelled'] = true;
+                    $events[$lastIndex]['cancel_reason'] = $details['reason'] ?? '';
+                }
+
+                // Reschedule support
+                if (!empty($details['current'])) {
+                    $events[$lastIndex]['rescheduled'] = [
+                        'previous' => $details['previous'] ?? null,
+                        'current'  => $details['current'],
+                    ];
+                }
+            }
+
+            // =====================================================
+            // END 1:1 PATCH
+            // =====================================================
+
 
 
             // $events[] = [
@@ -567,6 +736,10 @@ $add_one2one_events = function() use (
     }
 };
 
+
+
+
+
 /**
  * Group events (course 2)
  */
@@ -578,6 +751,7 @@ $add_group_events = function() use (
     $teacherid,
     $cohortid,
     $studentid,
+    $studentids,
     $availability_collect_cohorts,
     $fmt_iso,
     $derive_times_from_gm,
@@ -591,11 +765,16 @@ $add_group_events = function() use (
     // All cohorts map
     $cohortById = $DB->get_records('cohort', null, '', 'id, cohortmainteacher, cohortguideteacher');
 
-    // Student cohorts (for filter)
+    // Student cohorts (for filter) - support both single and multiple students
     $studentCohorts = [];
-    if ($studentid) {
-        $rows = $DB->get_records('cohort_members', ['userid' => $studentid], '', 'id, cohortid');
-        $studentCohorts = array_map(fn($r) => (int)$r->cohortid, $rows);
+    $studentIdsToCheck = !empty($studentids) ? $studentids : ($studentid ? [$studentid] : []);
+    
+    if (!empty($studentIdsToCheck)) {
+        list($insqlStu, $paramsStu) = $DB->get_in_or_equal($studentIdsToCheck, SQL_PARAMS_NAMED);
+        $rows = $DB->get_records_select('cohort_members', "userid $insqlStu", $paramsStu, '', 'id, userid, cohortid');
+        foreach ($rows as $row) {
+            $studentCohorts[(int)$row->userid][] = (int)$row->cohortid;
+        }
     }
 
     $sections = $DB->get_records('course_sections', ['course' => $courseid_group], 'id ASC', 'id, availability, section');
@@ -662,9 +841,30 @@ $add_group_events = function() use (
             continue;
         }
 
-        // Student filter: require membership in at least one cohort
-        if ($studentid && $cohortIds) {
-            if (!array_intersect($cohortIds, $studentCohorts)) {
+        // Student filter: support both new (multiple students) and legacy (single student)
+        if (!empty($studentids) || $studentid) {
+            // If students are filtered, only show events for cohorts they're in
+            if ($cohortIds) {
+                $hasMatchingCohort = false;
+                
+                if (!empty($studentids)) {
+                    // Check if ANY selected student is in ANY of the event's cohorts
+                    foreach ($studentids as $sid) {
+                        if (isset($studentCohorts[$sid]) && array_intersect($cohortIds, $studentCohorts[$sid])) {
+                            $hasMatchingCohort = true;
+                            break;
+                        }
+                    }
+                } else if ($studentid && isset($studentCohorts[$studentid])) {
+                    // Legacy: check if the single student is in any of the event's cohorts
+                    $hasMatchingCohort = !empty(array_intersect($cohortIds, $studentCohorts[$studentid]));
+                }
+                
+                if (!$hasMatchingCohort) {
+                    continue;
+                }
+            } else {
+                // No cohorts for this event, skip if students are filtered
                 continue;
             }
         }
@@ -732,6 +932,31 @@ $add_group_events = function() use (
 
         $teacherIdsSingle = $teacherIdDisplay ? [$teacherIdDisplay] : [];
 
+       
+
+
+// ----------------------------------------------------
+// ADD current teacher profile pic (same style as previous teacher)
+// ----------------------------------------------------
+$currentTeacherPicc = '';
+
+if ($teacherIdDisplay > 0) {
+ 
+   
+    if ($u22 = $DB->get_record('user', ['id' => $teacherIdDisplay])) {
+
+    global $PAGE;
+    if (!$PAGE) {
+        $PAGE = new moodle_page();
+        $PAGE->set_context(context_system::instance());
+    }
+
+    $picCurrr = new user_picture($u22);
+    $picCurrr->size = 50;
+    $currentTeacherPicc = $picCurrr->get_url($PAGE)->out(false);
+}
+}
+
         // Preload that specific teacher for name
         $teacherNames = [];
         if ($teacherIdDisplay) {
@@ -760,47 +985,97 @@ $add_group_events = function() use (
             // --- STEP 1: get the raw event date from googlemeet_events ---
             $eventdate_ts = (int)$e->eventdate;
 
-            // --- STEP 2: combine that date + googlemeet time ---
-            $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-            if ($gmTimes) {
-                [$eventStart, $eventEnd] = $gmTimes;
-            } else {
-                // Fallback: old behaviour (eventdate + duration)
-                $eventStart = $eventdate_ts;
-                $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // // --- STEP 2: combine that date + googlemeet time ---
+            // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+            // if ($gmTimes) {
+            //     [$eventStart, $eventEnd] = $gmTimes;
+            // } else {
+            //     // Fallback: old behaviour (eventdate + duration)
+            //     $eventStart = $eventdate_ts;
+            //     $eventEnd   = $eventStart + max(60, (int)$e->duration * 60);
+            // }
+
+
+            // ----------------------------------------------------
+            // Date from googlemeet_events.eventdate
+            // Time from googlemeet (starthour/startminute/endhour/endminute)
+            // ----------------------------------------------------
+
+            $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+            // Build start time
+            $eventStart = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->starthour,
+                (int)($gm->startminute ?? 0)
+            ));
+
+            // Build end time
+            $eventEnd = strtotime(sprintf(
+                '%s %02d:%02d:00',
+                $eventDate,
+                (int)$gm->endhour,
+                (int)($gm->endminute ?? 0)
+            ));
+
+            // If end is before or equal start → crosses midnight
+            if ($eventEnd <= $eventStart) {
+                $eventEnd += 86400;
             }
 
-            $events[] = [
-                'id'            => 'group-' . $e->id,
-                'eventid'       => (int)$e->id,
-                'main_event_id' => (int)$mainEventId,
-                'is_parent'     => ((int)$e->id === $mainEventId),
-                'sequence'      => $seq++,
 
-                'source'        => 'group',
-                'courseid'      => $courseid_group,
-                'cmid'          => (int)$cmid,
-                'googlemeetid'  => (int)$gm->id,
-                'title'         => (string)$gm->name,
+           // Build student list for these cohorts
+$studentIdsFinal = [];
+if (!empty($cohortIds)) {
+    list($insqlC, $paramsC) = $DB->get_in_or_equal($cohortIds, SQL_PARAMS_NAMED);
+    $sqlStudents = "
+        SELECT DISTINCT userid
+        FROM {cohort_members}
+        WHERE cohortid $insqlC
+    ";
+    $studentRows = $DB->get_records_sql($sqlStudents, $paramsC);
 
-                'start_ts'      => $eventStart,
-                'end_ts'        => $eventEnd,
-                'start'         => $fmt_iso($eventStart),
-                'end'           => $fmt_iso($eventEnd),
+    foreach ($studentRows as $row) {
+        $studentIdsFinal[] = (int)$row->userid;
+    }
+}
 
-                // NOW: exactly one teacher (based on main/tutoring)
-                'teacherids'    => $teacherIdsSingle,
-                'teachernames'  => $teacherNames,
-                'studentids'    => [],            // implicit via cohort
-                'studentnames'  => [],            // no explicit list
-                'cohortids'     => $cohortIds,
+$events[] = [
+    'id'            => 'group-' . $e->id,
+    'eventid'       => (int)$e->id,
+    'main_event_id' => (int)$mainEventId,
+    'is_parent'     => ((int)$e->id === $mainEventId),
+    'sequence'      => $seq++,
 
-                'class_type'    => $classType,   // 'main' | 'tutoring'
-                'is_recurring'  => $isrecurring,
+    'source'        => 'group',
+    'courseid'      => $courseid_group,
+    'cmid'          => (int)$cmid,
+    'googlemeetid'  => (int)$gm->id,
+    'title'         => (string)$gm->name,
 
-                'meetingurl'    => $meetingurl,
-                'viewurl'       => $viewurl,
-            ];
+    'start_ts'      => $eventStart,
+    'end_ts'        => $eventEnd,
+    'start'         => $fmt_iso($eventStart),
+    'end'           => $fmt_iso($eventEnd),
+
+    'teacherids'    => $teacherIdsSingle,
+    'teacherpic'    => $currentTeacherPicc,
+    'teachernames'  => $teacherNames,
+
+    // ✅ UPDATED — all students from matched cohorts
+    'studentids'    => $studentIdsFinal,
+    'studentnames'  => [],
+
+    'cohortids'     => $cohortIds,
+
+    'class_type'    => $classType,
+    'is_recurring'  => $isrecurring,
+
+    'meetingurl'    => $meetingurl,
+    'viewurl'       => $viewurl,
+];
+
         }
     }
 };
@@ -811,6 +1086,7 @@ try {
     // If a specific 1:1 googlemeet is selected, ONLY load that 1:1 meet's events.
     if ($one2onegmid) {
         $add_one2one_events();
+        
     } else {
         // Normal behaviour: load both group + 1:1 events.
         $add_group_events();
@@ -1049,7 +1325,7 @@ unset($ev);
             foreach ($guideCohorts as $c) {
                 $cohortids[] = (int)$c->id;
             }
-        } elseif (!$teacherids && !$studentid && !$cohortid) {
+        } elseif (!$teacherids && !$studentid && !$studentids && !$cohortid) {
             // No explicit filter → fallback: cohorts where current user is main/guide teacher.
             $cohorts = $DB->get_records_sql(
                 "SELECT id
@@ -1074,24 +1350,30 @@ unset($ev);
             }
         }
 
-        // c) Apply student filter: cohorts where this student is a member.
-        if ($studentid) {
+        // c) Apply student filter: cohorts where these students are members
+        // Support both new (multiple students) and legacy (single student)
+        $studentIdsToFilter = !empty($studentids) ? $studentids : ($studentid ? [$studentid] : []);
+        
+        if (!empty($studentIdsToFilter)) {
             if (!empty($cohortids)) {
                 list($insql, $params) = $DB->get_in_or_equal($cohortids, SQL_PARAMS_NAMED);
-                $params['uid'] = $studentid;
+                list($insqlStu, $paramsStu) = $DB->get_in_or_equal($studentIdsToFilter, SQL_PARAMS_NAMED);
+                $params = array_merge($params, $paramsStu);
                 $rows = $DB->get_records_sql(
                     "SELECT DISTINCT cohortid
-                       FROM {cohort_members}
-                      WHERE userid = :uid
-                        AND cohortid $insql",
+                     FROM {cohort_members}
+                    WHERE cohortid $insql
+                      AND userid $insqlStu",
                     $params
                 );
             } else {
-                $rows = $DB->get_records(
-                    'cohort_members',
-                    ['userid' => $studentid],
-                    '',
-                    'cohortid'
+                // If no cohorts from previous filters, get cohorts for these students
+                list($insqlStu, $paramsStu) = $DB->get_in_or_equal($studentIdsToFilter, SQL_PARAMS_NAMED);
+                $rows = $DB->get_records_sql(
+                    "SELECT DISTINCT cohortid
+                     FROM {cohort_members}
+                    WHERE userid $insqlStu",
+                    $paramsStu
                 );
             }
 
@@ -1496,13 +1778,42 @@ try {
                         $eventdate_ts = (int)$ev->eventdate;
 
                         // combine date + gm time
-                        $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
-                        if ($gmTimes) {
-                            [$eventStart, $eventEnd] = $gmTimes;
-                        } else {
-                            $eventStart = $eventdate_ts;
-                            $eventEnd   = $eventStart + max(60, (int)$ev->duration * 60);
+                        // $gmTimes = $derive_times_from_gm($gm, $eventdate_ts);
+                        // if ($gmTimes) {
+                        //     [$eventStart, $eventEnd] = $gmTimes;
+                        // } else {
+                        //     $eventStart = $eventdate_ts;
+                        //     $eventEnd   = $eventStart + max(60, (int)$ev->duration * 60);
+                        // }
+
+                        // ----------------------------------------------------
+                        // Date from googlemeet_events.eventdate
+                        // Time from googlemeet (starthour/startminute/endhour/endminute)
+                        // ----------------------------------------------------
+
+                        $eventDate = date('Y-m-d', (int)$e->eventdate);
+
+                        // Build start time
+                        $eventStart = strtotime(sprintf(
+                            '%s %02d:%02d:00',
+                            $eventDate,
+                            (int)$gm->starthour,
+                            (int)($gm->startminute ?? 0)
+                        ));
+
+                        // Build end time
+                        $eventEnd = strtotime(sprintf(
+                            '%s %02d:%02d:00',
+                            $eventDate,
+                            (int)$gm->endhour,
+                            (int)($gm->endminute ?? 0)
+                        ));
+
+                        // If end is before or equal start → crosses midnight
+                        if ($eventEnd <= $eventStart) {
+                            $eventEnd += 86400;
                         }
+
 
                         $conferenceEvents[] = [
                             'id'            => 'conference-' . $ev->id,
@@ -1554,6 +1865,14 @@ $teacherTimeoff = [];
 try {
     // 1) Collect all teacher IDs from filtered events
     $allTeacherIds = [];
+
+
+      // First, add explicitly selected teachers
+    if (!empty($teacherids)) {
+        foreach ($teacherids as $tid) {
+            $allTeacherIds[] = (int)$tid;
+        }
+    }
     foreach ($filtered as $ev) {
         if (!empty($ev['teacherids']) && is_array($ev['teacherids'])) {
             foreach ($ev['teacherids'] as $tid) {
@@ -1712,6 +2031,574 @@ try {
 } catch (Throwable $e) {
     $teacherExtraSlots = [];
 }
+
+
+
+// -------------------------------------------------------------
+// ADD +1 DAY TO start AND end INSIDE $teacherTimeoff
+// -------------------------------------------------------------
+foreach ($teacherTimeoff as $tid => $items) {
+    foreach ($items as $idx => $it) {
+
+        // Add +1 day to start
+        if (!empty($it['start'])) {
+            $dt = new DateTime($it['start']);
+            $dt->modify('+1 day');
+            $teacherTimeoff[$tid][$idx]['start'] = $dt->format('Y-m-d');
+        }
+
+        // Add +1 day to end
+        if (!empty($it['end'])) {
+            $dt2 = new DateTime($it['end']);
+            $dt2->modify('+1 day');
+            $teacherTimeoff[$tid][$idx]['end'] = $dt2->format('Y-m-d');
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================================
+// PATCH: RESCHEDULE FILTER + WINDOW DETECTION for local_gm_event_status
+// ======================================================================
+
+$teacherFilter = (int)$teacheridsraw;
+$refiltered = [];
+
+// -------------------------------------------------------------
+// 1) LOAD ALL ACTIVE STATUS RECORDS (for scanning whole table)
+// -------------------------------------------------------------
+$allStatuses = $DB->get_records('local_gm_event_status', ['isactive' => 1]);
+
+// Index statuses by eventid for quick lookup
+$statusByEvent = [];
+foreach ($allStatuses as $s) {
+    $statusByEvent[(int)$s->eventid][] = $s;
+}
+
+// Used to avoid duplicates when adding extra events
+$addedEventIds = [];
+
+// -------------------------------------------------------------
+// 2) PROCESS EXISTING $filtered EVENTS (UPDATE + FILTER)
+// -------------------------------------------------------------
+foreach ($filtered as $ev) {
+
+    $eid = (int)($ev['eventid'] ?? 0);
+    
+    if ($eid <= 0) {
+        continue;
+    }
+
+    $statuses = $statusByEvent[$eid] ?? [];
+    if (!$statuses) {
+        // No status → keep as is
+        $refiltered[] = $ev;
+        continue;
+    }
+
+    $remove = false;
+    $updated = $ev;
+
+    foreach ($statuses as $s) {
+
+        $details = json_decode($s->detailsjson ?? '', true);
+        if (!is_array($details) || empty($details['current'])) {
+
+    // Mark as NOT rescheduled
+    $updated['rescheduled'] = ['status' => 'no'];
+
+    continue;
+}
+
+        $cur = $details['current'];
+
+        $newTeacher = (int)($cur['teacher'] ?? 0);
+        $newDate    = $cur['date']  ?? null;
+        $newStart   = $cur['start'] ?? null;
+        $newEnd     = $cur['end']   ?? null;
+
+        // ---------------------------------------------------------
+        // NEW: BUILD CURRENT TEACHER PROFILE PIC
+        // ---------------------------------------------------------
+        $currentTeacherPic = null;
+        if ($newTeacher > 0) {
+            if ($u = $DB->get_record('user', ['id' => $newTeacher])) {
+                $pic = new user_picture($u);
+                $pic->size = 50;
+                $currentTeacherPic = $pic->get_url($PAGE)->out(false);
+            }
+        }
+
+        // ---------------------------------------------------------
+        // NEW: BUILD PREVIOUS TEACHER PROFILE PIC
+        // ---------------------------------------------------------
+        $previousTeacherPic = null;
+        if (!empty($details['previous']['teacher'])) {
+            $prevTid = (int)$details['previous']['teacher'];
+            if ($u2 = $DB->get_record('user', ['id' => $prevTid])) {
+                $pic2 = new user_picture($u2);
+                $pic2->size = 50;
+                $previousTeacherPic = $pic2->get_url($PAGE)->out(false);
+            }
+        }
+
+        // -----------------------------------------------
+        // A) ALWAYS UPDATE TIME/DATE IF AVAILABLE
+        // -----------------------------------------------
+        if ($newDate && $newStart && $newEnd) {
+            $tsStart = strtotime("$newDate $newStart");
+            $tsEnd   = strtotime("$newDate $newEnd");
+
+            if ($tsStart && $tsEnd) {
+                $updated['start_ts'] = $tsStart;
+                $updated['end_ts']   = $tsEnd;
+                $updated['start']    = $fmt_iso($tsStart);
+                $updated['end']      = $fmt_iso($tsEnd);
+            }
+        }
+
+        // -----------------------------------------------------
+        // ATTACH PROFILE PICS ALWAYS (NEW)
+        // -----------------------------------------------------
+        $updated['currentTeacherPic']  = $currentTeacherPic;
+        $updated['previousTeacherPic'] = $previousTeacherPic;
+
+
+        //---------------------------------------------
+// ADD PROFILE PIC FOR CURRENT + PREVIOUS
+//---------------------------------------------
+
+$currentTeacherPic = '';
+$previousTeacherPic = '';
+
+// 1) Current Teacher Profile
+$currentTid = (int)($cur['teacher'] ?? 0);
+if ($currentTid > 0) {
+    if ($uT = $DB->get_record('user', ['id' => $currentTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj = new user_picture($uT);
+        $picObj->size = 50;
+        $currentTeacherPic = $picObj->get_url($PAGE)->out(false);
+    }
+}
+
+// 2) Previous Teacher Profile
+$prevTid = 0;
+if (!empty($details['previous']['teacher'])) {
+    $prevTid = (int)$details['previous']['teacher'];
+}
+
+if ($prevTid > 0) {
+    if ($uPrev = $DB->get_record('user', ['id' => $prevTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj2 = new user_picture($uPrev);
+        $picObj2->size = 50;
+        $previousTeacherPic = $picObj2->get_url($PAGE)->out(false);
+    }
+}
+
+// Attach pics back to $details (so you can use it later)
+$details['current']['teacher_pic'] = $currentTeacherPic;
+$details['previous']['teacher_pic'] = $previousTeacherPic;
+
+
+// $details['current']['teacher_pic'] = $currentTeacherPic;
+// $details['previous']['teacher_pic'] = $previousTeacherPic;
+
+// add full name for current
+if (!empty($details['current']['teacher'])) {
+    $cid = (int)$details['current']['teacher'];
+    if ($u = $DB->get_record('user', ['id' => $cid], 'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename')) {
+        $details['current']['teacher_name'] = fullname($u, true);
+    }
+}
+
+// add full name for previous
+if (!empty($details['previous']['teacher'])) {
+    $pid = (int)$details['previous']['teacher'];
+    if ($u2 = $DB->get_record('user', ['id' => $pid], 'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename')) {
+        $details['previous']['teacher_name'] = fullname($u2, true);
+    }
+}
+
+
+
+
+
+
+        // -----------------------------------------------
+        // B) TEACHER FILTER (your modified logic)
+        // -----------------------------------------------
+        if ($teacherFilter > 0 && $newTeacher > 0) {
+            if ($newTeacher !== $teacherFilter) {
+
+                // You wanted to KEEP it if previous matches—your logic disabled here.
+               $updated['rescheduled'] = $details;  // <--- full details json stored here
+                continue; // keep, do not remove
+            }
+        }
+    }
+
+    if (!$remove) {
+        $refiltered[] = $updated;
+        $addedEventIds[$eid] = true;
+    }
+}
+
+// -------------------------------------------------------------
+// 3) ADD EVENTS NOT PRESENT IN $filtered BUT WITH STATUS MATCH
+// -------------------------------------------------------------
+foreach ($allStatuses as $s) {
+
+    
+
+    $details = json_decode($s->detailsjson ?? '', true);
+
+   
+
+
+// ------------------------------------------------------------
+// RESOLVE COHORT IDS FROM THE *SECTION* WHERE GOOGLE MEET EXISTS
+// ------------------------------------------------------------
+$cohortids = [];
+$classType = 'group'; // default class type
+$sourcee = 'group';
+
+if (strpos($s->statuscode, 'one2one') !== false) {
+       $classType = 'one2one'; // default class type
+       $sourcee = 'one2one';
+    }
+
+$gm = $DB->get_record('googlemeet', ['id' => $s->googlemeetid], '*', IGNORE_MISSING);
+
+// ---------------------------------------
+// Extract cohort shortname from GM name
+// Example: "KY4-02132025-0107 Main Classes"
+// ---------------------------------------
+$cohortids = [];
+// $classType = 'group';
+
+if (!empty($gm->name)) {
+    // Split at first dash
+    $parts = explode('-', $gm->name, 2);
+    $shortname = trim($parts[0]);   // KY4
+
+    if ($shortname !== '') {
+        // Fetch the cohort by shortname
+        $cohort = $DB->get_record('cohort', ['shortname' => $shortname], 'id');
+        if ($cohort) {
+            $cohortids = [(int)$cohort->id];
+        }
+    }
+
+    // Detect class type from name
+    if (stripos($gm->name, 'Main') !== false) {
+        $classType = 'main';
+    } elseif (stripos($gm->name, 'Practice') !== false || stripos($gm->name, 'Tutoring') !== false) {
+        $classType = 'tutoring';
+    }
+}
+
+
+$teacherids = [];
+$teachernames = [];
+$teacherpics = [];
+
+if (!empty($cohortids)) {
+    $cid = $cohortids[0];
+    $coh = $DB->get_record('cohort', ['id' => $cid]);
+
+    if ($coh) {
+        $mainT  = (int)$coh->cohortmainteacher;
+        $guideT = (int)$coh->cohortguideteacher;
+
+        $teacherids = array_filter([$mainT, $guideT]);
+
+        foreach ($teacherids as $tid) {
+            if ($u = $DB->get_record('user', ['id' => $tid])) {
+
+                // teacher name
+                $teachernames[] = fullname($u);
+
+                // teacher profile pic
+                $pic = new user_picture($u);
+                $pic->size = 50;
+                $teacherpics[$tid] = $pic->get_url($PAGE)->out(false);
+            }
+        }
+    }
+}
+
+$studentids = [];
+$studentnames = [];
+
+if (!empty($cohortids)) {
+    $cid = $cohortids[0];
+
+    $sqlStudents = "
+        SELECT u.*
+        FROM {cohort_members} cm
+        JOIN {user} u ON u.id = cm.userid
+        WHERE cm.cohortid = :cid
+          AND u.deleted = 0
+          AND u.suspended = 0
+    ";
+
+    $students = $DB->get_records_sql($sqlStudents, ['cid' => $cid]);
+
+    foreach ($students as $stu) {
+        $studentids[] = (int)$stu->id;
+        $studentnames[] = fullname($stu);
+    }
+}
+
+
+// // attach results to status row
+// $s->detected_cohortids  = $cohortids;
+// $s->detected_class_type = $classType;
+
+
+//--------------------------------------------------------
+// 3) Attach results into $s for use in your final output
+//--------------------------------------------------------
+
+
+
+
+
+
+    if (!is_array($details) || empty($details['current'])) {
+        continue;
+    }
+
+    $cur = $details['current'];
+
+    $newTeacher = (int)($cur['teacher'] ?? 0);
+    $newDate    = $cur['date']  ?? null;
+    $newStart   = $cur['start'] ?? null;
+    $newEnd     = $cur['end']   ?? null;
+
+    // Must match selected teacher
+    if ($teacherFilter > 0 && $newTeacher !== $teacherFilter) {
+        continue;
+    }
+
+    // Must have all timing fields
+    if (!$newDate || !$newStart || !$newEnd) {
+        continue;
+    }
+
+    $tsStart = strtotime("$newDate $newStart");
+    $tsEnd   = strtotime("$newDate $newEnd");
+
+    if (!$tsStart || !$tsEnd) {
+        continue;
+    }
+
+    // Must be inside requested calendar range
+    if ($tsEnd < $startts || $tsStart > $endts) {
+        continue;
+    }
+
+    $eid = (int)$s->eventid;
+    if (isset($addedEventIds[$eid])) {
+        continue; // Already added
+    }
+
+    // Base googlemeet_events record
+    $base = $DB->get_record('googlemeet_events', ['id' => $eid], '*', IGNORE_MISSING);
+    if (!$base) {
+        continue;
+    }
+
+    // Load googlemeet instance → ensures correct title
+    $gm = $DB->get_record('googlemeet', ['id' => $base->googlemeetid], '*', IGNORE_MISSING);
+    $title = $gm ? $gm->name : 'Class';
+
+    // ---------------------------------------------------------
+    // NEW: BUILD PROFILE PICS FOR ADDED EVENTS
+    // ---------------------------------------------------------
+
+    // Current teacher pic
+    $currentTeacherPic = null;
+    if ($u = $DB->get_record('user', ['id' => $newTeacher])) {
+        $pic = new user_picture($u);
+        $pic->size = 50;
+        $currentTeacherPic = $pic->get_url($PAGE)->out(false);
+    }
+
+    // Previous teacher pic
+    $previousTeacherPic = null;
+    if (!empty($details['previous']['teacher'])) {
+        $prevTid = (int)$details['previous']['teacher'];
+        if ($u2 = $DB->get_record('user', ['id' => $prevTid])) {
+            $pic2 = new user_picture($u2);
+            $pic2->size = 50;
+            $previousTeacherPic = $pic2->get_url($PAGE)->out(false);
+        }
+    }
+
+
+
+    //---------------------------------------------
+// ADD PROFILE PIC FOR CURRENT + PREVIOUS
+//---------------------------------------------
+
+$currentTeacherPic = '';
+$previousTeacherPic = '';
+
+// 1) Current Teacher Profile
+$currentTid = (int)($cur['teacher'] ?? 0);
+if ($currentTid > 0) {
+    if ($uT = $DB->get_record('user', ['id' => $currentTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj = new user_picture($uT);
+        $picObj->size = 50;
+        $currentTeacherPic = $picObj->get_url($PAGE)->out(false);
+    }
+}
+
+// 2) Previous Teacher Profile
+$prevTid = 0;
+if (!empty($details['previous']['teacher'])) {
+    $prevTid = (int)$details['previous']['teacher'];
+}
+
+if ($prevTid > 0) {
+    if ($uPrev = $DB->get_record('user', ['id' => $prevTid])) {
+
+        global $PAGE;
+        if (!$PAGE) {
+            $PAGE = new moodle_page();
+            $PAGE->set_context(context_system::instance());
+        }
+
+        $picObj2 = new user_picture($uPrev);
+        $picObj2->size = 50;
+        $previousTeacherPic = $picObj2->get_url($PAGE)->out(false);
+    }
+}
+
+// Attach pics back to $details (so you can use it later)
+$details['current']['teacher_pic'] = $currentTeacherPic;
+$details['previous']['teacher_pic'] = $previousTeacherPic;
+
+// $details['current']['teacher_pic'] = $currentTeacherPic;
+// $details['previous']['teacher_pic'] = $previousTeacherPic;
+
+// add full name for current
+if (!empty($details['current']['teacher'])) {
+    $cid = (int)$details['current']['teacher'];
+    if ($u = $DB->get_record('user', ['id' => $cid], 'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename')) {
+        $details['current']['teacher_name'] = fullname($u, true);
+    }
+}
+
+// add full name for previous
+if (!empty($details['previous']['teacher'])) {
+    $pid = (int)$details['previous']['teacher'];
+    if ($u2 = $DB->get_record('user', ['id' => $pid], 'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename')) {
+        $details['previous']['teacher_name'] = fullname($u2, true);
+    }
+}
+
+
+
+
+$allStatusess = $DB->get_records('local_gm_event_status', ['isactive' => 1]);
+
+// Index statuses by eventid for quick lookup
+$statusByEventt = [];
+foreach ($allStatusess as $s) {
+    $statusByEventtt[$eid][] = $s;
+}
+
+    // Build the fully updated event entry
+    $refiltered[] = [
+        'id'            => 'status-' . $eid,
+        'eventid'       => $eid,
+        'main_event_id' => $eid,
+        'is_parent'     => true,
+        'sequence'      => 1,
+
+        'source'        => $sourcee,
+        'courseid'      => (int)($gm->course ?? 0),
+        'cmid'          => 0,
+        'googlemeetid'  => (int)$base->googlemeetid,
+        'title'         => $title,
+        'cohortids'     => $cohortids,
+        'class_type'    => $classType,
+
+        'start_ts'      => $tsStart,
+        'end_ts'        => $tsEnd,
+        'start'         => $fmt_iso($tsStart),
+        'end'           => $fmt_iso($tsEnd),
+
+        'teacherids'    => [$newTeacher],
+        'teachernames'  => $teachernames,
+
+        'studentids'    => $studentids,
+        'studentnames'  => $studentnames,
+        'rescheduled'   => $details,
+        'is_recurring'  => false,
+        'statuses'      => $statusByEventtt,
+
+        'meetingurl'    => $gm->meetingurl ?? '',
+        'viewurl'       => (new moodle_url('/mod/googlemeet/view.php', ['id' => $gm->coursemodule ?? 0]))->out(false),
+
+        // NEW PROPERTIES:
+        'currentTeacherPic'  => $currentTeacherPic,
+        'previousTeacherPic' => $previousTeacherPic
+    ];
+
+
+   
+
+    $addedEventIds[$eid] = true;
+}
+
+$filtered = $refiltered;
+
+// ======================================================================
+// END PATCH
+// ======================================================================
+
+
+
+
+
+
 
 
 

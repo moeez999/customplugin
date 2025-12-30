@@ -307,6 +307,49 @@
                     </div>
                 </div>
 
+                <!-- Filter Trigger (right side of student dropdown) -->
+                <button type="button" id="extra-search-trigger" class="filter-btn" aria-haspopup="true"
+                    aria-expanded="false" style="margin-left:12px;">
+                    <span class="filter-text">Filter</span>
+                    <span class="filter-icon" aria-hidden="true">
+                        <!-- simple filter SVG icon -->
+                        <img src="./img/filter-icon.svg" alt="">
+                    </span>
+                </button>
+
+                <style>
+                /* Compact filter button to match snapshot */
+                .filter-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    border-radius: 8px;
+                    border: 2px solid #edecec;
+                    background: #fff;
+                    cursor: pointer;
+                    font-weight: 600;
+                    color: #111;
+                    font-size: 13px;
+                    line-height: 1;
+                }
+
+                .filter-btn:active {
+                    transform: translateY(1px);
+                }
+
+                .filter-btn .filter-icon {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .filter-btn svg {
+                    display: block;
+                }
+                </style>
+
                 <!-- Student Widget -->
                 <section id="search-student" class="search-student-section" style="display:none">
                     <div class="search-widget-container" id="student-search-widget">
@@ -337,6 +380,152 @@
                     </div>
                 </section>
 
+                <!-- Extra Widget (right side dropdown content) - Events Filter (snapshot) -->
+                <style>
+                /* Events Filter popover snapshot styles */
+                .events-filter-popover {
+                    width: 220px;
+                    background: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+                    border: 1px solid #ececf3;
+                    padding: 10px 12px;
+                    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+                    font-size: 14px;
+                    color: #232323;
+                }
+
+                .events-filter-popover .ef-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 6px 2px 8px 2px;
+                }
+
+                .events-filter-popover .ef-title {
+                    font-weight: 700;
+                    font-size: 15px;
+                    color: #111
+                }
+
+                .events-filter-popover .ef-reset {
+                    color: #ef2d17;
+                    font-weight: 700;
+                    cursor: pointer;
+                    font-size: 13px
+                }
+
+                .events-filter-popover .ef-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    padding-top: 6px
+                }
+
+                .ef-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px
+                }
+
+                .ef-label {
+                    flex: 1
+                }
+
+                /* custom checkbox box */
+                .ef-box {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 6px;
+                    border: 1.6px solid #e1e3eb;
+                    display: inline-grid;
+                    place-items: center;
+                    cursor: pointer;
+                    background: #fff;
+                    color: #fff;
+                    font-weight: 800
+                }
+
+                input.ef-input {
+                    display: none
+                }
+
+                input.ef-input:checked+.ef-box {
+                    background: #ef2d17;
+                    border-color: #ef2d17
+                }
+
+                input.ef-input:checked+.ef-box::after {
+                    content: '✔';
+                    font-size: 13px
+                }
+
+                .ef-selectall {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px
+                }
+                </style>
+
+                <section id="search-extra" class="search-extra-section" style="display:none">
+                    <div class="events-filter-popover" id="extra-search-widget">
+                        <div class="ef-header">
+                            <div class="ef-title">Events Filter</div>
+                            <div class="ef-reset" id="ef-reset">Reset</div>
+                        </div>
+
+                        <div class="ef-list">
+                            <label class="ef-item ef-selectall">
+                                <input class="ef-input" type="checkbox" id="ef_select_all" data-value="select-all">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Select All</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="cohorts" id="ef_cohorts">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Cohorts</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="one1" id="ef_one1">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">1:1</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="peertalk" id="ef_peertalk">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Peer Talk</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="conference" id="ef_conference">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Conference</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="timeoff" id="ef_timeoff">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Time off</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="extraslots" id="ef_extraslots">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Extra Slots</span>
+                            </label>
+
+                            <label class="ef-item">
+                                <input class="ef-input" type="checkbox" data-value="availability" id="ef_availability">
+                                <span class="ef-box" aria-hidden="true"></span>
+                                <span class="ef-label">Availability</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
                 <?php require_once('calendar_admin_details_tabs.php'); ?>
             </div>
         </div>
@@ -345,7 +534,15 @@
         <div class="wrap" id="calendar_admin_calendar_flexrow">
             <div class="cal">
                 <div id="head" class="cal-head">
-                    <div class="gutter"></div>
+                    <div class="gutter">
+                        <div class="filter-toggle-container">
+                            <label class="filter-toggle-label">
+                                <input type="checkbox" id="filterToggle" class="filter-toggle-checkbox">
+                                <span class="filter-toggle-switch"></span>
+
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div id="grid" class="grid calender-hide-scrollbar">
                     <div id="gutter" class="gutter"></div>
@@ -547,6 +744,257 @@ $(function() {
 
 <script src="js/calendar_admin_details.js"></script>
 <script src="js/calendar_admin_details_calendar_content.js"></script>
+<script>
+// Remove initials and ellipsis from teacher and student pill containers after rendering
+function cleanUpPillContainers() {
+    // Remove initials and ellipsis spans for teachers
+    $('#teacher-pills .teacher-summary-initials').remove();
+    // Remove initials and ellipsis spans for students
+    $('#student-pills .student-summary-initials, #student-pills .student-summary-ellipsis').remove();
+}
+
+// Run cleanup after DOM ready and after any event that updates pills
+$(function() {
+    cleanUpPillContainers();
+    // If you have custom events that update pills, hook here:
+    $(document).on('teacherPillsUpdated studentPillsUpdated', cleanUpPillContainers);
+});
+</script>
+<script>
+// Position and behaviour for the Events Filter popover
+$(function() {
+    let filterPopoverVisible = false; // Track popover visibility state
+
+    $('#extra-search-trigger').on('click', function(e) {
+        e.stopPropagation();
+
+        const $btn = $(this);
+        const $popover = $('#search-extra .events-filter-popover');
+
+        // Toggle visibility
+        filterPopoverVisible = !filterPopoverVisible;
+
+        if (filterPopoverVisible) {
+            // Append to body and position absolutely under the button
+            const off = $btn.offset();
+            const top = off.top + $btn.outerHeight() + 8;
+            const left = $btn.offset().left; // align left edge of popover with button
+
+            $popover.appendTo('body').css({
+                position: 'absolute',
+                top: top + 'px',
+                left: left + 'px',
+                zIndex: 9999,
+                display: 'block'
+            });
+        } else {
+            // Move back to original location and hide
+            $popover.appendTo('#search-extra').css('display', 'none');
+        }
+    });
+
+    // Close when clicking outside
+    $(document).on('click', function(e) {
+        const $target = $(e.target);
+
+        // Check if click is outside popover AND button
+        if (!$target.closest('.events-filter-popover').length && !$target.closest(
+                '#extra-search-trigger').length) {
+            // Close popover
+            if (filterPopoverVisible) {
+                const $popover = $('.events-filter-popover'); // Find it anywhere in DOM
+                $popover.hide();
+                $popover.appendTo('#search-extra'); // Move back to original location
+                filterPopoverVisible = false;
+            }
+        }
+    });
+
+    // Prevent clicks inside popover from closing it
+    $(document).on('click', '.events-filter-popover', function(e) {
+        e.stopPropagation();
+    });
+
+    // Events Filter behaviours
+    // Reset link
+    $(document).on('click', '#ef-reset', function(e) {
+        e.stopPropagation();
+        $('.events-filter-popover').find('input.ef-input').prop('checked', false);
+        $('#ef_select_all').prop('checked', false);
+        $('#extra-search-trigger .filter-text').text('Filter');
+        applyEventTypeFilter();
+    });
+
+    // Select All behaviour
+    $(document).on('change', '#ef_select_all', function() {
+        const checked = $(this).is(':checked');
+        $('.events-filter-popover').find('input.ef-input').not(this).prop('checked', checked);
+        $('.events-filter-popover input.ef-input').trigger('change');
+    });
+
+    // If any individual checkbox is unchecked, update Select All and label
+    $(document).on('change', '.events-filter-popover input.ef-input', function() {
+        const all = $('.events-filter-popover input.ef-input').not('#ef_select_all');
+        const checkedCount = all.filter(':checked').length;
+        const total = all.length;
+        $('#ef_select_all').prop('checked', checkedCount === total);
+
+        // Update display text to show how many selected (if any)
+        if (checkedCount === 0) {
+            $('#extra-search-trigger .filter-text').text('Filter');
+        } else if (checkedCount === total) {
+            $('#extra-search-trigger .filter-text').text(total + ' selected');
+        } else {
+            $('#extra-search-trigger .filter-text').text(checkedCount + ' selected');
+        }
+
+        // Apply event type filter to rendered events
+        applyEventTypeFilter();
+    });
+
+    // Function to filter rendered events by type
+    function applyEventTypeFilter() {
+        const checkedFilters = [];
+        $('.events-filter-popover input.ef-input').not('#ef_select_all').each(function() {
+            if ($(this).is(':checked')) {
+                checkedFilters.push($(this).data('value'));
+            }
+        });
+
+        // Check how many teachers are selected
+        const selectedTeachers = window.calendarFilterState ? window.calendarFilterState.getSelectedTeachers() :
+            [];
+        const isSingleTeacher = selectedTeachers.length === 1;
+
+        // If no filters selected, show all events and white slots
+        if (checkedFilters.length === 0) {
+            $('.event').show();
+            // Show white slots only if single teacher is selected
+            if (isSingleTeacher) {
+                $('.slot-white').show();
+            }
+            return;
+        }
+
+        // Handle white slot visibility (for single teacher: availability and extra slots render as white slots)
+        if (isSingleTeacher) {
+            console.log('Filtering white slots, checked filters:', checkedFilters);
+
+            // Check if availability or extraslots filters are in the checked filters
+            const hasAvailabilityFilter = checkedFilters.includes('availability');
+            const hasExtraslotsFilter = checkedFilters.includes('extraslots');
+
+            // If neither availability nor extraslots are checked, hide all white slots
+            if (!hasAvailabilityFilter && !hasExtraslotsFilter) {
+                $('.slot-white').hide();
+            } else {
+                // Filter white slots independently based on their source
+                $('.slot-white').each(function() {
+                    const $slot = $(this);
+                    const source = $slot.data('source') || '';
+
+                    let shouldShow = false;
+                    if (source === 'availability' && hasAvailabilityFilter) {
+                        shouldShow = true;
+                    }
+                    if (source === 'extra_slot' && hasExtraslotsFilter) {
+                        shouldShow = true;
+                    }
+
+                    if (shouldShow) {
+                        $slot.show();
+                    } else {
+                        $slot.hide();
+                    }
+                });
+            }
+            console.log('White slots filtered. Visible count:', $('.slot-white:visible').length);
+        }
+
+        // Filter events based on their type
+        $('.event').each(function() {
+            const $event = $(this);
+            const classType = $event.data('class-type') || '';
+            const source = $event.data('source') || '';
+
+            let shouldShow = false;
+
+            // Check each filter
+            if (checkedFilters.includes('cohorts')) {
+                // Show cohort main classes (not one2one, not peertalk, not conference, not timeoff, not availability, not extra_slot)
+                if (!classType || (
+                        classType !== 'one2one_weekly' &&
+                        classType !== 'one2one_single' &&
+                        classType !== 'peertalk' &&
+                        classType !== 'conference' &&
+                        classType !== 'teacher_timeoff' &&
+                        classType !== 'availability' &&
+                        classType !== 'extra_slot' &&
+                        source !== 'peertalk' &&
+                        source !== 'conference' &&
+                        source !== 'teacher_timeoff' &&
+                        source !== 'availability' &&
+                        source !== 'extra_slot'
+                    )) {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('one1')) {
+                if (classType === 'one2one_weekly' || classType === 'one2one_single') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('peertalk')) {
+                if (classType === 'peertalk' || source === 'peertalk') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('conference')) {
+                if (classType === 'conference' || source === 'conference') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('timeoff')) {
+                if (classType === 'teacher_timeoff' || source === 'teacher_timeoff') {
+                    shouldShow = true;
+                }
+            }
+
+            if (checkedFilters.includes('extraslots')) {
+                // Multiple teachers: extra slots render as events, so show them
+                if (!isSingleTeacher && (classType === 'extra_slot' || source === 'extra_slot')) {
+                    shouldShow = true;
+                }
+                // Single teacher: extra slots render as white slots, not events, so don't show event elements
+            }
+
+            if (checkedFilters.includes('availability')) {
+                // Multiple teachers: availability renders as events, so show them
+                if (!isSingleTeacher && (classType === 'availability' || source === 'availability')) {
+                    shouldShow = true;
+                }
+                // Single teacher: availability renders as white slots, not events, so don't show event elements
+            }
+
+            // Show or hide the event
+            if (shouldShow) {
+                $event.show();
+            } else {
+                $event.hide();
+            }
+        });
+    }
+
+    // Apply filter on reset
+    $(document).on('click', '#ef-reset', function() {
+        applyEventTypeFilter();
+    });
+});
+</script>
 <?php require_once('calendar_admin_details_create_cohort.php'); ?>
 <script src="js/calendar_admin_details_create_cohort_tab_details.js"></script>
 <script src="js/calendar_admin_details_create_cohort_class_tab.js"></script>
