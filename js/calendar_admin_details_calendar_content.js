@@ -3304,15 +3304,32 @@ $(function () {
           // Hide status icon for current reschedule events (makeup icon shows instead)
           if (ev.isRescheduleCurrent && !ev.isTeacherChanged) return "";
 
-          // Show covered icon if teacher changed
+          // Show teacher profile if teacher changed
           if (ev.isTeacherChanged) {
-            return `
-             <span class="ev-status-icon" style="position:absolute; top:6px; right:26px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
-                <img src=${ev.rescheduled.current.teacher_pic} alt="Teacher Changed" title="Teacher Changed" style="width:16px; height:16px; border-radius:50%;">
-              </span>
-            <span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
-                <img src="./img/covered.svg" alt="Teacher Changed" title="Teacher Changed" style="width:16px; height:16px;">
+            // Get teacher pic from rescheduled or from status details
+            let teacherPic = null;
+            if (
+              ev.rescheduled &&
+              ev.rescheduled.current &&
+              ev.rescheduled.current.teacher_pic
+            ) {
+              teacherPic = ev.rescheduled.current.teacher_pic;
+            } else if (
+              statusMeta &&
+              statusMeta.statusObj &&
+              statusMeta.statusObj.details &&
+              statusMeta.statusObj.details.current &&
+              statusMeta.statusObj.details.current.teacher_pic
+            ) {
+              teacherPic = statusMeta.statusObj.details.current.teacher_pic;
+            }
+
+            if (teacherPic) {
+              return `
+              <span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+                <img src="${teacherPic}" alt="Teacher Changed" title="Teacher Changed" style="width:16px; height:16px; border-radius:50%;">
               </span>`;
+            }
           }
 
           if (!statusMeta) return "";
@@ -3419,14 +3436,7 @@ $(function () {
                     ev.classType !== "availability" &&
                     ev.classType !== "extra_slot"
                       ? `<div class=\"ev-top\">
-                          <div class=\"ev-left\">${
-                            ev.isTeacherChanged &&
-                            ev.rescheduled?.current?.teacher_pic
-                              ? `<img class=\"ev-avatar\" src=\"${ev.rescheduled.current.teacher_pic}\" alt=\"\">`
-                              : ev.avatar
-                              ? `<img class=\"ev-avatar\" src=\"${ev.avatar}\" alt=\"\">`
-                              : ""
-                          }</div>
+                      
                           ${
                             isTimeOffEvent
                               ? ""

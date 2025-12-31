@@ -1975,8 +1975,8 @@
         // Reset timezones
         const tzLeft = document.getElementById('eventTimezoneSelected');
         const tzRight = document.getElementById('eventTimezoneSelectedRight');
-        if (tzLeft) tzLeft.textContent = '(GMT-05:00) Eastern';
-        if (tzRight) tzRight.textContent = '(GMT+05:00) Pakistan';
+        if (tzLeft) tzLeft.textContent = '(GMT-05:00) Eastern Time (US & Canada)';
+        if (tzRight) tzRight.textContent = '(GMT-05:00) Eastern Time (US & Canada)';
 
         // Reset dates
         document.querySelectorAll('.conference_modal_date_btn').forEach(btn => {

@@ -2657,9 +2657,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     $('#manageUpdateScopeModalBackdrop').classList.add('active');
                     return;
                 }
-
-                // Reset the flag so future clicks reopen the scope modal if needed
-                window.weeklyReadyToSubmit = false;
             }
 
             // For single lessons, check if reschedule values are already stored
