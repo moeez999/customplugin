@@ -1243,6 +1243,40 @@ $(function () {
           currentClickedEvent
         );
 
+        // Mark teacher-changed reschedules (use the clicked event context)
+        const statusWithDetails = Array.isArray(currentClickedEvent.statuses)
+          ? currentClickedEvent.statuses.find(
+              (s) => s.details && (s.details.current || s.details.previous)
+            )
+          : null;
+
+        const rescheduledCurrent =
+          currentClickedEvent.rescheduled?.current ||
+          statusWithDetails?.details?.current;
+        const rescheduledPrevious =
+          currentClickedEvent.rescheduled?.previous ||
+          statusWithDetails?.details?.previous;
+
+        const prevTeacherId = rescheduledPrevious?.teacher;
+        const currTeacherId = rescheduledCurrent?.teacher;
+
+        const teacherChanged =
+          prevTeacherId && currTeacherId && prevTeacherId !== currTeacherId;
+
+        if (teacherChanged) {
+          currentClickedEvent.isTeacherChanged = true;
+
+          // Ensure teacher pics are present for tooltip/icon
+          const currentPic = rescheduledCurrent?.teacher_pic || null;
+          const previousPic = rescheduledPrevious?.teacher_pic || null;
+
+          if (currentClickedEvent.rescheduled?.current && currentPic) {
+            currentClickedEvent.rescheduled.current.teacher_pic = currentPic;
+          }
+          if (currentClickedEvent.rescheduled?.previous && previousPic) {
+            currentClickedEvent.rescheduled.previous.teacher_pic = previousPic;
+          }
+        }
         // Teacher time off: open Time Off modal
         if (classType === "teacher_timeoff" || source === "teacher_timeoff") {
           if (typeof window.openTimeOffModal === "function") {
@@ -3310,36 +3344,47 @@ $(function () {
             let teacherPic = null;
             let prevTeacherName = null;
             let newTeacherName = null;
-            let eventTime = null;
 
-            if (
-              ev.rescheduled &&
-              ev.rescheduled.current &&
-              ev.rescheduled.current.teacher_pic
-            ) {
-              teacherPic = ev.rescheduled.current.teacher_pic;
-              newTeacherName =
-                ev.rescheduled.current.teacher_name || "New Teacher";
-              if (ev.rescheduled.previous) {
-                prevTeacherName =
-                  ev.rescheduled.previous.teacher_name || "Previous Teacher";
-              }
-            } else if (
-              statusMeta &&
-              statusMeta.statusObj &&
-              statusMeta.statusObj.details &&
-              statusMeta.statusObj.details.current &&
-              statusMeta.statusObj.details.current.teacher_pic
-            ) {
+            const resCurrent = ev.rescheduled?.current;
+            const resPrev = ev.rescheduled?.previous;
+
+            // Prefer rescheduled.current teacher pic/name; fall back to status details; then avatars; finally placeholder
+            if (resCurrent?.teacher_pic) {
+              teacherPic = resCurrent.teacher_pic;
+            } else if (statusMeta?.statusObj?.details?.current?.teacher_pic) {
               teacherPic = statusMeta.statusObj.details.current.teacher_pic;
-              newTeacherName =
-                statusMeta.statusObj.details.current.teacher_name ||
-                "New Teacher";
-              if (statusMeta.statusObj.details.previous) {
-                prevTeacherName =
-                  statusMeta.statusObj.details.previous.teacher_name ||
-                  "Previous Teacher";
-              }
+            } else if (ev.currentTeacherAvatar) {
+              teacherPic = ev.currentTeacherAvatar;
+            } else if (
+              ev.studentavatar &&
+              Array.isArray(ev.studentavatar) &&
+              ev.studentavatar.length > 0
+            ) {
+              teacherPic = ev.studentavatar[0];
+            }
+
+            if (!teacherPic) {
+              teacherPic = "./img/default-avatar.svg";
+            }
+
+            newTeacherName =
+              resCurrent?.teacher_name ||
+              statusMeta?.statusObj?.details?.current?.teacher_name ||
+              (Array.isArray(ev.teachernames)
+                ? ev.teachernames[0]
+                : ev.teachernames || "New Teacher");
+
+            if (resPrev) {
+              prevTeacherName = resPrev.teacher_name || "Previous Teacher";
+            } else if (statusMeta?.statusObj?.details?.previous) {
+              prevTeacherName =
+                statusMeta.statusObj.details.previous.teacher_name ||
+                "Previous Teacher";
+            } else if (
+              Array.isArray(ev.teachernames) &&
+              ev.teachernames.length > 1
+            ) {
+              prevTeacherName = ev.teachernames[1];
             }
 
             if (teacherPic) {
@@ -3417,16 +3462,35 @@ $(function () {
         }${ev.pairedId ? ` data-paired-id="${ev.pairedId}"` : ""}${
           ev.part ? ` data-part="${ev.part}"` : ""
         }${
-          ev.studentids && ev.studentids.length > 0
-            ? ` data-student-ids="${ev.studentids.join(",")}"`
+          ev.studentids &&
+          (Array.isArray(ev.studentids)
+            ? ev.studentids.length > 0
+            : ev.studentids)
+            ? ` data-student-ids="${
+                Array.isArray(ev.studentids)
+                  ? ev.studentids.join(",")
+                  : ev.studentids
+              }"`
             : ""
         }${
-          ev.studentnames && ev.studentnames.length > 0
-            ? ` data-student-names="${ev.studentnames.join(",")}"`
+          ev.studentnames &&
+          (Array.isArray(ev.studentnames)
+            ? ev.studentnames.length > 0
+            : ev.studentnames)
+            ? ` data-student-names="${
+                Array.isArray(ev.studentnames)
+                  ? ev.studentnames.join(",")
+                  : ev.studentnames
+              }"`
             : ""
         }${ev.avatar ? ` data-avatar="${ev.avatar}"` : ""}${
-          ev.cohortids && ev.cohortids.length > 0
-            ? ` data-cohort-ids="${ev.cohortids.join(",")}"`
+          ev.cohortids &&
+          (Array.isArray(ev.cohortids) ? ev.cohortids.length > 0 : ev.cohortids)
+            ? ` data-cohort-ids="${
+                Array.isArray(ev.cohortids)
+                  ? ev.cohortids.join(",")
+                  : ev.cohortids
+              }"`
             : ""
         }${ev.eventid ? ` data-event-id="${ev.eventid}"` : ""}${
           ev.cmid ? ` data-cm-id="${ev.cmid}"` : ""
@@ -3464,8 +3528,23 @@ $(function () {
                   (ev.classType === "one2one_weekly" ||
                     ev.classType === "one2one_single") &&
                   ev.studentnames &&
-                  ev.studentnames.length > 0
-                    ? ev.studentnames.join(", ")
+                  (Array.isArray(ev.studentnames)
+                    ? ev.studentnames.length > 0
+                    : ev.studentnames)
+                    ? `<div style="display:flex;align-items:center;gap:6px;">
+                        ${
+                          ev.studentavatar &&
+                          Array.isArray(ev.studentavatar) &&
+                          ev.studentavatar.length > 0
+                            ? `<img src="${ev.studentavatar[0]}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">`
+                            : ""
+                        }
+                        <span>${
+                          Array.isArray(ev.studentnames)
+                            ? ev.studentnames.join(", ")
+                            : ev.studentnames
+                        }</span>
+                      </div>`
                     : ev.title || ""
                 }</div>
                 `
@@ -3500,10 +3579,29 @@ $(function () {
                       : ""
                   }
                   ${
+                    (ev.classType === "one2one_weekly" ||
+                      ev.classType === "one2one_single") &&
+                    ev.studentavatar &&
+                    Array.isArray(ev.studentavatar) &&
+                    ev.studentavatar.length > 0 &&
                     ev.classType !== "availability" &&
                     ev.classType !== "extra_slot"
-                      ? `<div class=\"ev-when\">${fmt12(ev.start)} – ${fmt12(
-                          ev.end
+                      ? `<div style="display:flex;justify-content:start;padding:4px 0;">
+                          <img src="${ev.studentavatar[0]}" alt="" style="width:23px;height:23px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">
+                        </div>`
+                      : ""
+                  }
+                  ${
+                    ev.classType !== "availability" &&
+                    ev.classType !== "extra_slot"
+                      ? `<div class=\"ev-when\">${fmt12(
+                          ev.start 
+                            ? (typeof ev.start === "string" ? minutes(ev.start) : (typeof ev.start === "number" ? ev.start : 0))
+                            : 0
+                        )} – ${fmt12(
+                          ev.end 
+                            ? (typeof ev.end === "string" ? minutes(ev.end) : (typeof ev.end === "number" ? ev.end : 0))
+                            : 0
                         )}</div>`
                       : ""
                   }
@@ -3515,8 +3613,12 @@ $(function () {
                           (ev.classType === "one2one_weekly" ||
                             ev.classType === "one2one_single") &&
                           ev.studentnames &&
-                          ev.studentnames.length > 0
-                            ? ev.studentnames.join(", ")
+                          (Array.isArray(ev.studentnames)
+                            ? ev.studentnames.length > 0
+                            : ev.studentnames)
+                            ? Array.isArray(ev.studentnames)
+                              ? ev.studentnames.join(", ")
+                              : ev.studentnames
                             : ev.title || ""
                         }</div>`
                       : ""
@@ -3547,8 +3649,12 @@ $(function () {
                   (ev.classType === "one2one_weekly" ||
                     ev.classType === "one2one_single") &&
                   ev.studentnames &&
-                  ev.studentnames.length > 0
-                    ? ev.studentnames.join(", ")
+                  (Array.isArray(ev.studentnames)
+                    ? ev.studentnames.length > 0
+                    : ev.studentnames)
+                    ? Array.isArray(ev.studentnames)
+                      ? ev.studentnames.join(", ")
+                      : ev.studentnames
                     : ev.title || "Event"
                 }</strong>
               </div>
@@ -5311,6 +5417,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // First, fetch events for selected teachers to get accurate data
+    if (
+      window.fetchCalendarEvents &&
+      typeof window.fetchCalendarEvents === "function"
+    ) {
+      await window.fetchCalendarEvents();
+    }
+
     // Load cohorts for selected teachers
     const cohorts = await loadCohortsForTeachers(selectedTeacherIds, true);
 
@@ -5478,21 +5592,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- Dropdown toggles ----------
 
-  teacherTrigger.addEventListener("click", () => {
+  teacherTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    // Close filter popover when opening teacher dropdown
+    if (typeof window.closeFilterPopover === "function") {
+      window.closeFilterPopover();
+    }
+
     teacherWidget.style.display =
       teacherWidget.style.display === "none" || !teacherWidget.style.display
         ? "block"
         : "none";
   });
 
-  cohortTrigger.addEventListener("click", () => {
-    cohortWidget.style.display =
-      cohortWidget.style.display === "none" || !cohortWidget.style.display
-        ? "block"
-        : "none";
+  cohortTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    // Close filter popover when opening cohort dropdown
+    if (typeof window.closeFilterPopover === "function") {
+      window.closeFilterPopover();
+    }
   });
 
-  studentTrigger.addEventListener("click", () => {
+  studentTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    // Close filter popover when opening student dropdown
+    if (typeof window.closeFilterPopover === "function") {
+      window.closeFilterPopover();
+    }
+
     studentWidget.style.display =
       studentWidget.style.display === "none" || !studentWidget.style.display
         ? "block"
@@ -6546,10 +6676,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 ev.teacher ||
                 (ev.teacherids && ev.teacherids[0]) ||
                 "",
-          classType: ev.classType || ev.class_type || "",
-          source: ev.source || "event",
+          classType:
+            ev.classType ||
+            ev.class_type ||
+            ev.rescheduled?.class_type ||
+            ev.source ||
+            "",
+          source: ev.source || ev.rescheduled?.class_type || "event",
           studentnames: ev.studentnames || [],
           studentids: ev.studentids || [],
+          studentavatar: ev.studentavatar || [],
           cohortids: ev.cohortids || [],
           eventid: ev.eventid || "",
           timeoffid:
@@ -6573,6 +6709,18 @@ document.addEventListener("DOMContentLoaded", () => {
           faded: false,
           availabilityId: ev.availabilityId || null,
         };
+
+        // Ensure teacherId is set from reschedule current teacher if missing
+        if (!eventObj.teacherId && eventObj.rescheduled?.current?.teacher) {
+          eventObj.teacherId = eventObj.rescheduled.current.teacher;
+        }
+
+        // Mark teacher change for rescheduled 1:1 events so badge shows
+        const prevTid = eventObj.rescheduled?.previous?.teacher;
+        const currTid = eventObj.rescheduled?.current?.teacher;
+        if (prevTid && currTid && prevTid !== currTid) {
+          eventObj.isTeacherChanged = true;
+        }
         window.events.push(eventObj);
         // If event is reschedule_instant, add previous event as faded
         if (

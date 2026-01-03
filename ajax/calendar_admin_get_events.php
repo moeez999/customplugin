@@ -268,6 +268,8 @@ $email_to_userid = function(array $emails) use ($DB): array {
     return $map;
 };
 
+  $mod = $DB->get_record('modules', ['name' => 'googlemeet'], 'id', IGNORE_MISSING);
+
 // ---- EVENT COLLECTION ----
 
 $events = [];
@@ -2325,17 +2327,38 @@ $cohortids = [];
 $classType = 'group'; // default class type
 $sourcee = 'group';
 
-if (strpos($s->statuscode, 'one2one') !== false) {
+// First, get the googlemeet record to check its course
+$gm = $DB->get_record('googlemeet', ['id' => (int)$s->googlemeetid], '*', IGNORE_MISSING);
+
+// Check if this is a 1:1 event by checking the courseid from the course module or status record
+$isOne2One = false;
+if (!empty($s->courseid) && (int)$s->courseid === $courseid_one2one) {
+    $isOne2One = true;
+} elseif ($gm) {
+    // Get the course module for this googlemeet instance
+    $mod = $DB->get_record('modules', ['name' => 'googlemeet'], 'id', IGNORE_MISSING);
+    if ($mod) {
+        $cm = $DB->get_record('course_modules', [
+            'module'   => $mod->id,
+            'instance' => (int)$gm->id,
+            'deletioninprogress' => 0
+        ], 'course', IGNORE_MISSING);
+        
+        if ($cm && (int)$cm->course === $courseid_one2one) {
+            $isOne2One = true;
+        }
+    }
+}
+
+// Also check statuscode as fallback
+if (!$isOne2One && strpos($s->statuscode, 'one2one') !== false) {
+    $isOne2One = true;
+}
+
+if ($isOne2One) {
 
     $classType = 'one2one';
     $sourcee   = 'one2one_single'; // default
-
-    $gm = $DB->get_record(
-        'googlemeet',
-        ['id' => (int)$s->googlemeetid],
-        '*',
-        MUST_EXIST
-    );
 
     $isRecurring = false;
 
@@ -2361,9 +2384,6 @@ if (strpos($s->statuscode, 'one2one') !== false) {
     $sourcee = $isRecurring ? 'one2one_weekly' : 'one2one_single';
 }
 
-
-$gm = $DB->get_record('googlemeet', ['id' => $s->googlemeetid], '*', IGNORE_MISSING);
-
 // ---------------------------------------
 // Extract cohort shortname from GM name
 // Example: "KY4-02132025-0107 Main Classes"
@@ -2384,11 +2404,13 @@ if (!empty($gm->name)) {
         }
     }
 
-    // Detect class type from name
-    if (stripos($gm->name, 'Main') !== false) {
-        $classType = 'main';
-    } elseif (stripos($gm->name, 'Practice') !== false || stripos($gm->name, 'Tutoring') !== false) {
-        $classType = 'tutoring';
+    // Detect class type from name (only if not already set to one2one)
+    if ($classType !== 'one2one' && $sourcee !== 'one2one_weekly' && $sourcee !== 'one2one_single') {
+        if (stripos($gm->name, 'Main') !== false) {
+            $classType = 'main';
+        } elseif (stripos($gm->name, 'Practice') !== false || stripos($gm->name, 'Tutoring') !== false) {
+            $classType = 'tutoring';
+        }
     }
 }
 
@@ -2665,8 +2687,365 @@ $filtered = $refiltered;
 
 
 
+//01-01-2026 1:1 add previous classes if any was resheduled to some other teacher
 
 
+$existing_one2one_event_ids = [];
+
+foreach ($filtered as $row) {
+
+    // If $row is object, adjust if it's array
+    $idd = is_object($row) ? ($row->source ?? '') : ($row['source'] ?? '');
+    $id = is_object($row) ? ($row->id ?? '') : ($row['id'] ?? '');
+
+    // Check if id starts with "1to1-"
+    if (strpos($idd, 'one2one') === 0) {
+
+        if (strpos($id, '-') !== false) {
+            $eventid = substr($id, strpos($id, '-') + 1);
+        } else {
+            $eventid = '';
+        }
+
+        // Ensure it's valid
+        if ($eventid !== '') {
+            $existing_one2one_event_ids[] = $eventid;
+        }
+    }
+}
+
+foreach ($allStatuses as $s) {
+
+     // skip if event already exists in 1:1 events
+    if (in_array((string)$s->eventid, $existing_one2one_event_ids, true)) {
+        continue;
+    }
+
+    
+
+    $details = json_decode($s->detailsjson ?? '', true);
+
+   
+
+
+// ------------------------------------------------------------
+// RESOLVE COHORT IDS FROM THE *SECTION* WHERE GOOGLE MEET EXISTS
+// ------------------------------------------------------------
+$cohortids = [];
+$classType = 'one2one'; // default class type
+$sourcee = 'one2one_single';
+
+// if (strpos($s->statuscode, 'one2one') !== false) {
+
+    $classType = 'one2one';
+    $sourcee   = 'one2one_single'; // default
+
+    $gm = $DB->get_record(
+        'googlemeet',
+        ['id' => (int)$s->googlemeetid],
+        '*',
+        MUST_EXIST
+    );
+
+    $isRecurring = false;
+
+    // days is JSON like {"Mon":"1","Wed":"1"}
+    if (!empty($gm->days)) {
+        $days = json_decode($gm->days, true);
+        if (is_array($days) && array_sum(array_map('intval', $days)) > 1) {
+            $isRecurring = true;
+        }
+    }
+
+    // addmultiply = 1 means repeating
+    if (!empty($gm->addmultiply) && (int)$gm->addmultiply === 1) {
+        $isRecurring = true;
+    }
+
+    // period > 1 also indicates recurrence
+    if (!empty($gm->period) && (int)$gm->period > 1) {
+        $isRecurring = true;
+    }
+
+    // ✅ FINAL DECISION
+    $sourcee = $isRecurring ? 'one2one_weekly' : 'one2one_single';
+// }
+
+
+$gm = $DB->get_record('googlemeet', ['id' => $s->googlemeetid], '*', IGNORE_MISSING);
+
+$cm = $DB->get_record('course_modules', [
+    'course'             => (int)$s->courseid,
+    'module'             => $mod->id,              // googlemeet module id
+    'instance'           => (int)$gm->id, // EXACT Google Meet instance
+    'deletioninprogress' => 0
+], 'id, instance, section, availability', IGNORE_MISSING);
+
+if (!$cm) {
+    continue;
+}
+
+
+
+$eventStart = null;
+$eventEnd   = null;
+
+if (!empty($details['current'])) {
+
+    // If timestamps exist (BEST – use these)
+    if (!empty($details['current']['start_ts'])) {
+        $eventStart = (int)$details['current']['start_ts'];
+    }
+
+    if (!empty($details['current']['end_ts'])) {
+        $eventEnd = (int)$details['current']['end_ts'];
+    }
+
+    // ---- OPTIONAL FALLBACK (if ts not present) ----
+    if ((!$eventStart || !$eventEnd) && !empty($details['current']['date'])) {
+
+        $date  = $details['current']['date']; // 2026-01-01
+        $start = $details['current']['start'] ?? null; // 10:00 AM
+        $end   = $details['current']['end'] ?? null;   // 11:00 AM
+
+        if ($start) {
+            $eventStart = strtotime($date . ' ' . $start);
+        }
+
+        if ($end) {
+            $eventEnd = strtotime($date . ' ' . $end);
+        }
+    }
+}
+
+$teacherids   = [];
+$teachernames = [];
+$studentids   = [];
+$studentnames = [];
+
+if (!empty($details['current'])) {
+
+    // ----------------------------
+    // TEACHER
+    // ----------------------------
+    if (!empty($details['current']['teacher'])) {
+
+        $tid = (int)$details['current']['teacher'];
+        $teacherids[] = $tid;
+
+        if ($teacher = $DB->get_record('user', ['id' => $tid], 'id, firstname, lastname', IGNORE_MISSING)) {
+            $teachernames[] = fullname($teacher);
+        }
+    }
+
+    // ----------------------------
+    // STUDENT (if present)
+    // ----------------------------
+    if (!empty($details['current']['student'])) {
+
+        $sid = (int)$details['current']['student'];
+        $studentids[] = $sid;
+
+        if ($student = $DB->get_record('user', ['id' => $sid], 'id, firstname, lastname', IGNORE_MISSING)) {
+            $studentnames[] = fullname($student);
+        }
+    }
+}
+
+// Match teacher id from CURRENT or PREVIOUS
+$currentTeacher  = (int)($details['current']['teacher']  ?? 0);
+$previousTeacher = (int)($details['previous']['teacher'] ?? 0);
+
+if (
+    (int)$teacheridsraw !== $currentTeacher &&
+    (int)$teacheridsraw !== $previousTeacher
+) {
+    continue;
+}
+
+
+
+
+if (empty($cm->availability)) {
+    continue;
+}
+
+$availability = json_decode($cm->availability, true);
+
+$restrictedEmail = null;
+
+if (!empty($availability['c']) && is_array($availability['c'])) {
+    foreach ($availability['c'] as $cond) {
+
+        if (
+            ($cond['type'] ?? '') === 'profile' &&
+            ($cond['sf']   ?? '') === 'email' &&
+            !empty($cond['v'])
+        ) {
+            $restrictedEmail = strtolower(trim($cond['v']));
+            break;
+        }
+    }
+}
+
+if (!$restrictedEmail) {
+    continue;
+}
+
+// --------------------------------------------------
+// Fetch user by email
+// --------------------------------------------------
+$user = $DB->get_record_sql("
+    SELECT id, firstname, lastname, picture, imagealt
+      FROM {user}
+     WHERE LOWER(email) = :email
+", ['email' => $restrictedEmail], IGNORE_MISSING);
+
+if (!$user) {
+    continue;
+}
+
+// --------------------------------------------------
+// Set name & avatar (no arrays)
+// --------------------------------------------------
+// $restrictedusername = fullname($user);
+
+// $pic = new user_picture($user);
+// $pic->size = 50;
+// $restricteduseravatar = $pic->get_url($PAGE)->out(false);
+
+// Name (unchanged if you still need it)
+$restrictedusername = fullname($user);
+
+// Avatar as array
+$restricteduseravatar = [];
+
+$pic = new user_picture($user);
+$pic->size = 50;
+
+$restricteduseravatar[0] = $pic->get_url($PAGE)->out(false);
+
+
+
+// Extract teacher ids
+$currentTeacher  = (int)($details['current']['teacher']  ?? 0);
+$previousTeacher = (int)($details['previous']['teacher'] ?? 0);
+
+// Skip if neither matches
+if (
+    (int)$teacheridsraw !== $currentTeacher &&
+    (int)$teacheridsraw !== $previousTeacher
+) {
+    continue;
+}
+
+// Init
+$currentTeacherAvatar  = '';
+$previousTeacherAvatar = '';
+
+// ----------------------------------
+// CURRENT teacher avatar
+// ----------------------------------
+if ($currentTeacher > 0) {
+    if ($u = $DB->get_record('user', [
+        'id' => $currentTeacher, 'deleted' => 0
+    ], 'id, firstname, lastname, picture, imagealt', IGNORE_MISSING)) {
+
+        $pic = new user_picture($u);
+        $pic->size = 50;
+        $currentTeacherAvatar = $pic->get_url($PAGE)->out(false);
+    }
+}
+
+// ----------------------------------
+// PREVIOUS teacher avatar
+// ----------------------------------
+if ($previousTeacher > 0) {
+    if ($u = $DB->get_record('user', [
+        'id' => $previousTeacher, 'deleted' => 0
+    ], 'id, firstname, lastname, picture, imagealt', IGNORE_MISSING)) {
+
+        $pic = new user_picture($u);
+        $pic->size = 50;
+        $previousTeacherAvatar = $pic->get_url($PAGE)->out(false);
+    }
+}
+
+
+$currentTeacherName  = '';
+$previousTeacherName = '';
+
+if ($currentTeacher > 0) {
+    $currentUser = $DB->get_record('user', ['id' => $currentTeacher], '*', IGNORE_MISSING);
+    if ($currentUser) {
+        $currentTeacherName = fullname($currentUser);
+    }
+}
+
+if ($previousTeacher > 0) {
+    $previousUser = $DB->get_record('user', ['id' => $previousTeacher], '*', IGNORE_MISSING);
+    if ($previousUser) {
+        $previousTeacherName = fullname($previousUser);
+    }
+}
+
+
+$details['previous']['teacher_pic'] = $previousTeacherAvatar;
+$details['current']['teacher_pic']  = $currentTeacherAvatar;
+$details['previous']['teacher_name'] = $previousTeacherName;
+$details['current']['teacher_name']  =  $currentTeacherName;  
+
+
+ 
+
+
+
+
+ $filtered[] = [
+                'id'            => '1to1-' . $s->eventid,
+                'eventid'       => (int)$s->eventid,
+                'main_event_id' => (int)$s->eventid,
+                'is_parent'     => ((int)$s->eventid === (int)$s->eventid),
+                'sequence'      => 1,
+                'class_type'    => $sourcee,
+
+                'source'        => $sourcee,
+                
+                'googlemeetid'  => (int)$gm->id,
+                'title'         => (string)$gm->name,
+
+                'start_ts'      => $eventStart,
+                'end_ts'        => $eventEnd,
+                'start'         => $fmt_iso($eventStart),
+                'end'           => $fmt_iso($eventEnd),
+
+                'teacherids'    => (int)$teacherids[0],
+                'teachernames'  => $teachernames[0],
+                'studentids'    => $user->id,
+                'studentnames'  => $restrictedusername,
+                'cohortids'     => [],
+                'is_recurring'  => $isRecurring,
+
+                'meetingurl'    => $gm->url,
+                'viewurl'       => $gm->url,
+                'studentavatar' => $restricteduseravatar,
+                 // -----------------------------
+                    // RESCHEDULED DATA
+                    // -----------------------------
+                    'rescheduled' => [
+                        'group'         => $sourcee,
+                        'class_type'    => $sourcee,
+                        'cmid'          => (int)$cm->id,
+                        'courseid'      => (int)$s->courseid,
+                        'previous' => $details['previous'] ?? null,
+                        'current'  => $details['current']  ?? null,
+                        'currentTeacherAvatar'    => $currentTeacherAvatar,
+                        'previousTeacherAvatar'   => $previousTeacherAvatar,
+                        'status'   => 'yes',
+                    ],
+                
+            ];
+}
 
 
 

@@ -940,30 +940,73 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // reset form helper
-function resetAddTimeFormExtraSlots(parent, initialState) {
+function resetAddTimeFormExtraSlots(parent, initialState, slotInfo) {
+    // If called without parameters but with slot info, populate from slot
+    if (!parent && !initialState && slotInfo) {
+        parent = document.getElementById('addExtraSlotsTabContent');
+        if (!parent) return;
+        
+        // Create initialState from the clicked slot
+        const slotDate = new Date(slotInfo.date);
+        const dateStr = slotDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        const dayName = dayNames[slotDate.getDay()];
+        const monthName = monthNames[slotDate.getMonth()];
+        const dayNum = slotDate.getDate();
+        const label = `${dayName}, ${monthName} ${dayNum}`;
+        
+        initialState = {
+            teacher: {
+                id: '',
+                name: 'Select Teacher',
+                img: ''
+            },
+            from: {
+                iso: dateStr,
+                label: label,
+                time: '9:30 am'
+            },
+            until: {
+                iso: dateStr,
+                label: label,
+                time: '10:00 am'
+            }
+        };
+    }
+    
     if (!parent || !initialState) return;
     const teacherTrigger = parent.querySelector('#addtimeTeacherTrigger');
     const teacherAvatar = parent.querySelector('#addtimeTeacherAvatar');
     const teacherNameEl = parent.querySelector('#addtimeTeacherName');
 
-    teacherAvatar.src = initialState.teacher.img;
-    teacherNameEl.textContent = initialState.teacher.name;
-    teacherTrigger.dataset.userid = initialState.teacher.id;
-    teacherTrigger.dataset.name = initialState.teacher.name;
-    teacherTrigger.dataset.img = initialState.teacher.img;
+    if (teacherAvatar && initialState.teacher.img) teacherAvatar.src = initialState.teacher.img;
+    if (teacherNameEl) teacherNameEl.textContent = initialState.teacher.name;
+    if (teacherTrigger) {
+        teacherTrigger.dataset.userid = initialState.teacher.id || '';
+        teacherTrigger.dataset.name = initialState.teacher.name;
+        teacherTrigger.dataset.img = initialState.teacher.img || '';
+    }
 
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn')
-        .setAttribute('data-iso', initialState.from.iso);
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text')
-        .textContent = initialState.from.label;
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_row .time-input')
-        .value = initialState.from.time;
+    const fromBtn = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_btn');
+    const fromText = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_text');
+    const fromRow = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_from_row');
+    if (fromBtn) fromBtn.setAttribute('data-iso', initialState.from.iso);
+    if (fromText) fromText.textContent = initialState.from.label;
+    if (fromRow) {
+        const ti = fromRow.querySelector('.time-input');
+        if (ti) ti.value = initialState.from.time;
+    }
 
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn')
-        .setAttribute('data-iso', initialState.until.iso);
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text')
-        .textContent = initialState.until.label;
-    parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_row .time-input')
-        .value = initialState.until.time;
+    const untilBtn = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_btn');
+    const untilText = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_text');
+    const untilRow = parent.querySelector('#calendar_admin_details_create_cohort_add_time_tab_until_row');
+    if (untilBtn) untilBtn.setAttribute('data-iso', initialState.until.iso);
+    if (untilText) untilText.textContent = initialState.until.label;
+    if (untilRow) {
+        const ti = untilRow.querySelector('.time-input');
+        if (ti) ti.value = initialState.until.time;
+    }
 }
 </script>
