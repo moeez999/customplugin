@@ -7,12 +7,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="../css/calendar_admin_details_create_cohort.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="js/toast_utils.js"></script>
+    <script src="js/modal_utils.js"></script>
 </head>
 
 <body>
     <div id="loader"
         style=" display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.6); z-index:9999; align-items:center; justify-content:center; ">
-        <img src="./img/loader.png" alt="Loading..." class="spin-logo" style="width:100px;height:100px;">
+        <div class="loader"></div>
     </div>
     <!-- Toast Notification -->
     <div id="toastNotificationForCreateCohort" style="display:none; position:fixed; top:30px; right:30px; 
@@ -1334,9 +1336,21 @@
         });
 
         // Make sure only one cohort-related modal/backdrop is visible at a time
+        // Using ModalUtils for centralized modal management when available
         function closeCohortOverlays() {
-            $('#customRecurrenceModalBackdrop, #calendarDateModalBackdrop, #monthly_cal_modal_backdrop, #timePickerModalBackdrop')
-                .fadeOut(0);
+            const modalIds = [
+                'customRecurrenceModalBackdrop',
+                'calendarDateModalBackdrop',
+                'monthly_cal_modal_backdrop',
+                'timePickerModalBackdrop'
+            ];
+            modalIds.forEach(id => {
+                if (window.ModalUtils && window.ModalUtils.isOpen(id)) {
+                    window.ModalUtils.close(id);
+                } else if (window.$) {
+                    $('#' + id).fadeOut(0);
+                }
+            });
         }
         // expose for other scripts (e.g. calendar_admin_details_calendar_content.js)
         window.closeCohortOverlays = closeCohortOverlays;
@@ -1593,7 +1607,13 @@
         });
 
         // Calendar picker logic
+        // daysInMonth() is now in js/date_utils.js
+        // Using: daysInMonth() from date_utils.js
         function daysInMonth(year, month) {
+            if (window.daysInMonth) {
+                return window.daysInMonth(year, month);
+            }
+            // Fallback
             return new Date(year, month + 1, 0).getDate();
         }
 
@@ -1860,49 +1880,12 @@
         $('.calendar_admin_details_create_cohort_class_btn').removeClass('open');
     });
 
-    // ====== ENHANCED TOAST NOTIFICATION FUNCTION ======
+    // ====== TOAST NOTIFICATION FUNCTION ======
+    // showToast() is now in js/toast_utils.js
+    // Using: showToast() from toast_utils.js
+    // For backward compatibility, keep showToast wrapper
     function showToast(message, type = 'success', duration = 5000) {
-        const toast = document.getElementById('toastNotificationForCreateCohort');
-        if (!toast) {
-            console.warn('Toast element not found');
-            return;
-        }
-
-        // Set message and styling
-        toast.textContent = message;
-        toast.style.background = type === 'error' ? '#dc3545' :
-            type === 'warning' ? '#ffc107' :
-            type === 'info' ? '#17a2b8' : '#28a745';
-        toast.style.color = type === 'warning' ? '#212529' : '#fff';
-        toast.style.display = 'block';
-        toast.style.zIndex = '999999';
-
-        // Animate in
-        setTimeout(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateY(0)';
-        }, 10);
-
-        // Auto hide
-        const toastTimeout = setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 300);
-        }, duration);
-
-        // Return dismiss function for manual control
-        return {
-            dismiss: () => {
-                clearTimeout(toastTimeout);
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 300);
-            }
-        };
+        return window.showToast(message, type, duration, 'toastNotificationForCreateCohort');
     }
 
     function resetRecurrenceModal() {

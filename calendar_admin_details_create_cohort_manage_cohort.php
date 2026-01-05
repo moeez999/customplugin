@@ -1,4 +1,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="js/toast_utils.js"></script>
+<script src="js/api_utils.js"></script>
 
 <!-- Toast Notification -->
 <div id="toastNotificationForManageCohort" style="display:none; position:fixed; top:30px; right:30px; 
@@ -507,21 +509,11 @@ $('.cohortDropdownBtn').on('click', function() {
 // Reset manage cohort form
 // =========================
 
+// showToast() is now in js/toast_utils.js
+// Using: showToast() from toast_utils.js
+// For backward compatibility, alias showToastManage to showToast
 function showToastManage(message, duration = 5000) {
-    const toast = document.getElementById('toastNotificationForManageCohort');
-    toast.textContent = message;
-    toast.style.display = 'block';
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 100); // Slight delay for transition
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 300); // Wait for transition to finish
-    }, duration);
+    return window.showToast(message, 'success', duration, 'toastNotificationForManageCohort');
 }
 $('.cohortDropdownBtn').click(function(e) {
     e.stopPropagation();
@@ -1078,7 +1070,13 @@ const time12to24 = (s) => {
 
 $(document).ready(function() {
     // Calendar Date Picker Logic
+    // daysInMonth() is now in js/date_utils.js
+    // Using: daysInMonth() from date_utils.js
     function daysInMonth(year, month) {
+        if (window.daysInMonth) {
+            return window.daysInMonth(year, month);
+        }
+        // Fallback
         return new Date(year, month + 1, 0).getDate();
     }
 
@@ -1926,11 +1924,28 @@ $(document).ready(function() {
 
                     console.log('✅ cohort_update_cohort OK:', json);
 
-                    if (window.refetchCustomPluginData) {
-                        window.refetchCustomPluginData('update-cohort');
-                    } else if (window.fetchCalendarEvents) {
-                        window.fetchCalendarEvents();
+                    // Keep loader visible during calendar refresh
+                    // Show global loader if not already shown
+                    if (window.showGlobalLoader) {
+                        window.showGlobalLoader();
                     }
+
+                    // Refresh calendar events - wait for it to complete
+                    try {
+                        if (window.refetchCustomPluginData) {
+                            // refetchCustomPluginData already shows/hides loader internally
+                            await window.refetchCustomPluginData('update-cohort');
+                        } else if (window.fetchCalendarEvents) {
+                            // fetchCalendarEvents shows loader unless skipLoaderShow is true
+                            await window.fetchCalendarEvents(false); // false = don't skip loader
+                        }
+                    } catch (fetchError) {
+                        console.error('Error refreshing calendar:', fetchError);
+                        // Hide loader on error
+                        if (window.hideGlobalLoader) window.hideGlobalLoader();
+                        if (loader) loader.style.display = 'none';
+                    }
+                    // Note: Loader will be hidden by refetchCustomPluginData or fetchCalendarEvents in their finally blocks
 
                     // Reset form after 1 second
                     setTimeout(() => {
@@ -1946,10 +1961,11 @@ $(document).ready(function() {
 
                         showToastManage('❌ Unexpected error updating cohort');
                     }
-                } finally {
-                    // ✅ Always hide loader
+                    // Hide loader on error
+                    if (window.hideGlobalLoader) window.hideGlobalLoader();
                     if (loader) loader.style.display = 'none';
                 }
+                // Note: Don't hide loader in finally - let refetchCustomPluginData or fetchCalendarEvents handle it
             })();
 
         }, {

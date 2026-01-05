@@ -184,39 +184,17 @@
 
     </div>
 </div>
+<!-- Include centralized time and date utilities -->
+<script src="js/time_utils.js"></script>
+<script src="js/date_utils.js"></script>
+
 <script>
 // --- AGENDA VIEW FUNCTIONS ---
 
-// Helper functions
-function pad2(n) {
-    return String(n).padStart(2, '0');
-}
-
-function fmt12(min) {
-    let h = Math.floor(min / 60),
-        m = min % 60;
-    if (h >= 24) h -= 24;
-    const ap = h >= 12 ? 'PM' : 'AM';
-    const dispH = h % 12 || 12;
-    return `${dispH}:${pad2(m)} ${ap}`;
-}
-
-function minutes(hhmm) {
-    const [h, m] = hhmm.split(':').map(Number);
-    return h * 60 + m;
-}
-
-function ymd(d) {
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-
-function mondayOf(date) {
-    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const dow = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - dow);
-    d.setHours(0, 0, 0, 0);
-    return d;
-}
+// Helper functions - pad2, fmt12, and minutes are now in js/time_utils.js
+// Date functions (ymd, mondayOf) are now in js/date_utils.js
+// Using: pad2(), fmt12(), and minutes() from time_utils.js
+// Using: ymd(), mondayOf() from date_utils.js
 
 // Get agenda data from window.events
 function getAgendaData() {
@@ -228,14 +206,14 @@ function getAgendaData() {
     }
 
     // Get current week range
-    const currentWeekStart = window.currentWeekStart || mondayOf(new Date());
+    const currentWeekStart = window.currentWeekStart || window.mondayOf(new Date());
     console.log('Current week start:', currentWeekStart);
 
     const weekDates = [];
     for (let i = 0; i < 7; i++) {
         const d = new Date(currentWeekStart);
         d.setDate(d.getDate() + i);
-        weekDates.push(ymd(d));
+        weekDates.push(window.ymd(d));
     }
     console.log('Week dates:', weekDates);
 
@@ -275,7 +253,7 @@ function renderAgendaView() {
     $container.empty();
 
     const eventsByDate = getAgendaData();
-    const currentWeekStart = window.currentWeekStart || mondayOf(new Date());
+    const currentWeekStart = window.currentWeekStart || window.mondayOf(new Date());
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -297,7 +275,7 @@ function renderAgendaView() {
     for (let i = 0; i < 7; i++) {
         const d = new Date(currentWeekStart);
         d.setDate(d.getDate() + i);
-        const dateStr = ymd(d);
+        const dateStr = window.ymd(d);
         const dayName = dayNames[d.getDay()];
         const dateNum = d.getDate();
 
@@ -546,11 +524,8 @@ function setupAgendaEventHandlers() {
                     console.log('Creating synthetic event for 1:1 lesson to trigger lesson info handler');
 
                     // Convert time format from HH:MM to minutes from midnight
-                    function timeToMinutes(timeStr) {
-                        if (!timeStr) return 540;
-                        const parts = timeStr.split(':');
-                        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                    }
+                    // timeToMinutes() is now in js/time_utils.js
+                    // Using: timeToMinutes() from time_utils.js (alias for minutes())
 
                     const startMins = timeToMinutes(eventData.start);
                     const endMins = timeToMinutes(eventData.end);

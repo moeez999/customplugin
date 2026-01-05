@@ -1,7 +1,7 @@
 /* ====== CONFIG ====== */
 
 const START_H = 0,
-  END_H = 23,
+  END_H = 24, // Changed to 24 to include the 11:30 PM to 12:00 AM slot
   SLOT_MIN = 30;
 const SLOT_H =
   parseInt(
@@ -72,46 +72,16 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let whiteSlotRules = [];
 window.teacherExtraSlots = window.teacherExtraSlots || {};
 
-// Map event status codes to icons/labels
-const STATUS_ICON_MAP = {
-  scheduled: { icon: "./img/confirmed.svg", label: "Taught" },
-
-  cancel: {
-    icon: "./img/cancelled.svg",
-    label: "Cancelled",
-  },
-
-  cancel_no_makeup: {
-    icon: "./img/cancelled.svg",
-    label: "Cancelled (No Makeup)",
-  },
-
-  cancel_reschedule_later: {
-    icon: "./img/rescheduled.svg",
-    label: "Cancelled (Reschedule Later)",
-  },
-  reschedule_instant: { icon: "./img/rescheduled.svg", label: "Rescheduled" },
-  rescheduled: { icon: "./img/rescheduled.svg", label: "Rescheduled" },
-  reschedule_one2one: {
-    icon: "./img/rescheduled.svg",
-    label: "Rescheduled 1:1",
-  },
-  covered: { icon: "./img/covered.svg", label: "Covered" },
-  missed: { icon: "./img/missed.svg", label: "Missed" },
-  pendingconfirmation: {
-    icon: "./img/pendingconfirmation.svg",
-    label: "Pending Confirmation",
-  },
-  pending_confirmation: {
-    icon: "./img/pendingconfirmation.svg",
-    label: "Pending Confirmation",
-  },
-
-  makeup: { icon: "./img/makeup.svg", label: "Makeup" },
-  make_up: { icon: "./img/makeup.svg", label: "Makeup" },
-};
+// Status icon map and getActiveStatusMeta are now in js/event_icon_utils.js
+// Using: EventIconUtils.getActiveStatusMeta() and EventIconUtils.STATUS_ICON_MAP from event_icon_utils.js
+// Keep local reference for backward compatibility
+const STATUS_ICON_MAP = window.EventIconUtils ? window.EventIconUtils.STATUS_ICON_MAP : {};
 
 function getActiveStatusMeta(statuses) {
+  if (window.EventIconUtils && window.EventIconUtils.getActiveStatusMeta) {
+    return window.EventIconUtils.getActiveStatusMeta(statuses);
+  }
+  // Fallback implementation (simplified)
   if (!Array.isArray(statuses) || statuses.length === 0) return null;
   const activeStatuses = statuses.filter((s) => s && s.isactive);
   const statusObj = activeStatuses.length
@@ -128,34 +98,11 @@ function getActiveStatusMeta(statuses) {
 }
 
 window.events = [];
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-function fmt12(min) {
-  let h = Math.floor(min / 60),
-    m = min % 60;
-  // Normalize hours to 0-23 range for display (don't wrap beyond 24)
-  h = h % 24;
-  // When h >= 12: PM, when h < 12: AM
-  const ap = h >= 12 ? "PM" : "AM";
-  const dispH = h % 12 || 12;
-  return `${dispH}:${pad2(m)} ${ap}`;
-}
-
-function minutes(hhmm) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-function ymd(d) {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-function mondayOf(date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dow = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dow);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+// Time utility functions (pad2, fmt12, minutes) are now in js/time_utils.js
+// Date utility functions (ymd, formatYMD, mondayOf, timestampToDate) are now in js/date_utils.js
+// Ensure time_utils.js and date_utils.js are loaded before this file
+// Using: pad2(), fmt12(), and minutes() from time_utils.js
+// Using: ymd(), formatYMD(), mondayOf(), timestampToDate() from date_utils.js
 function rangeText(startDate) {
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 6);
@@ -197,7 +144,7 @@ function isWhiteSlotFor(dayIndex, isoDate, minuteOfDay) {
 let SHOW_WHITE_SLOTS = false;
 
 /* ====== STATE ====== */
-let currentWeekStart = mondayOf(new Date());
+let currentWeekStart = window.mondayOf(new Date());
 
 $(function () {
   const rows = (END_H - START_H) * (60 / SLOT_MIN);
@@ -446,15 +393,8 @@ $(function () {
     // Populate time if available
     if (eventData.start && eventData.end) {
       // Convert minutes to time format
-      function minutesToTime(mins) {
-        const hours = Math.floor(mins / 60);
-        const minutes = mins % 60;
-        return (
-          String(hours).padStart(2, "0") +
-          ":" +
-          String(minutes).padStart(2, "0")
-        );
-      }
+      // minutesToTime() is now in js/time_utils.js
+      // Using: minutesToTime() from time_utils.js
 
       console.log(
         "Event times - Start:",
@@ -505,12 +445,8 @@ $(function () {
         console.log("Processing recurrence event:", ev);
 
         // Convert minutes (from midnight) to HH:MM format
-        function minutesToTime(minutes) {
-          if (minutes === undefined || minutes === null) return "00:00";
-          const h = Math.floor(minutes / 60);
-          const m = minutes % 60;
-          return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-        }
+        // minutesToTime() is now in js/time_utils.js
+        // Using: minutesToTime() from time_utils.js
 
         // Convert timestamp to HH:MM format
         function timestampToTime(ts) {
@@ -521,18 +457,9 @@ $(function () {
           return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
         }
 
-        // Convert timestamp to YYYY-MM-DD date
-        function timestampToDate(ts) {
-          if (!ts) return "";
-          const date = new Date(ts * 1000);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const day = String(date.getDate()).padStart(2, "0");
-          return `${year}-${month}-${day}`;
-        }
-
         // Get date from timestamp or existing date
-        const eventDate = ev.start_ts ? timestampToDate(ev.start_ts) : ev.date;
+        // Using timestampToDate() from date_utils.js
+        const eventDate = ev.start_ts ? window.timestampToDate(ev.start_ts) : ev.date;
 
         // Parse date to get day name
         const dateObj = new Date(eventDate);
@@ -1135,12 +1062,8 @@ $(function () {
         console.log("Processing recurrence event:", ev);
 
         // Convert minutes (from midnight) to HH:MM format
-        function minutesToTime(minutes) {
-          if (minutes === undefined || minutes === null) return "00:00";
-          const h = Math.floor(minutes / 60);
-          const m = minutes % 60;
-          return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-        }
+        // minutesToTime() is now in js/time_utils.js
+        // Using: minutesToTime() from time_utils.js
 
         return {
           date: ev.date,
@@ -2595,7 +2518,7 @@ $(function () {
       type: "POST",
       data: JSON.stringify(payload),
       contentType: "application/json",
-      success: function (response) {
+      success: async function (response) {
         console.log("Reschedule Response:", response);
         if (window.showToast) {
           window.showToast("Session updated successfully!", "success");
@@ -2621,12 +2544,20 @@ $(function () {
             setTimeout(() => toast.remove(), 400);
           }, 2200);
         }
-        // Don't hide loader here - refetchCustomPluginData will manage it
-        if (window.refetchCustomPluginData) {
-          window.refetchCustomPluginData("reschedule");
-        } else if (window.fetchCalendarEvents) {
-          window.fetchCalendarEvents();
+        // Keep loader visible during calendar refresh
+        // refetchCustomPluginData will manage showing/hiding the loader
+        try {
+          if (window.refetchCustomPluginData) {
+            await window.refetchCustomPluginData("reschedule");
+          } else if (window.fetchCalendarEvents) {
+            await window.fetchCalendarEvents();
+          }
+        } catch (fetchError) {
+          console.error('Error refreshing calendar:', fetchError);
+          // Hide loader on error
+          if (window.hideGlobalLoader) window.hideGlobalLoader();
         }
+        // Note: Loader will be hidden by refetchCustomPluginData or fetchCalendarEvents in their finally blocks
         $("#manage-session-modal").fadeOut(300);
         $(".custom-dropdown .dropdown-list").hide();
       },
@@ -2745,17 +2676,8 @@ $(function () {
         startMin + (typeof SLOT_MIN !== "undefined" ? SLOT_MIN : 30);
 
       // Format time as 12h
-      function pad2(n) {
-        return String(n).padStart(2, "0");
-      }
-      function fmt12(min) {
-        let h = Math.floor(min / 60),
-          m = min % 60;
-        if (h >= 24) h -= 24;
-        const ap = h >= 12 ? "PM" : "AM";
-        const dispH = h % 12 || 12;
-        return `${dispH}:${pad2(m)} ${ap}`;
-      }
+      // pad2() and fmt12() are now in js/time_utils.js
+      // Using: pad2() and fmt12() from time_utils.js
 
       // Get day name
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -2819,7 +2741,7 @@ $(function () {
 
   // Today button: jump to current week (Monday)
   $("#btnToday").on("click", () => {
-    currentWeekStart = mondayOf(new Date());
+    currentWeekStart = window.mondayOf(new Date());
     // First render the week layout to establish week dates
     renderWeek(true);
     // Then fetch fresh events for this week
@@ -2836,7 +2758,7 @@ $(function () {
 
   // Update Today button enabled/disabled state
   function updateTodayButton() {
-    const todayMonday = mondayOf(new Date());
+    const todayMonday = window.mondayOf(new Date());
     const isTodayWeek = todayMonday.getTime() === currentWeekStart.getTime();
     $("#btnToday").prop("disabled", isTodayWeek);
   }
@@ -2905,7 +2827,7 @@ $(function () {
     // Header
     const $head = $("#head");
     $head.find(".day-h").remove();
-    const today = ymd(new Date());
+    const today = window.ymd(new Date());
     for (let i = 0; i < 7; i++) {
       const d = new Date(currentWeekStart);
       d.setDate(d.getDate() + i);
@@ -2914,7 +2836,7 @@ $(function () {
         .append(`<span class="dt">${d.getDate()}</span>`);
 
       // Add 'today' class if this is today's date
-      if (ymd(d) === today) {
+      if (window.ymd(d) === today) {
         $dayHeader.addClass("today");
       }
 
@@ -2928,7 +2850,7 @@ $(function () {
     const $grid = $("#grid");
     $grid.empty().append('<div id="gutter" class="gutter"></div>');
     const $gut = $("#gutter");
-    for (let m = START_H * 60; m <= END_H * 60; m += SLOT_MIN) {
+    for (let m = START_H * 60; m < END_H * 60; m += SLOT_MIN) {
       const $row = $('<div class="time-row">');
       if (m % 60 === 0)
         $row.append(`<div class="time-label">${fmt12(m)}</div>`);
@@ -2940,18 +2862,18 @@ $(function () {
     for (let i = 0; i < 7; i++) {
       const d = new Date(currentWeekStart);
       d.setDate(d.getDate() + i);
-      weekDates.push(ymd(d));
+      weekDates.push(window.ymd(d));
 
       const $col = $('<div class="day" style="z-index:0 !important">');
       const $inner = $('<div class="day-inner">').appendTo($col);
-      $inner.attr("data-date", ymd(d));
+      $inner.attr("data-date", window.ymd(d));
 
       // CREATE SLOTS (white background layer is optional)
       const $slots = $('<div class="slots">').appendTo($inner);
       for (let r = 0; r < rows; r++) {
         const minuteOfDay = START_H * 60 + r * SLOT_MIN;
         const slotSource = SHOW_WHITE_SLOTS
-          ? isWhiteSlotFor(i, ymd(d), minuteOfDay)
+          ? isWhiteSlotFor(i, window.ymd(d), minuteOfDay)
           : null;
         const makeWhite = !!slotSource;
         const $slot = $("<div>").toggleClass("slot-white", makeWhite);
@@ -2964,7 +2886,7 @@ $(function () {
           if (r === 0 || minuteOfDay % 120 === 0) {
             // Log occasionally to avoid spam
             console.log("White slot created:", {
-              date: ymd(d),
+              date: window.ymd(d),
               minute: minuteOfDay,
               source: slotSource,
             });
@@ -2981,11 +2903,8 @@ $(function () {
     const perDay = Array.from({ length: 7 }, () => []);
     console.log("Events to render:", events);
 
-    function timeToMinutes(time) {
-      if (typeof time === "number") return time;
-      const [h, m] = time.split(":").map(Number);
-      return h * 60 + m;
-    }
+    // timeToMinutes() is now in js/time_utils.js
+    // Using: timeToMinutes() from time_utils.js (alias for minutes())
 
     const eventMap = new Map();
 
@@ -3333,107 +3252,41 @@ $(function () {
           ev.class_type === "teacher_timeoff" ||
           ev.source === "teacher_timeoff";
 
+        // Status and type icons are now rendered using EventIconUtils
+        // Status and type icons are now rendered using EventIconUtils
+        // Using: EventIconUtils.renderStatusIcons() and EventIconUtils.renderTypeIcon() from event_icon_utils.js
         const statusMeta = getActiveStatusMeta(ev.statuses);
-        const statusIconHtml = (() => {
-          // Hide status icon for current reschedule events (makeup icon shows instead)
-          if (ev.isRescheduleCurrent && !ev.isTeacherChanged) return "";
-
-          // Show teacher profile if teacher changed
-          if (ev.isTeacherChanged) {
-            // Get teacher pic from rescheduled or from status details
-            let teacherPic = null;
-            let prevTeacherName = null;
-            let newTeacherName = null;
-
-            const resCurrent = ev.rescheduled?.current;
-            const resPrev = ev.rescheduled?.previous;
-
-            // Prefer rescheduled.current teacher pic/name; fall back to status details; then avatars; finally placeholder
-            if (resCurrent?.teacher_pic) {
-              teacherPic = resCurrent.teacher_pic;
-            } else if (statusMeta?.statusObj?.details?.current?.teacher_pic) {
-              teacherPic = statusMeta.statusObj.details.current.teacher_pic;
-            } else if (ev.currentTeacherAvatar) {
-              teacherPic = ev.currentTeacherAvatar;
-            } else if (
-              ev.studentavatar &&
-              Array.isArray(ev.studentavatar) &&
-              ev.studentavatar.length > 0
-            ) {
-              teacherPic = ev.studentavatar[0];
-            }
-
-            if (!teacherPic) {
-              teacherPic = "./img/default-avatar.svg";
-            }
-
-            newTeacherName =
-              resCurrent?.teacher_name ||
-              statusMeta?.statusObj?.details?.current?.teacher_name ||
-              (Array.isArray(ev.teachernames)
-                ? ev.teachernames[0]
-                : ev.teachernames || "New Teacher");
-
-            if (resPrev) {
-              prevTeacherName = resPrev.teacher_name || "Previous Teacher";
-            } else if (statusMeta?.statusObj?.details?.previous) {
-              prevTeacherName =
-                statusMeta.statusObj.details.previous.teacher_name ||
-                "Previous Teacher";
-            } else if (
-              Array.isArray(ev.teachernames) &&
-              ev.teachernames.length > 1
-            ) {
-              prevTeacherName = ev.teachernames[1];
-            }
-
-            if (teacherPic) {
-              // Format date and time
-              const eventDate = ev.date || currentWeekStart;
-              const dayName = [
-                "Sunday",
-                "Monday",
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-                "Saturday",
-              ][new Date(eventDate).getDay()];
-              const monthDay = new Date(eventDate).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-              });
-              const year = new Date(eventDate).getFullYear();
-              const startTime = fmt12(ev.start);
-              const endTime = fmt12(ev.end);
-              const eventDateTime = `${dayName}, ${monthDay} ${year}, ${startTime}-${endTime}`;
-
-              // Return only the icon, tooltip will be created dynamically
-              return `<span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:auto; z-index:2; cursor: pointer; user-select: none;" data-teacher-pic="${teacherPic}" data-prev-teacher="${
-                prevTeacherName || "N/A"
-              }" data-new-teacher="${
-                newTeacherName || "N/A"
-              }" data-event-datetime="${eventDateTime}">
-                <img src="${teacherPic}" alt="Teacher Changed" style="width:16px; height:16px; border-radius:50%;">
-              </span>`;
-            }
-          }
-
-          if (!statusMeta) return "";
-          if (statusMeta.code === "cancel_reschedule_later") {
-            return `<span class="ev-status-icon" style="position:absolute; top:6px; right:6px; display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; pointer-events:none; z-index:2;">
-                <span style="display:inline-flex; align-items:center; justify-content:center; ">
-                  <img src="./img/pendingconfirmation.svg" alt="Pending Confirmation" title="Pending Confirmation" style="width:16px; height:16px;">
-                </span>
-                <span style="display:inline-flex; align-items:center; justify-content:center; ">
-                  <img src="./img/cancelled.svg" alt="Cancelled" title="Cancelled" style="width:16px; height:16px;">
-                </span>
-              </span>`;
-          }
-          return `<span class="ev-status-icon" title="${statusMeta.label}" aria-label="${statusMeta.label}" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+        let statusIconHtml = '';
+        if (window.EventIconUtils && typeof window.EventIconUtils.renderStatusIcons === 'function') {
+          try {
+            statusIconHtml = window.EventIconUtils.renderStatusIcons(ev, statusMeta, {
+              hideForRescheduleCurrent: true,
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              zIndex: 2
+            }, currentWeekStart);
+          } catch (e) {
+            console.warn('EventIconUtils.renderStatusIcons error:', e);
+            // Fallback on error
+            if (ev.isRescheduleCurrent && !ev.isTeacherChanged) {
+              statusIconHtml = "";
+            } else if (statusMeta) {
+              statusIconHtml = `<span class="ev-status-icon" title="${statusMeta.label}" aria-label="${statusMeta.label}" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
                 <img src="${statusMeta.icon}" alt="${statusMeta.label}" style="width:16px; height:16px;">
               </span>`;
-        })();
+            }
+          }
+        } else {
+          // Fallback implementation if EventIconUtils is not available
+          if (ev.isRescheduleCurrent && !ev.isTeacherChanged) {
+            statusIconHtml = "";
+          } else if (statusMeta) {
+            statusIconHtml = `<span class="ev-status-icon" title="${statusMeta.label}" aria-label="${statusMeta.label}" style="position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none; z-index:2;">
+              <img src="${statusMeta.icon}" alt="${statusMeta.label}" style="width:16px; height:16px;">
+            </span>`;
+          }
+        }
 
         // Add faded styling for previous reschedule events and cancelled events
         const isCancelled =
@@ -3729,7 +3582,8 @@ $(function () {
         }
 
         // Add hover tooltip for teacher change icon
-        const teacherChangeIcon = $ev.find(".ev-status-icon[data-teacher-pic]");
+        // Updated selector: data attributes are now on inner span, not on .ev-status-icon
+        const teacherChangeIcon = $ev.find("[data-teacher-pic]");
         if (teacherChangeIcon.length > 0) {
           const $teacherTooltip = $(`
             <div class="notification-card teacher-change-tooltip-card">
@@ -3749,40 +3603,40 @@ $(function () {
 
           teacherChangeIcon.on("mouseenter", function (e) {
             const $icon = $(this);
-            const iconOffset = $icon.closest(".event").offset();
-            const iconPos = $icon.position();
-            const iconWidth = $icon.outerWidth();
-            const iconHeight = $icon.outerHeight();
-
-            // Position tooltip above and to the right of the icon
-            $teacherTooltip.css({
-              position: "fixed",
-              top: iconOffset.top - 165 + "px",
-              left: iconOffset.left + iconPos.left + iconWidth + 10 + "px",
-              zIndex: 10000,
-            });
+            const iconRect = $icon[0].getBoundingClientRect();
+            const gap = 8; // Small gap between icon and tooltip
 
             $("body").append($teacherTooltip);
 
-            // Adjust if tooltip goes off screen
+            // Get actual tooltip dimensions after appending
             const tooltipRect = $teacherTooltip[0].getBoundingClientRect();
-            if (tooltipRect.right > window.innerWidth) {
-              // Position to the left instead
-              $teacherTooltip.css({
-                left:
-                  iconOffset.left +
-                  iconPos.left -
-                  $teacherTooltip.outerWidth() -
-                  10 +
-                  "px",
-              });
+            const tooltipWidth = tooltipRect.width;
+            const tooltipHeight = tooltipRect.height;
+
+            // Position tooltip above the icon, centered horizontally, with small gap
+            let top = iconRect.top - tooltipHeight - gap;
+            let left = iconRect.left + (iconRect.width / 2) - (tooltipWidth / 2);
+
+            // Adjust if tooltip goes off screen horizontally
+            if (left < 10) {
+              left = 10;
+            } else if (left + tooltipWidth > window.innerWidth - 10) {
+              left = window.innerWidth - tooltipWidth - 10;
             }
-            if (tooltipRect.top < 10) {
+
+            // Adjust if tooltip goes off screen vertically (above)
+            if (top < 10) {
               // Position below instead
-              $teacherTooltip.css({
-                top: iconOffset.top + iconPos.top + iconHeight + 10 + "px",
-              });
+              top = iconRect.bottom + gap;
             }
+
+            // Position tooltip
+            $teacherTooltip.css({
+              position: "fixed",
+              top: top + "px",
+              left: left + "px",
+              zIndex: 10000,
+            });
 
             $teacherTooltip.fadeIn(200);
           });
@@ -3842,34 +3696,40 @@ $(function () {
 
           $ev.on("mouseenter", function (e) {
             const $event = $(this);
-            const eventOffset = $event.offset();
-            const eventWidth = $event.outerWidth();
-
-            // Position tooltip above and to the right of the event
-            $makeupTooltip.css({
-              position: "fixed",
-              top: eventOffset.top - 165 + "px",
-              left: eventOffset.left + eventWidth + 10 + "px",
-              zIndex: 10000,
-            });
+            const eventRect = $event[0].getBoundingClientRect();
+            const gap = 8; // Small gap between event and tooltip
 
             $("body").append($makeupTooltip);
 
-            // Adjust if tooltip goes off screen
+            // Get actual tooltip dimensions after appending
             const tooltipRect = $makeupTooltip[0].getBoundingClientRect();
-            if (tooltipRect.right > window.innerWidth) {
-              // Position to the left instead
-              $makeupTooltip.css({
-                left:
-                  eventOffset.left - $makeupTooltip.outerWidth() - 10 + "px",
-              });
+            const tooltipWidth = tooltipRect.width;
+            const tooltipHeight = tooltipRect.height;
+
+            // Position tooltip above the event, centered horizontally, with small gap
+            let top = eventRect.top - tooltipHeight - gap;
+            let left = eventRect.left + (eventRect.width / 2) - (tooltipWidth / 2);
+
+            // Adjust if tooltip goes off screen horizontally
+            if (left < 10) {
+              left = 10;
+            } else if (left + tooltipWidth > window.innerWidth - 10) {
+              left = window.innerWidth - tooltipWidth - 10;
             }
-            if (tooltipRect.top < 10) {
+
+            // Adjust if tooltip goes off screen vertically (above)
+            if (top < 10) {
               // Position below instead
-              $makeupTooltip.css({
-                top: eventOffset.top + $event.outerHeight() + 10 + "px",
-              });
+              top = eventRect.bottom + gap;
             }
+
+            // Position tooltip
+            $makeupTooltip.css({
+              position: "fixed",
+              top: top + "px",
+              left: left + "px",
+              zIndex: 10000,
+            });
 
             $makeupTooltip.fadeIn(200);
           });
@@ -3937,16 +3797,31 @@ $(function () {
   let selectedDateFilters = []; // array of YYYY-MM-DD
   let selectedTimeSlotFilters = new Set(); // minutes
   let filteringEnabled = false; // toggle state for filters - initially disabled
+  
+  // Make these variables globally accessible for applyEventTypeFilter
+  window.selectedDateFilters = selectedDateFilters;
+  window.selectedTimeSlotFilters = selectedTimeSlotFilters;
+  
   function applyFilters() {
     $(".event").hide();
 
     const hasDateFilter = selectedDateFilters.length > 0;
     const hasTimeFilter = selectedTimeSlotFilters.size > 0;
 
+    // Get checked event type filters
+    const checkedFilters = [];
+    $('.events-filter-popover input.ef-input').not('#ef_select_all').each(function() {
+      if ($(this).is(':checked')) {
+        checkedFilters.push($(this).data('value'));
+      }
+    });
+    const hasEventTypeFilter = checkedFilters.length > 0;
+
     $(".event").each(function () {
-      const eventDate = $(this).data("event-date");
-      const eventStart = parseInt($(this).data("start"), 10);
-      const eventEnd = parseInt($(this).data("end"), 10);
+      const $event = $(this);
+      const eventDate = $event.data("event-date");
+      const eventStart = parseInt($event.data("start"), 10);
+      const eventEnd = parseInt($event.data("end"), 10);
 
       if (isNaN(eventStart) || isNaN(eventEnd)) return;
 
@@ -3967,10 +3842,91 @@ $(function () {
         }
       }
 
-      // Show event only if it matches both filters
-      if (dateMatch && timeMatch) $(this).show();
+      // Check event type filter if any are selected
+      let eventTypeMatch = true;
+      if (hasEventTypeFilter) {
+        const classType = $event.data('class-type') || '';
+        const source = $event.data('source') || '';
+        const selectedTeachers = window.calendarFilterState ? window.calendarFilterState.getSelectedTeachers() : [];
+        const isSingleTeacher = selectedTeachers.length === 1;
+
+        eventTypeMatch = false;
+
+        if (checkedFilters.includes('cohorts')) {
+          if (!classType || (
+            classType !== 'one2one_weekly' &&
+            classType !== 'one2one_single' &&
+            classType !== 'peertalk' &&
+            classType !== 'conference' &&
+            classType !== 'teacher_timeoff' &&
+            classType !== 'availability' &&
+            classType !== 'extra_slot' &&
+            source !== 'peertalk' &&
+            source !== 'conference' &&
+            source !== 'teacher_timeoff' &&
+            source !== 'availability' &&
+            source !== 'extra_slot'
+          )) {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('one1')) {
+          if (classType === 'one2one_weekly' || classType === 'one2one_single') {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('peertalk')) {
+          if (classType === 'peertalk' || source === 'peertalk') {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('conference')) {
+          if (classType === 'conference' || source === 'conference') {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('timeoff')) {
+          if (classType === 'teacher_timeoff' || source === 'teacher_timeoff') {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('extraslots')) {
+          if (!isSingleTeacher && (classType === 'extra_slot' || source === 'extra_slot')) {
+            eventTypeMatch = true;
+          }
+        }
+
+        if (checkedFilters.includes('availability')) {
+          if (!isSingleTeacher && (classType === 'availability' || source === 'availability')) {
+            eventTypeMatch = true;
+          }
+        }
+      }
+
+      // Show event only if it matches all active filters
+      if (dateMatch && timeMatch && eventTypeMatch) $event.show();
     });
+    
+    // Also update white slots if single teacher
+    const selectedTeachers = window.calendarFilterState ? window.calendarFilterState.getSelectedTeachers() : [];
+    const isSingleTeacher = selectedTeachers.length === 1;
+    if (isSingleTeacher && typeof applyEventTypeFilter === 'function') {
+      // applyEventTypeFilter will handle white slots
+      setTimeout(() => {
+        if (typeof applyEventTypeFilter === 'function') {
+          applyEventTypeFilter();
+        }
+      }, 0);
+    }
   }
+  
+  // Expose applyFilters globally
+  window.applyFilters = applyFilters;
 
   // Function to filter events by selected date
   // function filterEventsByDates(dates) {
@@ -3997,8 +3953,13 @@ $(function () {
   // Function to reset date filter
   function clearDateFilter() {
     selectedDateFilters = [];
+    window.selectedDateFilters = selectedDateFilters;
     $("#head .day-h").removeClass("date-filter-active");
     applyFilters();
+    // Also trigger event type filter to update
+    if (typeof applyEventTypeFilter === 'function') {
+      applyEventTypeFilter();
+    }
   }
 
   //   // Function to filter events by selected time slot
@@ -4055,8 +4016,13 @@ $(function () {
   // }
   function clearTimeSlotFilter() {
     selectedTimeSlotFilters.clear();
+    window.selectedTimeSlotFilters = selectedTimeSlotFilters;
     $(".time-row").removeClass("time-slot-filter-active");
     applyFilters();
+    // Also trigger event type filter to update
+    if (typeof applyEventTypeFilter === 'function') {
+      applyEventTypeFilter();
+    }
   }
 
   // Add click handler to calendar header date elements
@@ -4067,7 +4033,7 @@ $(function () {
     const dayIndex = $("#head .day-h").index($dayHeader);
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() + dayIndex);
-    const fullDate = ymd(d); // YYYY-MM-DD
+    const fullDate = window.ymd(d); // YYYY-MM-DD
 
     const idx = selectedDateFilters.indexOf(fullDate);
     if (idx > -1) {
@@ -4077,8 +4043,13 @@ $(function () {
       selectedDateFilters.push(fullDate);
       $dayHeader.addClass("date-filter-active");
     }
-
+    
+    window.selectedDateFilters = selectedDateFilters;
     applyFilters();
+    // Also trigger event type filter to update
+    if (typeof applyEventTypeFilter === 'function') {
+      applyEventTypeFilter();
+    }
   });
 
   // Add click handler to time slot elements - improved version
@@ -4149,7 +4120,13 @@ $(function () {
       selectedTimeSlotFilters.add(timeMinutes);
       $hourBlock.addClass("time-slot-filter-active");
     }
+    
+    window.selectedTimeSlotFilters = selectedTimeSlotFilters;
     applyFilters();
+    // Also trigger event type filter to update
+    if (typeof applyEventTypeFilter === 'function') {
+      applyEventTypeFilter();
+    }
   });
 
   function drawNow() {
@@ -4198,9 +4175,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Elements
   const teacherTrigger = document.getElementById("teacher-search-trigger");
   const teacherWidget = document.getElementById("search-teacher");
-  const teacherFieldset = teacherWidget.querySelector(
+  const teacherFieldset = teacherWidget ? teacherWidget.querySelector(
     ".teacher-list-form fieldset"
-  );
+  ) : null;
   const teacherDisplayText = document.getElementById("teacher-display-text");
   const teacherPillsContainer = document.getElementById("teacher-pills");
   const teacherSearchInput = document.getElementById("teacher-search-input");
@@ -4221,9 +4198,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const studentTrigger = document.getElementById("student-search-trigger");
   const studentWidget = document.getElementById("search-student");
-  const studentFieldset = studentWidget.querySelector(
+  const studentFieldset = studentWidget ? studentWidget.querySelector(
     ".student-list-form fieldset"
-  );
+  ) : null;
   const studentDisplayText = document.getElementById("student-display-text");
   const studentPillsContainer = document.getElementById("student-pills");
   const studentSearchInput = document.getElementById("student-search-input");
@@ -4236,7 +4213,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- helpers ----------
 
+  // fetchJSON is now in js/api_utils.js
+  // Using: fetchJSON() from api_utils.js
+  // For backward compatibility, use global fetchJSON if available, otherwise fallback
   async function fetchJSON(url) {
+    if (window.fetchJSON && window.fetchJSON !== fetchJSON) {
+      // Use centralized version
+      return window.fetchJSON(url);
+    }
+    // Fallback implementation
     try {
       const res = await fetch(url, {
         credentials: "same-origin",
@@ -4260,62 +4245,65 @@ document.addEventListener("DOMContentLoaded", () => {
     while (el.firstChild) el.removeChild(el.firstChild);
   }
 
-  // Small global loader helpers (ensure loader shows for at least 3 seconds)
-  let __loaderShownAt = 0;
-  let __loaderHideTimer = null;
-  const __LOADER_MIN_MS = 3000; // 3 seconds
+  // Loader functions are now in js/loader_utils.js
+  // Using: showGlobalLoader() and hideGlobalLoader() from loader_utils.js
+  // If loader_utils.js is not loaded, fallback to local implementation
+  if (!window.showGlobalLoader || !window.hideGlobalLoader) {
+    console.warn('loader_utils.js not loaded, using fallback implementation');
+    let __loaderShownAt = 0;
+    let __loaderHideTimer = null;
+    const __LOADER_MIN_MS = 3000;
 
-  function __setLoaderDisplay(display) {
-    try {
-      const el = document.getElementById("loader");
-      if (el) {
-        el.style.display = display;
-        if (display === "flex") {
-          el.style.zIndex = "99999";
+    function __setLoaderDisplay(display) {
+      try {
+        const el = document.getElementById("loader");
+        if (el) {
+          el.style.display = display;
+          if (display === "flex") {
+            el.style.zIndex = "99999";
+          }
         }
+        if (window.$) {
+          window.$("#loader").css({
+            "display": display,
+            "z-index": display === "flex" ? "99999" : "auto",
+          });
+        }
+      } catch (e) {
+        console.warn("__setLoaderDisplay error:", e);
       }
-      // Also try jQuery if available
-      if (window.$) {
-        window.$("#loader").css({
-          "display": display,
-          "z-index": display === "flex" ? "99999" : "auto",
-        });
+    }
+
+    function showGlobalLoader() {
+      if (__loaderHideTimer) {
+        clearTimeout(__loaderHideTimer);
+        __loaderHideTimer = null;
       }
-    } catch (e) {
-      console.warn("__setLoaderDisplay error:", e);
+      __setLoaderDisplay("flex");
+      __loaderShownAt = Date.now();
+      console.log("Loader shown at:", __loaderShownAt);
     }
-  }
 
-  function showGlobalLoader() {
-    if (__loaderHideTimer) {
-      clearTimeout(__loaderHideTimer);
-      __loaderHideTimer = null;
+    function hideGlobalLoader() {
+      const elapsed = __loaderShownAt
+        ? Date.now() - __loaderShownAt
+        : __LOADER_MIN_MS;
+      function doHide() {
+        __setLoaderDisplay("none");
+        __loaderShownAt = 0;
+        __loaderHideTimer = null;
+        console.log("Loader hidden");
+      }
+      if (elapsed >= __LOADER_MIN_MS) {
+        doHide();
+      } else {
+        __loaderHideTimer = setTimeout(doHide, __LOADER_MIN_MS - elapsed);
+      }
     }
-    __setLoaderDisplay("flex");
-    __loaderShownAt = Date.now();
-    console.log("Loader shown at:", __loaderShownAt);
-  }
 
-  function hideGlobalLoader() {
-    const elapsed = __loaderShownAt
-      ? Date.now() - __loaderShownAt
-      : __LOADER_MIN_MS;
-    function doHide() {
-      __setLoaderDisplay("none");
-      __loaderShownAt = 0;
-      __loaderHideTimer = null;
-      console.log("Loader hidden");
-    }
-    if (elapsed >= __LOADER_MIN_MS) {
-      doHide();
-    } else {
-      __loaderHideTimer = setTimeout(doHide, __LOADER_MIN_MS - elapsed);
-    }
+    window.showGlobalLoader = showGlobalLoader;
+    window.hideGlobalLoader = hideGlobalLoader;
   }
-
-  // Expose globally
-  window.showGlobalLoader = showGlobalLoader;
-  window.hideGlobalLoader = hideGlobalLoader;
 
   // Function to trigger calendar reload
   function triggerCalendarReload() {
@@ -5669,16 +5657,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const startDate = new Date(`${monthName} ${startDay}, ${year}`);
     const endDate = new Date(`${monthName} ${endDay}, ${year}`);
 
-    const formatYMD = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    };
-
+    // Using formatYMD() from date_utils.js
     const params = new URLSearchParams();
-    params.set("start", formatYMD(startDate));
-    params.set("end", formatYMD(endDate));
+    params.set("start", window.formatYMD(startDate));
+    params.set("end", window.formatYMD(endDate));
     params.set("teacherids", teacherIds.join(","));
 
     try {
@@ -6018,8 +6000,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------------- Week range helpers ----------------
 
-  // Start = Monday of current week
+  // getWeekStart() and getWeekEnd() are now in js/date_utils.js
+  // Using: getWeekStart() and getWeekEnd() from date_utils.js
   function getWeekStart(date) {
+    if (window.getWeekStart) {
+      return window.getWeekStart(date);
+    }
+    // Fallback
     const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const day = d.getDay(); // 0 (Sun) - 6 (Sat)
     const diff = (day === 0 ? -6 : 1) - day; // make Monday = 1
@@ -6029,18 +6016,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getWeekEnd(startDate) {
+    if (window.getWeekEnd) {
+      return window.getWeekEnd(startDate);
+    }
+    // Fallback
     const d = new Date(startDate.getTime());
     d.setDate(d.getDate() + 6);
     d.setHours(23, 59, 59, 999);
     return d;
   }
 
-  function formatYMD(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
+  // Using formatYMD() from date_utils.js
 
   let currentStart = getWeekStart(new Date());
   let currentEnd = getWeekEnd(currentStart);
@@ -6204,7 +6190,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (startMin === null || endMin === null) return;
 
         whiteSlotRules.push({
-          date: ymd(dayDate),
+          date: window.ymd(dayDate),
           dayIndex,
           start: startMin,
           end: endMin,
@@ -6240,7 +6226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const endMin = endDate.getHours() * 60 + endDate.getMinutes();
 
         whiteSlotRules.push({
-          date: ymd(startDate),
+          date: window.ymd(startDate),
           dayIndex: (startDate.getDay() + 6) % 7,
           start: startMin,
           end: endMin,
@@ -6301,7 +6287,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // If this candidate week is before the startDate, skip this week
             if (startDateObj && candidate < startDateObj) return null;
 
-            return ymd(candidate);
+            return window.ymd(candidate);
           }
 
           // Fallback to startDate weekday if day is missing
@@ -6310,11 +6296,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const candidate = new Date(baseDate);
             candidate.setDate(baseDate.getDate() + startDayIdx);
             if (candidate < startDateObj) return null;
-            return ymd(candidate);
+            return window.ymd(candidate);
           }
 
           // Last resort: use base date
-          return ymd(baseDate);
+          return window.ymd(baseDate);
         })();
 
         // If dateStr is null (week is before startDate), skip this slot for this week
@@ -6427,8 +6413,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const studentids = getSelectedStudentIds();
 
     const params = new URLSearchParams();
-    params.set("start", formatYMD(currentStart));
-    params.set("end", formatYMD(currentEnd));
+    params.set("start", window.formatYMD(currentStart));
+    params.set("end", window.formatYMD(currentEnd));
 
     if (teacherids && teacherids.length > 0)
       params.set("teacherids", teacherids.join(","));
@@ -6708,6 +6694,9 @@ document.addEventListener("DOMContentLoaded", () => {
             typeof ev.rescheduled !== "undefined" ? ev.rescheduled : null,
           faded: false,
           availabilityId: ev.availabilityId || null,
+          // Include previous teacher picture for teacher change icon
+          previousTeacherPic: ev.previousTeacherPic || ev.rescheduled?.previous_teacher_picture || null,
+          previous_teacher_picture: ev.previous_teacher_picture || ev.rescheduled?.previous_teacher_picture || null,
         };
 
         // Ensure teacherId is set from reschedule current teacher if missing

@@ -794,36 +794,12 @@ input#class-name {
     </div>
 </div>
 
+<!-- Include centralized loader utilities -->
+<script src="js/loader_utils.js"></script>
+
 <script>
-// Loader and toast helpers
-function showGlobalLoader() {
-    if (window.$) {
-        window.$('#loader').css('display', 'flex');
-    } else {
-        var el = document.getElementById('loader');
-        if (el) el.style.display = 'flex';
-    }
-    window.__loaderShownAt = Date.now();
-}
-
-function hideGlobalLoader() {
-    var elapsed = window.__loaderShownAt ? Date.now() - window.__loaderShownAt : 3000;
-
-    function doHide() {
-        if (window.$) {
-            window.$('#loader').css('display', 'none');
-        } else {
-            var el = document.getElementById('loader');
-            if (el) el.style.display = 'none';
-        }
-        window.__loaderShownAt = 0;
-    }
-    if (elapsed >= 3000) {
-        doHide();
-    } else {
-        setTimeout(doHide, 3000 - elapsed);
-    }
-}
+// Loader functions are now in js/loader_utils.js
+// Using: showGlobalLoader() and hideGlobalLoader() from loader_utils.js
 
 $(document).ready(function() {
     // Calendar variables for manage session modal

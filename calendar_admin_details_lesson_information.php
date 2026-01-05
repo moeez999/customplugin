@@ -1945,6 +1945,10 @@ require_once('calendar_admin_details_lesson_information_cancel_lesson.php'); */?
 }
 </style>
 
+<!-- Include centralized toast and modal utilities -->
+<script src="js/toast_utils.js"></script>
+<script src="js/modal_utils.js"></script>
+
 <script>
 // Pre-declare the functions to make them available globally
 let openLessonInfo;
@@ -2072,20 +2076,15 @@ let closeAll;
     }
 
     // Toast helpers
-    let toastTimer = null;
-
+    // showToast() and hideToast() are now in js/toast_utils.js
+    // Using: showLessonInfoToast() from toast_utils.js for multi-line toasts
+    // For backward compatibility, keep showToast wrapper
     function showToast(line2, line3, title = 'Lesson Rescheduled') {
-        $('#calendar_admin_toast_line2').text(line2 || '');
-        $('#calendar_admin_toast_line3').text(line3 || '');
-        $toast.stop(true, true).fadeIn(140);
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(hideToast, 4500);
+        return window.showLessonInfoToast(line2, line3, title);
     }
 
     function hideToast() {
-        $toast.fadeOut(180);
-        clearTimeout(toastTimer);
-        toastTimer = null;
+        return window.hideLessonInfoToast();
     }
     $('.calendar_admin_toast_close').on('click', hideToast);
 
@@ -2798,7 +2797,13 @@ let closeAll;
     let rescheduleCalendarMonth = null;
     let rescheduleSelectedDate = null;
 
+    // daysInMonth() is now in js/date_utils.js
+    // Using: daysInMonth() from date_utils.js
     function daysInMonth(year, month) {
+        if (window.daysInMonth) {
+            return window.daysInMonth(year, month);
+        }
+        // Fallback
         return new Date(year, month + 1, 0).getDate();
     }
 

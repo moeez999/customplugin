@@ -9,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/toast_utils.js"></script>
 
     <style>
     /* Your existing CSS remains the same */
@@ -528,19 +529,6 @@
         border-radius: 8px;
     }
 
-    @keyframes spin {
-        from {
-            transform: rotate(0deg);
-        }
-
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    .spin-logo {
-        animation: spin 2s linear infinite;
-    }
     </style>
 </head>
 
@@ -548,7 +536,7 @@
     <!-- Loader -->
     <div id="loader"
         style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.6); z-index:9999; align-items:center; justify-content:center;">
-        <img src="./img/loader.png" alt="Loading..." class="spin-logo" style="width:100px;height:100px;">
+        <div class="loader"></div>
     </div>
 
     <!-- Toast Notification -->
@@ -706,49 +694,9 @@
 
     <script>
     // ===== TOAST NOTIFICATION FUNCTION =====
-    function showToast(message, type = 'success', duration = 5000) {
-        const toast = document.getElementById('toastNotificationForAvailability');
-        if (!toast) {
-            console.warn('Toast element not found');
-            return;
-        }
-
-        // Set message and styling
-        toast.textContent = message;
-        toast.style.background = type === 'error' ? '#dc3545' :
-            type === 'warning' ? '#ffc107' :
-            type === 'info' ? '#17a2b8' : '#28a745';
-        toast.style.color = type === 'warning' ? '#212529' : '#fff';
-        toast.style.display = 'block';
-        toast.style.zIndex = '999999';
-
-        // Animate in
-        setTimeout(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateY(0)';
-        }, 10);
-
-        // Auto hide
-        const toastTimeout = setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 300);
-        }, duration);
-
-        // Return dismiss function for manual control
-        return {
-            dismiss: () => {
-                clearTimeout(toastTimeout);
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 300);
-            }
-        };
-    }
+    // showToast() is now in js/toast_utils.js
+    // Using: window.showToast() directly from toast_utils.js
+    // No local wrapper needed - use window.showToast directly to avoid recursion
 
     // ===== CORE UTILITY FUNCTIONS =====
     function getDayName(dayIndex) {
@@ -870,7 +818,7 @@
 
                     // Show toast instead of alert
                     if (typeof showToast === 'function') {
-                        showToast('Availability saved successfully (' + response.action + ')', 'success');
+                        window.showToast('Availability saved successfully (' + response.action + ')', 'success', 5000, 'toastNotificationForAvailability');
                     } else {
                         console.log("Availability saved successfully (" + response.action + ")");
                     }
@@ -884,7 +832,7 @@
                 } else {
                     // Show error toast instead of alert
                     if (typeof showToast === 'function') {
-                        showToast('Error: ' + response.error, 'error');
+                        window.showToast('Error: ' + response.error, 'error', 5000, 'toastNotificationForAvailability');
                     } else {
                         console.error("Error: " + response.error);
                     }
@@ -894,7 +842,7 @@
                 console.error("Availability Error:", xhr.responseText);
                 // Show error toast instead of alert
                 if (typeof showToast === 'function') {
-                    showToast('Something went wrong while saving availability.', 'error');
+                    window.showToast('Something went wrong while saving availability.', 'error', 5000, 'toastNotificationForAvailability');
                 } else {
                     console.error("Something went wrong while saving availability.");
                 }
@@ -979,6 +927,10 @@
             const teachers =
                 <?php echo json_encode($teacherJsArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
             const $btn = $('#calendar_admin_details_setup_availablity_userbtn');
+            if (!$btn.length) {
+                console.warn('calendar_admin_details_setup_availablity_userbtn not found');
+                return;
+            }
             const $menu = $(`
             <div id="calendar_admin_details_setup_availablity_menu" class="calendar_admin_details_setup_availablity_menu" role="menu" aria-hidden="true">
                 <div class="p-2 border-bottom">
@@ -1034,9 +986,9 @@
                         console.log("Teacher availability response:", res);
 
                         if (!res || res.ok === false) {
-                            if (typeof showToast === 'function') {
-                                showToast("Failed to load availability: " + (res && res.error ? res
-                                    .error : "Unknown error"), 'error');
+                            if (typeof window.showToast === 'function') {
+                                window.showToast("Failed to load availability: " + (res && res.error ? res
+                                    .error : "Unknown error"), 'error', 5000, 'toastNotificationForAvailability');
                             } else {
                                 console.error("Failed to load availability: " + (res && res.error ? res
                                     .error : "Unknown error"));
@@ -1053,8 +1005,8 @@
                     },
                     error: function(xhr) {
                         console.error("Load teacher availability error:", xhr.responseText);
-                        if (typeof showToast === 'function') {
-                            showToast('Something went wrong while loading availability.', 'error');
+                        if (typeof window.showToast === 'function') {
+                            window.showToast('Something went wrong while loading availability.', 'error', 5000, 'toastNotificationForAvailability');
                         } else {
                             console.error("Something went wrong while loading availability.");
                         }
@@ -1077,6 +1029,7 @@
             }
 
             function pos() {
+                if (!$btn.length || !$btn[0]) return;
                 const r = $btn[0].getBoundingClientRect(),
                     gap = 8;
                 let l = r.left,

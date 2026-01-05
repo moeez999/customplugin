@@ -642,7 +642,9 @@
 
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
+<!-- Include centralized time and date utilities -->
+<script src="js/time_utils.js"></script>
+<script src="js/date_utils.js"></script>
 <script>
 $('.customrec-close, #customrec_cancel, #customRecurrenceModalBackdrop, .calendar_admin_details_create_cohort_close_sub')
     .on('click', function(e) {
@@ -652,29 +654,8 @@ $('.customrec-close, #customrec_cancel, #customRecurrenceModalBackdrop, .calenda
         }
     });
 
-function to12h(hhmm) {
-    // expects "HH:MM" or "HH:MM AM/PM" and returns {hm:"hh:mm", period:"AM|PM"}
-    let t = hhmm.trim().toUpperCase();
-    if (/AM|PM/.test(t)) {
-        // already 12h (e.g., "9:30 AM")
-        let [hm, period] = t.split(/\s+/);
-        let [h, m] = hm.split(':').map(s => s.padStart(2, '0'));
-        return {
-            hm: `${h}:${m}`,
-            period
-        };
-    } else {
-        // 24h -> 12h
-        let [h, m] = t.split(':').map(Number);
-        let period = h >= 12 ? 'PM' : 'AM';
-        h = h % 12;
-        if (h === 0) h = 12;
-        return {
-            hm: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,
-            period
-        };
-    }
-}
+// to12h function is now in js/time_utils.js
+// Using: to12h() from time_utils.js
 
 function renderWidgetTime(key, start, end) {
     const s = to12h(start),
@@ -706,17 +687,15 @@ function pad(n) {
     return n < 10 ? '0' + n : n;
 }
 
-function formatDate(dateObj) {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${months[dateObj.getMonth()]} ${pad(dateObj.getDate())},${dateObj.getFullYear()}`;
-}
+// formatDate() is now in js/date_utils.js
+// Using: formatDate() from date_utils.js
 
 $(function() {
     // Initial Monthly and "On" date are today
     let monthlyDate = new Date();
     let endsOnDate = new Date();
-    $('#customrec_monthly_picker_date').text(formatDate(monthlyDate));
-    $('#customrec_end_date_btn').text(formatDate(endsOnDate));
+    $('#customrec_monthly_picker_date').text(window.formatDate(monthlyDate));
+    $('#customrec_end_date_btn').text(window.formatDate(endsOnDate));
 
     // Track where the calendar was opened from
     let calendarTarget = null; // "monthly" or "endsOn"
@@ -746,7 +725,7 @@ $(function() {
         } else if (period.toLowerCase() === 'monthly') {
             $('#customrec_repeat_on_container').slideUp(130);
             $('#customrec_monthly_picker_container').slideDown(130);
-            $('#customrec_monthly_picker_date').text(formatDate(monthlyDate));
+            $('#customrec_monthly_picker_date').text(window.formatDate(monthlyDate));
         } else {
             $('#customrec_repeat_on_container').slideUp(130);
             $('#customrec_monthly_picker_container').slideUp(130);
@@ -902,10 +881,10 @@ $(function() {
     $('#monthly_cal_done').on('click', function() {
         if (calendarTarget === 'monthly') {
             monthlyDate = new Date(calSelectedDate.getTime());
-            $('#customrec_monthly_picker_date').text(formatDate(monthlyDate));
+            $('#customrec_monthly_picker_date').text(window.formatDate(monthlyDate));
         } else if (calendarTarget === 'endsOn') {
             endsOnDate = new Date(calSelectedDate.getTime());
-            $('#customrec_end_date_btn').text(formatDate(endsOnDate));
+            $('#customrec_end_date_btn').text(window.formatDate(endsOnDate));
         } else if (calendarTarget === 'manageSession') {
             // Update manage session modal date button
             const $dateBtn = $('#session-event-date-btn');
@@ -1246,17 +1225,11 @@ $(function() {
         const endInput = ($('#tp_end').val() || '10:00 AM').trim();
 
         // Convert 12h format to 24h format
+        // convert12to24 function is now in js/time_utils.js as convert12hTo24h
+        // Using: convert12hTo24h() from time_utils.js
         function convert12to24(timeStr) {
-            const match = timeStr.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
-            if (!match) return '09:00'; // fallback
-            let h = parseInt(match[1], 10);
-            const m = match[2];
-            const period = (match[3] || 'AM').toUpperCase();
-
-            if (period === 'PM' && h !== 12) h += 12;
-            if (period === 'AM' && h === 12) h = 0;
-
-            return `${String(h).padStart(2, '0')}:${m}`;
+            // Alias for backward compatibility - uses centralized function
+            return convert12hTo24h(timeStr) || '09:00';
         }
 
         let start = convert12to24(startInput);

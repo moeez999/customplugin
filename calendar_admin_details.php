@@ -16,20 +16,8 @@
 <!-- Global Loader -->
 <div id="loader"
     style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:99999; align-items:center; justify-content:center;">
-    <img src="./img/loader.png" alt="Loading..." class="spin-logo"
-        style="width:100px;height:100px; animation:spin 2s linear infinite;">
+    <div class="loader"></div>
 </div>
-<style>
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-</style>
 
 <div class="calendar_admin_main_wrapper">
 
@@ -761,6 +749,13 @@ $(function() {
 </script>
 
 <script src="js/calendar_admin_details.js"></script>
+<script src="js/time_utils.js"></script>
+<script src="js/date_utils.js"></script>
+<script src="js/toast_utils.js"></script>
+<script src="js/loader_utils.js"></script>
+<script src="js/modal_utils.js"></script>
+<script src="js/api_utils.js"></script>
+<script src="js/event_icon_utils.js"></script>
 <script src="js/calendar_admin_details_calendar_content.js"></script>
 <script>
 // Remove initials and ellipsis from teacher and student pill containers after rendering
@@ -870,7 +865,7 @@ $(function() {
         applyEventTypeFilter();
     });
 
-    // If any individual checkbox is unchecked, update Select All and label
+        // If any individual checkbox is unchecked, update Select All and label
     $(document).on('change', '.events-filter-popover input.ef-input', function() {
         // Prevent recursion when this is triggered by Select All
         if ($(this).attr('id') === 'ef_select_all') return;
@@ -896,6 +891,11 @@ $(function() {
 
         // Apply event type filter to rendered events
         applyEventTypeFilter();
+        // Also apply date/time filters if toggle is enabled
+        const filterToggleEnabled = $('#filterToggle').is(':checked');
+        if (filterToggleEnabled && typeof window.applyFilters === 'function') {
+            window.applyFilters();
+        }
     });
 
     // Function to filter rendered events by type
@@ -912,12 +912,28 @@ $(function() {
             [];
         const isSingleTeacher = selectedTeachers.length === 1;
 
-        // If no filters selected, show all events and white slots
+        // Check if filter toggle is enabled and if date/time filters are active
+        const filterToggleEnabled = $('#filterToggle').is(':checked');
+        const hasDateFilter = window.selectedDateFilters && window.selectedDateFilters.length > 0;
+        const hasTimeFilter = window.selectedTimeSlotFilters && window.selectedTimeSlotFilters.size > 0;
+        const hasDateOrTimeFilter = filterToggleEnabled && (hasDateFilter || hasTimeFilter);
+
+        // If no filters selected, show all events and white slots (unless date/time filters are active)
         if (checkedFilters.length === 0) {
-            $('.event').show();
+            if (hasDateOrTimeFilter) {
+                // If date/time filters are active but no event type filters, hide all events
+                // The date/time filter will handle showing the right events
+                $('.event').hide();
+            } else {
+                $('.event').show();
+            }
             // Show white slots only if single teacher is selected
             if (isSingleTeacher) {
                 $('.slot-white').show();
+            }
+            // If date/time filters are active, apply them
+            if (hasDateOrTimeFilter && typeof window.applyFilters === 'function') {
+                window.applyFilters();
             }
             return;
         }
@@ -962,6 +978,32 @@ $(function() {
             const $event = $(this);
             const classType = $event.data('class-type') || '';
             const source = $event.data('source') || '';
+
+            // Check date and time filters if toggle is enabled
+            let dateTimeMatch = true;
+            if (hasDateOrTimeFilter) {
+                const eventDate = $event.data('event-date');
+                const eventStart = parseInt($event.data('start'), 10);
+                const eventEnd = parseInt($event.data('end'), 10);
+
+                // Check date filter
+                if (hasDateFilter) {
+                    dateTimeMatch = dateTimeMatch && window.selectedDateFilters.includes(eventDate);
+                }
+
+                // Check time slot filter
+                if (hasTimeFilter && !isNaN(eventStart) && !isNaN(eventEnd)) {
+                    let timeMatch = false;
+                    for (const slotStart of window.selectedTimeSlotFilters) {
+                        const slotEnd = slotStart + 60; // 60 minutes per slot
+                        if (eventStart < slotEnd && eventEnd > slotStart) {
+                            timeMatch = true;
+                            break;
+                        }
+                    }
+                    dateTimeMatch = dateTimeMatch && timeMatch;
+                }
+            }
 
             let shouldShow = false;
 
@@ -1026,8 +1068,8 @@ $(function() {
                 // Single teacher: availability renders as white slots, not events, so don't show event elements
             }
 
-            // Show or hide the event
-            if (shouldShow) {
+            // Show or hide the event (must match both event type AND date/time filters if active)
+            if (shouldShow && dateTimeMatch) {
                 $event.show();
             } else {
                 $event.hide();

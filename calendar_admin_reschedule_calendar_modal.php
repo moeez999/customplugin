@@ -163,7 +163,13 @@ $(document).ready(function() {
     let rescheduleCalendarMonth = null;
     let rescheduleSelectedDate = null;
 
+    // daysInMonth() is now in js/date_utils.js
+    // Using: daysInMonth() from date_utils.js
     function daysInMonth(year, month) {
+        if (window.daysInMonth) {
+            return window.daysInMonth(year, month);
+        }
+        // Fallback
         return new Date(year, month + 1, 0).getDate();
     }
 

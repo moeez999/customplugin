@@ -697,6 +697,35 @@ hr.weekly_lesson_hr.large {
     display: flex;
 }
 
+/* CSS Loader - Replaces loader.png */
+.loader {
+    width: 50px;
+    aspect-ratio: 1;
+    display: grid;
+    border-radius: 50%;
+    background:
+        linear-gradient(0deg ,rgb(0 0 0/50%) 30%,#0000 0 70%,rgb(0 0 0/100%) 0) 50%/8% 100%,
+        linear-gradient(90deg,rgb(0 0 0/25%) 30%,#0000 0 70%,rgb(0 0 0/75% ) 0) 50%/100% 8%;
+    background-repeat: no-repeat;
+    animation: l23 1s infinite steps(12);
+}
+.loader::before,
+.loader::after {
+   content: "";
+   grid-area: 1/1;
+   border-radius: 50%;
+   background: inherit;
+   opacity: 0.915;
+   transform: rotate(30deg);
+}
+.loader::after {
+   opacity: 0.83;
+   transform: rotate(60deg);
+}
+@keyframes l23 {
+  100% {transform: rotate(1turn)}
+}
+
 /* Disabled button state */
 .calendar_admin_details_create_cohort_schedule_btn_manage:disabled {
     opacity: 0.5;
@@ -1562,7 +1591,7 @@ echo $studentsItemsHtml;
 
 <!-- Loader Overlay -->
 <div class="loader-overlay" id="loaderOverlay">
-    <img src="./img/loader.png" alt="Loading..." class="spin-logo" style="width:100px;height:100px;">
+    <div class="loader"></div>
 </div>
 
 <!-- Custom Calendar Modal -->
@@ -1698,25 +1727,19 @@ echo $studentsItemsHtml;
             transform:translateY(20px);">
 </div>
 
+<!-- Include centralized time, date, toast, and API utilities -->
+<script src="js/time_utils.js"></script>
+<script src="js/date_utils.js"></script>
+<script src="js/toast_utils.js"></script>
+<script src="js/api_utils.js"></script>
+
 <script>
 // ====== TOAST NOTIFICATION FUNCTION ======
+// showToast() is now in js/toast_utils.js
+// Using: showToast() from toast_utils.js
+// For backward compatibility, alias showToastManage to showToast
 function showToastManage(message, duration = 5000) {
-    const toast = document.getElementById('toastNotificationForManageClass');
-    if (!toast) return;
-
-    toast.textContent = message;
-    toast.style.display = 'block';
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 100);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 300);
-    }, duration);
+    return window.showToast(message, 'success', duration, 'toastNotificationForManageClass');
 }
 
 // ====== GLOBAL STATE AND UTILITIES ======
@@ -1725,9 +1748,12 @@ const DropdownManager = {
 
     init() {
         // Set up global backdrop click handler
-        document.getElementById('globalDropdownBackdrop').addEventListener('click', () => {
-            this.closeAll();
-        });
+        const backdrop = document.getElementById('globalDropdownBackdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', () => {
+                this.closeAll();
+            });
+        }
 
         // Initialize all dropdowns
         this.initializeDropdowns();
@@ -1768,7 +1794,10 @@ const DropdownManager = {
         this.closeAll();
         this.activeDropdown = content;
         content.classList.add('active');
-        document.getElementById('globalDropdownBackdrop').classList.add('active');
+        const backdrop = document.getElementById('globalDropdownBackdrop');
+        if (backdrop) {
+            backdrop.classList.add('active');
+        }
     },
 
     closeAll() {
@@ -1776,7 +1805,10 @@ const DropdownManager = {
             this.activeDropdown.classList.remove('active');
             this.activeDropdown = null;
         }
-        document.getElementById('globalDropdownBackdrop').classList.remove('active');
+        const backdrop = document.getElementById('globalDropdownBackdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
     }
 };
 
@@ -1827,34 +1859,8 @@ function updateEndsUI() {
     if (occPlusBtn) occPlusBtn.disabled = !afterChecked;
 }
 
-function convert12hTo24h(time12h) {
-    const [time, period] = time12h.split(' ');
-    let [hours, minutes] = time.split(':');
-
-    hours = parseInt(hours);
-    minutes = minutes || '00';
-
-    if (period === 'PM' && hours < 12) {
-        hours += 12;
-    }
-    if (period === 'AM' && hours === 12) {
-        hours = 0;
-    }
-
-    return `${String(hours).padStart(2, '0')}:${minutes}`;
-}
-
-function convert24hTo12h(time24h) {
-    const [hours, minutes] = time24h.split(':');
-    let hour = parseInt(hours);
-    const minute = minutes;
-
-    const period = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12;
-    if (hour === 0) hour = 12;
-
-    return `${hour}:${minute} ${period}`;
-}
+// Time conversion functions are now in js/time_utils.js
+// Using: convert12hTo24h() and convert24hTo12h() from time_utils.js
 
 function renderWidgetTimeManage(key, start, end) {
     const widget = document.querySelector(`.weekly_lesson_scroll_widget_manage[data-key="${key}"]`);
@@ -1941,33 +1947,10 @@ function renderWidgetTimeManage(key, start, end) {
     };
 }
 
-function formatDate(dateObj) {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ];
-    const day = dateObj.getDate().toString().padStart(2, '0');
-    return `${months[dateObj.getMonth()]} ${day}, ${dateObj.getFullYear()}`;
-}
-
-function formatTime12Hour(date) {
-    let hours = date.getHours();
-    let minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-    minutes = minutes < 10 ? '0' + minutes : minutes;
-
-    return `${hours}:${minutes} ${ampm}`;
-}
-
-function formatTime12HourFromParts(hours, minutes) {
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-    minutes = minutes < 10 ? '0' + minutes : minutes;
-    return `${hours}:${minutes} ${ampm}`;
-}
+// Date formatting functions are now in js/date_utils.js
+// Time formatting functions are now in js/time_utils.js
+// Using: formatDate() from date_utils.js
+// Using: formatTime12Hour() and formatTime12HourFromParts() from time_utils.js
 
 function getDayIcon(day) {
     const iconMap = {
@@ -2421,19 +2404,12 @@ function calculateDateForDay(dayText, baseDate) {
     const resultDate = new Date(baseDateObj);
     resultDate.setUTCDate(resultDate.getUTCDate() + daysToAdd);
 
-    // Format as YYYY-MM-DD
-    const yyyy = resultDate.getUTCFullYear();
-    const mm = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(resultDate.getUTCDate()).padStart(2, '0');
-
-    return `${yyyy}-${mm}-${dd}`;
+    // Format as YYYY-MM-DD using formatDateUTC() from date_utils.js
+    return window.formatDateUTC(resultDate);
 }
 
-function parseUnixTimestamp(timestamp) {
-    // Handle both seconds and milliseconds timestamps
-    const ts = parseInt(timestamp, 10);
-    return new Date(ts < 1e12 ? ts * 1000 : ts);
-}
+// parseUnixTimestamp() is now in js/date_utils.js
+// Using: parseUnixTimestamp() from date_utils.js
 
 function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, startTime, endTime) {
     console.log(`Populating modal for activity ${activityIndex}, day: ${selectedDay}, time: ${startTime} - ${endTime}`);
@@ -2458,14 +2434,14 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
             // Use clicked event date instead of start date from googleMeet
             const [year, month, day] = clickedEventDate.split('-').map(Number);
             const dateObj = new Date(year, month - 1, day, 0, 0, 0);
-            startDateEl.textContent = formatDate(dateObj);
+            startDateEl.textContent = window.formatDate(dateObj);
             startDateEl.dataset.fullDate = clickedEventDate;
             window.weeklyLessonStartDate = dateObj;
-            console.log('Set start date to clicked event date:', clickedEventDate, '→ formatted:', formatDate(dateObj));
+            console.log('Set start date to clicked event date:', clickedEventDate, '→ formatted:', window.formatDate(dateObj));
         } else if (startDateStr) {
             // Fallback to start date from googleMeet if no clicked event date
-            const startDate = parseUnixTimestamp(startDateStr);
-            startDateEl.textContent = formatDate(startDate);
+            const startDate = window.parseUnixTimestamp(startDateStr);
+            startDateEl.textContent = window.formatDate(startDate);
             // store deterministic ISO date for later parsing
             try {
                 startDateEl.dataset.fullDate = startDate.toISOString().split('T')[0];
@@ -2481,15 +2457,12 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
     });
 
     if (endDateStr && endDateStr !== "no" && endDateStr !== "0") {
-        const endDate = parseUnixTimestamp(endDateStr);
+        const endDate = window.parseUnixTimestamp(endDateStr);
         if (endDateBtn) {
-            endDateBtn.textContent = formatDate(endDate);
+            endDateBtn.textContent = window.formatDate(endDate);
             // Store the date in dataset to avoid timezone issues
             try {
-                const yyyy = endDate.getFullYear();
-                const mm = String(endDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(endDate.getDate()).padStart(2, '0');
-                endDateBtn.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                endDateBtn.dataset.fullDate = window.ymd(endDate);
             } catch (e) {}
             window.weeklyLessonEndDate = endDate;
         }
@@ -2646,10 +2619,7 @@ function updateDateTimeFields(date, startTime, endTime, durationMinutes) {
         dateElement.textContent = formattedDate;
         try {
             // Format date manually to avoid timezone issues
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-            dateElement.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+            dateElement.dataset.fullDate = window.ymd(date);
         } catch (e) {}
     }
 
@@ -3488,22 +3458,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const endDateBtn = $('#weeklyLessonEndDateBtnManage');
 
         if (startDateText) {
-            startDateText.textContent = formatDate(weeklyLessonStartDate);
+            startDateText.textContent = window.formatDate(weeklyLessonStartDate);
             try {
-                const yyyy = weeklyLessonStartDate.getFullYear();
-                const mm = String(weeklyLessonStartDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(weeklyLessonStartDate.getDate()).padStart(2, '0');
-                startDateText.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                startDateText.dataset.fullDate = window.ymd(weeklyLessonStartDate);
             } catch (e) {}
         }
         if (endDateBtn) {
             endDateBtn.disabled = false;
-            endDateBtn.textContent = formatDate(weeklyLessonEndsOnDate);
+            endDateBtn.textContent = window.formatDate(weeklyLessonEndsOnDate);
             try {
-                const yyyy = weeklyLessonEndsOnDate.getFullYear();
-                const mm = String(weeklyLessonEndsOnDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(weeklyLessonEndsOnDate.getDate()).padStart(2, '0');
-                endDateBtn.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                endDateBtn.dataset.fullDate = window.ymd(weeklyLessonEndsOnDate);
             } catch (e) {}
         }
 
@@ -3591,23 +3555,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (calendarTarget === 'start') {
                 weeklyLessonStartDate = new Date(selectedDate);
                 if (startDateText) {
-                    startDateText.textContent = formatDate(weeklyLessonStartDate);
+                    startDateText.textContent = window.formatDate(weeklyLessonStartDate);
                     try {
-                        const yyyy = weeklyLessonStartDate.getFullYear();
-                        const mm = String(weeklyLessonStartDate.getMonth() + 1).padStart(2, '0');
-                        const dd = String(weeklyLessonStartDate.getDate()).padStart(2, '0');
-                        startDateText.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                        startDateText.dataset.fullDate = window.ymd(weeklyLessonStartDate);
                     } catch (e) {}
                 }
             } else {
                 weeklyLessonEndsOnDate = new Date(selectedDate);
                 if (endDateBtn) {
-                    endDateBtn.textContent = formatDate(weeklyLessonEndsOnDate);
+                    endDateBtn.textContent = window.formatDate(weeklyLessonEndsOnDate);
                     try {
-                        const yyyy = weeklyLessonEndsOnDate.getFullYear();
-                        const mm = String(weeklyLessonEndsOnDate.getMonth() + 1).padStart(2, '0');
-                        const dd = String(weeklyLessonEndsOnDate.getDate()).padStart(2, '0');
-                        endDateBtn.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                        endDateBtn.dataset.fullDate = window.ymd(weeklyLessonEndsOnDate);
                     } catch (e) {}
                 }
             }
@@ -3868,11 +3826,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     dateText.textContent = formatted;
 
-                    // Store full date
-                    const yyyy = selectedDate.getFullYear();
-                    const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                    const dd = String(selectedDate.getDate()).padStart(2, '0');
-                    dateText.dataset.fullDate = `${yyyy}-${mm}-${dd}`;
+                    // Store full date using ymd() from date_utils.js
+                    dateText.dataset.fullDate = window.ymd(selectedDate);
                 }
                 calendarBackdrop.style.display = 'none';
             });
@@ -4134,10 +4089,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // ✅ FIX: Create date at noon to avoid timezone issues
                         const dateObj = new Date(year, month, day, 12, 0, 0);
                         // Format as YYYY-MM-DD without timezone conversion
-                        const yyyy = dateObj.getFullYear();
-                        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-                        const dd = String(dateObj.getDate()).padStart(2, '0');
-                        date = `${yyyy}-${mm}-${dd}`;
+                        date = window.ymd(dateObj);
                     }
                 }
             }
@@ -4434,21 +4386,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             console.log('Update Response:', result);
 
-            // Hide loader
-            if (loaderOverlay) loaderOverlay.classList.remove('active');
-
             if (!result.success) {
+                // Hide loader on error
+                if (loaderOverlay) loaderOverlay.classList.remove('active');
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
                 showToastManage('❌ Error: ' + result.message);
                 return;
             }
 
             showToastManage('✅ Session updated successfully!');
 
-            if (window.refetchCustomPluginData) {
-                window.refetchCustomPluginData('update-one2one');
-            } else if (window.fetchCalendarEvents) {
-                window.fetchCalendarEvents();
+            // Keep loader visible during calendar refresh
+            // Switch from overlay loader to global loader for calendar fetch
+            if (loaderOverlay) loaderOverlay.classList.remove('active');
+            
+            // Show global loader for calendar fetch
+            if (window.showGlobalLoader) {
+                window.showGlobalLoader();
+            } else {
+                // Fallback: show overlay loader if global loader not available
+                if (loaderOverlay) loaderOverlay.classList.add('active');
             }
+
+            // Refresh calendar events - wait for it to complete
+            try {
+                if (window.refetchCustomPluginData) {
+                    // refetchCustomPluginData already shows/hides loader internally
+                    await window.refetchCustomPluginData('update-one2one');
+                } else if (window.fetchCalendarEvents) {
+                    // fetchCalendarEvents shows loader unless skipLoaderShow is true
+                    // Since we already showed loader above, we could skip, but let it manage its own loader
+                    await window.fetchCalendarEvents(false); // false = don't skip loader
+                }
+            } catch (fetchError) {
+                console.error('Error refreshing calendar:', fetchError);
+                // Hide loader on error
+                if (window.hideGlobalLoader) window.hideGlobalLoader();
+                if (loaderOverlay) loaderOverlay.classList.remove('active');
+            }
+            // Note: Loader will be hidden by refetchCustomPluginData or fetchCalendarEvents in their finally blocks
 
             // Reset form after successful submission
             setTimeout(() => {

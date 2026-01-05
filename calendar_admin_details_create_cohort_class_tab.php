@@ -962,29 +962,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Include centralized time, date, and toast utilities -->
+<script src="js/time_utils.js"></script>
+<script src="js/date_utils.js"></script>
+<script src="js/toast_utils.js"></script>
+
 <script>
 (function() {
-    // Utility function to convert time to 12h format
-    function to12h(hhmm) {
-        let t = hhmm.trim().toUpperCase();
-        if (/AM|PM/.test(t)) {
-            let [hm, period] = t.split(/\s+/);
-            let [h, m] = hm.split(':').map(s => s.padStart(2, '0'));
-            return {
-                hm: `${h}:${m}`,
-                period
-            };
-        } else {
-            let [h, m] = t.split(':').map(Number);
-            let period = h >= 12 ? 'PM' : 'AM';
-            h = h % 12;
-            if (h === 0) h = 12;
-            return {
-                hm: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,
-                period
-            };
-        }
-    }
+    // to12h function is now in js/time_utils.js
+    // Using: to12h() from time_utils.js
 
     // Render time on widget
     function renderWidgetTime(key, start, end) {
@@ -1014,12 +1000,8 @@ document.addEventListener('DOMContentLoaded', function() {
         $time.classList.add('has-time');
     }
 
-    // Format date helper
-    function formatDate(dateObj) {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const day = dateObj.getDate().toString().padStart(2, '0');
-        return `${months[dateObj.getMonth()]} ${day}, ${dateObj.getFullYear()}`;
-    }
+    // formatDate() is now in js/date_utils.js
+    // Using: formatDate() from date_utils.js
 
     // State
     let wlInterval = 1;
@@ -1224,16 +1206,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let wlCalViewYear = wlStartDate.getFullYear();
     let wlCalSelectedDate = new Date(wlStartDate);
 
-    // Format date helper
-    function formatDate(dateObj) {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const day = dateObj.getDate().toString().padStart(2, '0');
-        return `${months[dateObj.getMonth()]} ${day}, ${dateObj.getFullYear()}`;
-    }
+    // formatDate() is now in js/date_utils.js
+    // Using: formatDate() from date_utils.js
 
     // Set initial dates
-    document.getElementById('wl_start_date_text').textContent = formatDate(wlStartDate);
-    document.getElementById('wl_end_date_btn').textContent = formatDate(wlEndsOnDate);
+    document.getElementById('wl_start_date_text').textContent = window.formatDate(wlStartDate);
+    document.getElementById('wl_end_date_btn').textContent = window.formatDate(wlEndsOnDate);
 
     // Open calendar for START DATE
     document.getElementById('wl_start_date_btn').addEventListener('click', function() {
@@ -1343,11 +1321,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('wl_cal_done').addEventListener('click', function() {
         if (wlCalendarTarget === 'start') {
             wlStartDate = new Date(wlCalSelectedDate);
-            document.getElementById('wl_start_date_text').textContent = formatDate(wlStartDate);
+            document.getElementById('wl_start_date_text').textContent = window.formatDate(wlStartDate);
             document.getElementById('wl_start_date_text').dataset.fullDate = wlStartDate.toISOString().split('T')[0];
         } else if (wlCalendarTarget === 'ends') {
             wlEndsOnDate = new Date(wlCalSelectedDate);
-            document.getElementById('wl_end_date_btn').textContent = formatDate(wlEndsOnDate);
+            document.getElementById('wl_end_date_btn').textContent = window.formatDate(wlEndsOnDate);
             document.getElementById('wl_end_date_btn').dataset.fullDate = wlEndsOnDate.toISOString().split('T')[0];
         }
         document.getElementById('wlStartDateCalendarBackdrop').style.display = 'none';
@@ -1378,69 +1356,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    function formatDateShort(date) {
-        return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]}${date.getDate()}`;
-    }
-
-    function formatDateLong(date) {
-        return `${monthNames[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}`;
-    }
+    // formatDateShort() and formatDateLong() are now in js/date_utils.js
+    // Using: formatDateShort() and formatDateLong() from date_utils.js
 
     // Set today's date in single lesson section
     const selectedDateText = document.getElementById('selectedDateText');
     if (selectedDateText) {
-        selectedDateText.textContent = formatDateShort(today);
+        selectedDateText.textContent = window.formatDateShort(today, dayNames, monthNames);
         selectedDateText.dataset.fullDate = today.toISOString().split('T')[0];
     }
 
     // Set today's date in weekly lesson section
     const wlStartDateText = document.getElementById('wl_start_date_text');
     if (wlStartDateText) {
-        wlStartDateText.textContent = formatDateLong(today);
+        wlStartDateText.textContent = window.formatDateLong(today, monthNames);
     }
 
     // ====== TOAST NOTIFICATION FUNCTION ======
-    // ====== ENHANCED TOAST NOTIFICATION FUNCTION ======
+    // showToast() is now in js/toast_utils.js
+    // Using: showToast() from toast_utils.js
+    // For backward compatibility, alias showToastCreateClass to showToast
     function showToastCreateClass(message, type = 'success', duration = 5000) {
-        const toast = document.getElementById('toastNotificationFor1:1Class');
-        if (!toast) {
-            console.warn('Toast element not found');
-            return;
-        }
-
-        // Set message and styling
-        toast.textContent = message;
-        toast.style.background = type === 'error' ? '#dc3545' :
-            type === 'warning' ? '#ffc107' :
-            type === 'info' ? '#17a2b8' : '#28a745';
-        toast.style.color = type === 'warning' ? '#212529' : '#fff';
-        toast.style.display = 'block';
-
-        // Animate in
-        setTimeout(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateY(0)';
-        }, 10);
-
-        // Auto hide
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 300);
-        }, duration);
-
-        // Return dismiss function for manual control
-        return {
-            dismiss: () => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 300);
-            }
-        };
+        return window.showToast(message, type, duration, 'toastNotificationFor1:1Class');
     }
 
     // ====== COMPREHENSIVE VALIDATION FUNCTIONS ======

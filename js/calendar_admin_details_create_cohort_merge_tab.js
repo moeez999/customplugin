@@ -52,8 +52,14 @@ $(document).click(function () {
 // let mergeCalendarMonth = null;
 // let mergeSelectedCalendarDate = null;
 
+// daysInMonth() is now in js/date_utils.js
+// Using: daysInMonth() from date_utils.js
 function mergeDaysInMonth(year, month) {
-  return new Date(year, month + 1, 0).getDate();
+    if (window.daysInMonth) {
+        return window.daysInMonth(year, month);
+    }
+    // Fallback
+    return new Date(year, month + 1, 0).getDate();
 }
 // Show modal on button click
 $("#mergeClosingDateBtn, #mergeMergingDateBtn").click(function (e) {
