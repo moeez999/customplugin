@@ -118,8 +118,14 @@
             <aside class="md:col-span-3">
                 <nav class="my_profile_settings_tabs_details_list pr-0 md:pr-6">
 
-                    <button class="my_profile_settings_tabs_details_item my_profile_settings_tabs_details_active"
+                    <?php
+                    $isSubscriptionActive =
+                        isset($_GET['subscription']) && $_GET['subscription'] === 'active';
+                    ?>
+                    <button  class="my_profile_settings_tabs_details_item
+                        <?php if (!$isSubscriptionActive) echo 'my_profile_settings_tabs_details_active'; ?>"
                         data-my_profile_settings_tabs_details_target="account">
+                        
                         <span class="my_profile_settings_tabs_details_indicator_bar"></span>
                         Account
                     </button>
@@ -142,7 +148,8 @@
                         Payment methods
                     </button>
 
-                    <button class="my_profile_settings_tabs_details_item"
+                    <button class="my_profile_settings_tabs_details_item 
+                        <?php if ($isSubscriptionActive) echo 'my_profile_settings_tabs_details_active'; ?>"
                         data-my_profile_settings_tabs_details_target="subscription">
                         <span class="my_profile_settings_tabs_details_indicator_bar"></span>
                         Subscription
