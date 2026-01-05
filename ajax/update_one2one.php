@@ -431,17 +431,38 @@ $courseid = (int)$cm->course;
 
      
 
-    // Payload timing (frontend)
+    
+
+    if($data['currentData']['start'] && $data['currentData']['end'])
+    {
+        $dayInfo = [
+            'start' => $data['currentData']['start'],
+            'end'   => $data['currentData']['end'],
+            'date' => $data['currentData']['date'] ?? ''
+        ];
+
+       
+    $eventDate   = $data['currentData']['date'];
+
+    $oldStartTS = strtotime($eventDate . ' ' . $dayInfo['start']);
+    $oldEndTS   = strtotime($eventDate . ' ' . $dayInfo['end']);
+    $teacherid = $data['currentData']['teacherId'];
+
+    }else{
+          // Payload timing (frontend)
     $dayInfo = $data['weeklyLesson']['days'][0] ?? null;
-    if (!$dayInfo || empty($dayInfo['start']) || empty($dayInfo['end'])) {
-        throw new moodle_exception('invaliddata', 'error', '', 'days[start,end] required');
-    }
 
     $eventDateTS = (int)$gmEvent->eventdate;
     $eventDate   = date('Y-m-d', $eventDateTS);
 
     $oldStartTS = strtotime($eventDate . ' ' . $dayInfo['start']);
     $oldEndTS   = strtotime($eventDate . ' ' . $dayInfo['end']);
+    }
+    if (!$dayInfo || empty($dayInfo['start']) || empty($dayInfo['end'])) {
+        throw new moodle_exception('invaliddata', 'error', '', 'days[start,end] required');
+    }
+
+    
 
     $previousFinal = [
         'eventid'      => $eventid,
@@ -453,16 +474,43 @@ $courseid = (int)$cm->course;
         'start_ts'     => $oldStartTS,
         'end_ts'       => $oldEndTS,
         'time'         => time(),
-        'action'       => 'reschedule_one2one'
+        'action'       => 'reschedule_instant'
     ];
 }
 
 // -----------------------------------------------------
 // 4) Build CURRENT from payload
 // -----------------------------------------------------
-$payloadTs = strtotime($data['timestamp']);
-$newDate   = date('Y-m-d', $payloadTs);
-$newDay = $data['weeklyLesson']['days'][0];
+// Determine the new date: prioritize date from days array, then currentData, then fallback to timestamp
+$newDate = null;
+
+// First, try to get date from weeklyLesson days array (if date was explicitly set)
+$newDay = $data['weeklyLesson']['days'][0] ?? null;
+if ($newDay && !empty($newDay['date'])) {
+    $newDate = $newDay['date'];
+} 
+// Second, use the original event date from currentData (when only teacher changes, date should stay the same)
+elseif (!empty($data['currentData']['date'])) {
+    $newDate = $data['currentData']['date'];
+}
+// Third, fallback to eventDate from previousFinal
+elseif (!empty($eventDate)) {
+    $newDate = $eventDate;
+}
+// Last resort: calculate from timestamp (should rarely happen)
+elseif (!empty($data['timestamp'])) {
+    $payloadTs = $data['timestamp']; // "2026-01-01T18:20:21.573Z"
+    $newDate   = date('Y-m-d', strtotime($payloadTs));
+} else {
+    // Final fallback
+    $newDate = $eventDate ?? date('Y-m-d');
+}
+
+// Ensure we have day info before calculating timestamps
+if (!$newDay || empty($newDay['start']) || empty($newDay['end'])) {
+    throw new moodle_exception('invaliddata', 'error', '', 'days[start,end] required');
+}
+
 $newStartTS = strtotime($newDate . ' ' . $newDay['start']);
 $newEndTS   = strtotime($newDate . ' ' . $newDay['end']);
 
@@ -470,7 +518,7 @@ if (!$newStartTS || !$newEndTS) {
     throw new moodle_exception('invalidtime', 'error', '', 'Invalid date/time combination');
 }
 
-$dayInfo = $data['weeklyLesson']['days'][0] ?? null;
+$dayInfo = $newDay;
 
 $currentFinal = [
     'eventid'      => $eventid,
@@ -484,7 +532,7 @@ $currentFinal = [
     'start_ts'     => $newStartTS,
     'end_ts'       => $newEndTS,
     'time'         => time(),
-    'action'       => 'reschedule_one2one'
+    'action'       => 'reschedule_instant'
 ];
 
 // -----------------------------------------------------
@@ -493,14 +541,14 @@ $currentFinal = [
 $details = [
     'previous' => $previousFinal,
     'current'  => $currentFinal,
-    'action'   => 'reschedule_one2one'
+    'action'   => 'reschedule_instant'
 ];
 
 
 
 if ($statusrow) {
 
-    $statusrow->statuscode   = 'reschedule_one2one';
+    $statusrow->statuscode   = 'reschedule_instant';
     $statusrow->detailsjson  = json_encode($details); // ✅ STRING
     $statusrow->timemodified = time();
     $statusrow->createdby    = $USER->id;
@@ -513,7 +561,7 @@ if ($statusrow) {
     $insert->googlemeetid  = $currentFinal['googlemeetid'];
     $insert->courseid      = $courseid ;
     $insert->cmid          = (int)$cm->id;
-    $insert->statuscode    = 'reschedule_one2one';
+    $insert->statuscode    = 'reschedule_instant';
     $insert->detailsjson   = json_encode($details); // ✅ STRING
     $insert->isactive      = 1;
     $insert->timecreated  = time();
@@ -598,7 +646,7 @@ if (!empty($data['newData']['allEvents'])) {
                 'start_ts'     => $oldStart,
                 'end_ts'       => $oldEnd,
                 'time'         => time(),
-                'action'       => 'reschedule_one2one'
+                'action'       => 'reschedule_instant'
             ];
         }
 
@@ -619,20 +667,20 @@ if (!empty($data['newData']['allEvents'])) {
             'start_ts'     => $newStart,
             'end_ts'       => $newEnd,
             'time'         => time(),
-            'action'       => 'reschedule_one2one'
+            'action'       => 'reschedule_instant'
         ];
 
         $details = [
             'previous' => $prev,
             'current'  => $cur,
-            'action'   => 'reschedule_one2one'
+            'action'   => 'reschedule_instant'
         ];
 
         // ---------------------------------------------
         // Update / Insert local_gm_event_status
         // ---------------------------------------------
         if ($oldRow) {
-            $oldRow->statuscode   = 'reschedule_one2one';
+            $oldRow->statuscode   = 'reschedule_instant';
             $oldRow->detailsjson  = json_encode($details);
             $oldRow->timemodified = time();
             $oldRow->createdby   = $USER->id;
@@ -643,7 +691,7 @@ if (!empty($data['newData']['allEvents'])) {
             $ins->googlemeetid  = (int)$fev->googlemeetid;
             $ins->courseid      = $courseid;
             $ins->cmid          = $cm->id;
-            $ins->statuscode    = 'reschedule_one2one';
+            $ins->statuscode    = 'reschedule_instant';
             $ins->detailsjson   = json_encode($details);
             $ins->isactive      = 1;
             $ins->timecreated   = time();

@@ -1395,10 +1395,19 @@
                     break;
                 case 'addtime':
                     $('#addTimeTabContent').show();
-                    resetAddTimeForm();
+                    // Pass slot info if available from empty slot click
+                    if (window._lastCohortSlotInfo) {
+                        resetAddTimeForm(null, null, window._lastCohortSlotInfo);
+                    } else {
+                        resetAddTimeForm();
+                    }
                     break;
                 case 'extraslots':
                     $('#addExtraSlotsTabContent').show();
+                    // Pass slot info if available from empty slot click
+                    if (window._lastCohortSlotInfo) {
+                        resetAddTimeFormExtraSlots(null, null, window._lastCohortSlotInfo);
+                    }
                     break;
             }
 

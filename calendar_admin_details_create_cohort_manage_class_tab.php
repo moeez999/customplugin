@@ -2374,6 +2374,61 @@ function fullDayName(short) {
     return map[short] || short;
 }
 
+function calculateDateForDay(dayText, baseDate) {
+    /**
+     * Calculates the actual date for a given weekday based on a base date.
+     * @param {string} dayText - Day abbreviation (e.g., 'Mon', 'Tue', 'Wed')
+     * @param {string|Date} baseDate - Reference date (YYYY-MM-DD format or Date object)
+     * @returns {string} - Date in YYYY-MM-DD format, or null if calculation fails
+     */
+    const dayMap = {
+        'Sun': 0,
+        'Mon': 1,
+        'Tue': 2,
+        'Wed': 3,
+        'Thu': 4,
+        'Fri': 5,
+        'Sat': 6
+    };
+
+    if (!dayText || !baseDate) return null;
+
+    // Parse base date
+    let baseDateObj;
+    if (typeof baseDate === 'string') {
+        // Assume YYYY-MM-DD format
+        baseDateObj = new Date(baseDate + 'T00:00:00Z');
+    } else if (baseDate instanceof Date) {
+        baseDateObj = new Date(baseDate);
+    } else {
+        return null;
+    }
+
+    if (isNaN(baseDateObj.getTime())) return null;
+
+    // Get target day of week
+    const targetDayNum = dayMap[dayText];
+    if (targetDayNum === undefined) return null;
+
+    // Get current day of week of base date
+    const currentDayNum = baseDateObj.getUTCDay();
+
+    // Calculate days to add
+    let daysToAdd = targetDayNum - currentDayNum;
+    if (daysToAdd <= 0) daysToAdd += 7;
+
+    // Create new date
+    const resultDate = new Date(baseDateObj);
+    resultDate.setUTCDate(resultDate.getUTCDate() + daysToAdd);
+
+    // Format as YYYY-MM-DD
+    const yyyy = resultDate.getUTCFullYear();
+    const mm = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(resultDate.getUTCDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 function parseUnixTimestamp(timestamp) {
     // Handle both seconds and milliseconds timestamps
     const ts = parseInt(timestamp, 10);
@@ -2393,16 +2448,30 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
     const startDateStr = googleMeet.eventdate;
     const endDateStr = googleMeet.eventenddate;
 
-    // ---- Populate Start Date ----
+    // ---- Get the clicked event date to determine which day to select ----
+    const clickedEventDate = window.currentEventData?.date || null;
+
+    // ---- Populate Start Date with clicked event date if available ----
     const startDateEl = document.getElementById('weeklyLessonStartDateTextManage');
-    if (startDateEl && startDateStr) {
-        const startDate = parseUnixTimestamp(startDateStr);
-        startDateEl.textContent = formatDate(startDate);
-        // store deterministic ISO date for later parsing
-        try {
-            startDateEl.dataset.fullDate = startDate.toISOString().split('T')[0];
-        } catch (e) {}
-        window.weeklyLessonStartDate = startDate;
+    if (startDateEl) {
+        if (clickedEventDate) {
+            // Use clicked event date instead of start date from googleMeet
+            const [year, month, day] = clickedEventDate.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day, 0, 0, 0);
+            startDateEl.textContent = formatDate(dateObj);
+            startDateEl.dataset.fullDate = clickedEventDate;
+            window.weeklyLessonStartDate = dateObj;
+            console.log('Set start date to clicked event date:', clickedEventDate, '→ formatted:', formatDate(dateObj));
+        } else if (startDateStr) {
+            // Fallback to start date from googleMeet if no clicked event date
+            const startDate = parseUnixTimestamp(startDateStr);
+            startDateEl.textContent = formatDate(startDate);
+            // store deterministic ISO date for later parsing
+            try {
+                startDateEl.dataset.fullDate = startDate.toISOString().split('T')[0];
+            } catch (e) {}
+            window.weeklyLessonStartDate = startDate;
+        }
     }
 
     // ---- Handle End Date + Radio selection ----
@@ -2468,13 +2537,26 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
             if (window.weeklyLessonDayTimes) delete window.weeklyLessonDayTimes[key];
         });
 
-        // Apply active days
-        Object.keys(daysPattern).forEach(day => {
-            if (daysPattern[day] === "1" && dayMap[day] !== undefined) {
-                const widget = widgetRow.querySelector(
-                    `.weekly_lesson_scroll_widget_manage[data-key="${dayMap[day]}"]`
-                );
-                if (widget) {
+        // Determine which day to select based on clicked event
+        let clickedDayOfWeek = null;
+
+        if (clickedEventDate) {
+            // Parse the date in UTC to avoid timezone issues
+            const dateObj = new Date(clickedEventDate + 'T00:00:00Z');
+            clickedDayOfWeek = dateObj.getUTCDay();
+            console.log('Clicked event date:', clickedEventDate, '→ UTC day of week:', clickedDayOfWeek, '→ Date object:', dateObj);
+        }
+
+        // Apply active days - only select the clicked day if available, otherwise all days
+        if (clickedDayOfWeek !== null) {
+            // Only select the specific day that was clicked
+            const widget = widgetRow.querySelector(
+                `.weekly_lesson_scroll_widget_manage[data-key="${clickedDayOfWeek}"]`
+            );
+            if (widget) {
+                // Check if this day is in the pattern
+                const dayName = Object.keys(dayMap).find(k => dayMap[k] === clickedDayOfWeek);
+                if (dayName && daysPattern[dayName] === "1") {
                     widget.classList.add('selected');
                     widget.setAttribute('aria-pressed', 'true');
 
@@ -2482,16 +2564,71 @@ function populateWeeklyModalWithData(googleMeet, selectedDay, activityIndex, sta
                     const end24h = convert12hTo24h(endTime);
 
                     if (!window.weeklyLessonDayTimes) window.weeklyLessonDayTimes = {};
-                    window.weeklyLessonDayTimes[dayMap[day]] = {
+                    
+                    // Store the clicked event's date for this specific day
+                    window.weeklyLessonDayTimes[clickedDayOfWeek] = {
                         start: start24h,
                         end: end24h,
-                        activityIndex
+                        activityIndex,
+                        date: clickedEventDate // Store the date for this specific day
                     };
 
-                    renderWidgetTimeManage(dayMap[day], start24h, end24h);
+                    renderWidgetTimeManage(clickedDayOfWeek, start24h, end24h);
+                    console.log('Selected only clicked day:', clickedDayOfWeek, '(', dayName, ')', 'with date:', clickedEventDate);
+                } else {
+                    console.warn('Clicked day', dayName, 'is not in the weekly lesson pattern');
+                    // Fallback to all days if clicked day is not in pattern
+                    Object.keys(daysPattern).forEach(day => {
+                        if (daysPattern[day] === "1" && dayMap[day] !== undefined) {
+                            const widget = widgetRow.querySelector(
+                                `.weekly_lesson_scroll_widget_manage[data-key="${dayMap[day]}"]`
+                            );
+                            if (widget) {
+                                widget.classList.add('selected');
+                                widget.setAttribute('aria-pressed', 'true');
+
+                                const start24h = convert12hTo24h(startTime);
+                                const end24h = convert12hTo24h(endTime);
+
+                                if (!window.weeklyLessonDayTimes) window.weeklyLessonDayTimes = {};
+                                window.weeklyLessonDayTimes[dayMap[day]] = {
+                                    start: start24h,
+                                    end: end24h,
+                                    activityIndex
+                                };
+
+                                renderWidgetTimeManage(dayMap[day], start24h, end24h);
+                            }
+                        }
+                    });
                 }
             }
-        });
+        } else {
+            // Fallback: select all days from pattern if no clicked day info
+            Object.keys(daysPattern).forEach(day => {
+                if (daysPattern[day] === "1" && dayMap[day] !== undefined) {
+                    const widget = widgetRow.querySelector(
+                        `.weekly_lesson_scroll_widget_manage[data-key="${dayMap[day]}"]`
+                    );
+                    if (widget) {
+                        widget.classList.add('selected');
+                        widget.setAttribute('aria-pressed', 'true');
+
+                        const start24h = convert12hTo24h(startTime);
+                        const end24h = convert12hTo24h(endTime);
+
+                        if (!window.weeklyLessonDayTimes) window.weeklyLessonDayTimes = {};
+                        window.weeklyLessonDayTimes[dayMap[day]] = {
+                            start: start24h,
+                            end: end24h,
+                            activityIndex
+                        };
+
+                        renderWidgetTimeManage(dayMap[day], start24h, end24h);
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -3045,6 +3182,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (button) {
                         button.classList.remove('has-time');
                     }
+                    
+                    // When a day is selected, calculate and store its date
+                    const dayMap = {
+                        Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6
+                    };
+                    const dayName = Object.keys(dayMap).find(k => dayMap[k] === key);
+                    
+                    if (dayName) {
+                        // Get the date to use as base - prefer clicked event date, then start date
+                        const currentEventData = window.currentEventData || null;
+                        const clickedEventDate = currentEventData?.date || null;
+                        const clickedDayOfWeek = clickedEventDate ? new Date(clickedEventDate + 'T00:00:00Z').getUTCDay() : null;
+                        const startDateEl = document.getElementById('weeklyLessonStartDateTextManage');
+                        const startDate = startDateEl?.dataset?.fullDate || null;
+                        
+                        // Calculate date for this day
+                        let dayDate = null;
+                        if (clickedEventDate) {
+                            if (key === clickedDayOfWeek) {
+                                // This is the clicked day - use clicked event date directly
+                                dayDate = clickedEventDate;
+                                console.log('Selected clicked day - using clicked event date:', dayDate);
+                            } else {
+                                // This is a different day - calculate from clicked event date
+                                dayDate = calculateDateForDay(dayName, clickedEventDate);
+                                console.log('Selected different day - calculated date from clicked event:', clickedEventDate, '→', dayDate);
+                            }
+                        } else if (startDate) {
+                            // Fallback to start date
+                            dayDate = calculateDateForDay(dayName, startDate);
+                            console.log('Calculated date from start date:', startDate, '→', dayDate);
+                        }
+                        
+                        if (dayDate) {
+                            // Initialize or update the day times entry
+                            if (!window.weeklyLessonDayTimes) window.weeklyLessonDayTimes = {};
+                            if (!window.weeklyLessonDayTimes[key]) {
+                                window.weeklyLessonDayTimes[key] = {
+                                    start: '09:00',
+                                    end: '10:00'
+                                };
+                            }
+                            window.weeklyLessonDayTimes[key].date = dayDate;
+                            console.log('Stored date for day', dayName, '(', key, '):', dayDate);
+                        }
+                    }
                 }
             }
         });
@@ -3283,7 +3466,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!backdrop) return;
 
         let calendarTarget = 'start';
-        let weeklyLessonStartDate = new Date();
+        // ✅ FIX: Use existing date from window.weeklyLessonStartDate if available (when updating)
+        let weeklyLessonStartDate = window.weeklyLessonStartDate ? new Date(window.weeklyLessonStartDate) :
+            new Date();
         // **FIX: Set to start of day (no time)**
         weeklyLessonStartDate.setHours(0, 0, 0, 0);
 
@@ -4005,9 +4190,60 @@ document.addEventListener('DOMContentLoaded', function() {
             const dayWidgets = document.querySelectorAll(
                 '.weekly_lesson_scroll_widget_manage.selected');
 
+            const baseDate = originalEventData?.date || null;
+            const clickedEventDate = originalEventData?.date || null;
+            const isAllEvents = window.allEvents || false;
+
+            // Map single-letter day abbreviations to 3-letter day names
+            const dayThreeLetterMap = {
+                'M': 'Mon',
+                'T': 'Tue',
+                'W': 'Wed',
+                'Th': 'Thu',
+                'F': 'Fri',
+                'Sa': 'Sat',
+                'Su': 'Sun'
+            };
+
+            // If updating only this event (not all events), we need to determine which specific day to update
+            let clickedDayOfWeek = null;
+            let dayToUpdateForThisEvent = null;
+            
+            if (clickedEventDate && !isAllEvents) {
+                const dateObj = new Date(clickedEventDate + 'T00:00:00Z');
+                clickedDayOfWeek = dateObj.getUTCDay();
+                console.log('Updating only this event - clicked day:', clickedDayOfWeek, 'date:', clickedEventDate);
+                
+                // Determine which day to update:
+                // 1. If user has selected days, use the first selected day
+                // 2. If no days selected, use the clicked day (we'll add it back below)
+                if (dayWidgets.length > 0) {
+                    // User has selected days - use the first selected day
+                    dayToUpdateForThisEvent = parseInt(dayWidgets[0].dataset.key, 10);
+                    console.log('User selected day(s) - will update only day:', dayToUpdateForThisEvent);
+                } else {
+                    // No days selected - will use clicked day
+                    dayToUpdateForThisEvent = clickedDayOfWeek;
+                    console.log('No days selected - will use clicked day:', dayToUpdateForThisEvent);
+                }
+            }
+
             dayWidgets.forEach(widget => {
-                const dayText = widget.querySelector('.weekly_lesson_widget_text_manage')
+                const dayKey = parseInt(widget.dataset.key, 10);
+                let dayText = widget.querySelector('.weekly_lesson_widget_text_manage')
                     ?.textContent || '';
+
+                // Expand single-letter days to 3-letter abbreviations
+                if (dayText.length <= 2) {
+                    dayText = dayThreeLetterMap[dayText] || dayText;
+                }
+
+                // If updating only this event, only include the day to update (first selected day or clicked day)
+                if (!isAllEvents && dayToUpdateForThisEvent !== null && dayKey !== dayToUpdateForThisEvent) {
+                    console.log('Skipping day', dayText, 'because we are updating only day', dayToUpdateForThisEvent);
+                    return; // Skip this day
+                }
+
                 const startTime = widget.querySelector(
                     '.weekly_lesson_widget_hour_minute_manage.start')?.textContent || '';
                 const endTime = widget.querySelector(
@@ -4019,14 +4255,119 @@ document.addEventListener('DOMContentLoaded', function() {
                     '.weekly_lesson_widget_period_manage.end-period')?.textContent || '';
 
                 if (startTime && endTime) {
+                    // Calculate date for this day
+                    let dayDate = null;
+                    
+                    // Get stored date from weeklyLessonDayTimes if available
+                    if (window.weeklyLessonDayTimes && window.weeklyLessonDayTimes[dayKey] && window.weeklyLessonDayTimes[dayKey].date) {
+                        dayDate = window.weeklyLessonDayTimes[dayKey].date;
+                        console.log('Using stored date for day', dayText, ':', dayDate);
+                    } else if (isAllEvents) {
+                        // For all events, calculate from start date
+                        if (startDate) {
+                            dayDate = calculateDateForDay(dayText, startDate);
+                        }
+                    } else {
+                        // For this event only, calculate date based on the selected day
+                        // If this is the clicked day, use clicked event date directly
+                        // If this is a different day, calculate the date for that day from the clicked event date
+                        if (clickedEventDate) {
+                            if (dayKey === clickedDayOfWeek) {
+                                // Same day as clicked - use clicked event date
+                                dayDate = clickedEventDate;
+                                console.log('Using clicked event date for clicked day:', dayDate);
+                            } else {
+                                // Different day - calculate date for this day from clicked event date
+                                dayDate = calculateDateForDay(dayText, clickedEventDate);
+                                console.log('Calculated date for changed day', dayText, 'from clicked date:', clickedEventDate, '→', dayDate);
+                            }
+                        } else if (baseDate) {
+                            dayDate = calculateDateForDay(dayText, baseDate);
+                        }
+                    }
+
                     selectedDays.push({
                         day: dayText,
+                        date: dayDate,
                         start: `${startTime} ${startPeriod}`,
                         end: `${endTime} ${endPeriod}`
                     });
                 }
             });
-
+            
+            // If updating "this event only" and no days were selected, add the clicked day back with default times
+            if (!isAllEvents && selectedDays.length === 0 && clickedDayOfWeek !== null && clickedEventDate) {
+                // Find the widget for the clicked day to get its time, or use default times
+                const clickedDayWidget = document.querySelector(
+                    `.weekly_lesson_scroll_widget_manage[data-key="${clickedDayOfWeek}"]`
+                );
+                
+                const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+                const dayName = Object.keys(dayMap).find(k => dayMap[k] === clickedDayOfWeek);
+                
+                if (dayName) {
+                    const fullDayName = dayThreeLetterMap[dayName] || dayName;
+                    let startTime = '';
+                    let endTime = '';
+                    let startPeriod = '';
+                    let endPeriod = '';
+                    
+                    if (clickedDayWidget) {
+                        // Try to get times from the widget
+                        startTime = clickedDayWidget.querySelector(
+                            '.weekly_lesson_widget_hour_minute_manage.start')?.textContent || '';
+                        endTime = clickedDayWidget.querySelector(
+                            '.weekly_lesson_widget_hour_minute_manage.end')?.textContent || '';
+                        startPeriod = clickedDayWidget.querySelector(
+                            '.weekly_lesson_widget_period_manage.start-period')?.textContent || '';
+                        endPeriod = clickedDayWidget.querySelector(
+                            '.weekly_lesson_widget_period_manage.end-period')?.textContent || '';
+                    }
+                    
+                    // If no times found, try to get from weeklyLessonDayTimes
+                    if (!startTime || !endTime) {
+                        if (window.weeklyLessonDayTimes && window.weeklyLessonDayTimes[clickedDayOfWeek]) {
+                            const dayTimes = window.weeklyLessonDayTimes[clickedDayOfWeek];
+                            const start12h = convert24hTo12h(dayTimes.start || '09:00');
+                            const end12h = convert24hTo12h(dayTimes.end || '10:00');
+                            const startParts = start12h.split(' ');
+                            const endParts = end12h.split(' ');
+                            startTime = startParts[0] || '09:00';
+                            startPeriod = startParts[1] || 'AM';
+                            endTime = endParts[0] || '10:00';
+                            endPeriod = endParts[1] || 'AM';
+                        } else {
+                            // Default times
+                            startTime = '09:00';
+                            startPeriod = 'AM';
+                            endTime = '10:00';
+                            endPeriod = 'AM';
+                        }
+                    }
+                    
+                    selectedDays.push({
+                        day: fullDayName,
+                        date: clickedEventDate,
+                        start: `${startTime} ${startPeriod}`,
+                        end: `${endTime} ${endPeriod}`
+                    });
+                    console.log('Added clicked day back to payload:', fullDayName, clickedEventDate, startTime, endTime);
+                }
+            }
+            
+            // Validate that we have at least one day
+            if (selectedDays.length === 0) {
+                showToastManage('❌ Please select at least one day for the weekly lesson.');
+                return;
+            }
+            
+            console.log('Selected days for payload:', selectedDays, 'isAllEvents:', isAllEvents, 'clickedDayOfWeek:', clickedDayOfWeek);
+            // Reset change-teacher UI so previous selections do not bleed into new events
+            const changeTeacherCheckbox = document.getElementById('changeTeacherCheckbox');
+            if (changeTeacherCheckbox) {
+                changeTeacherCheckbox.checked = false;
+                changeTeacherCheckbox.dispatchEvent(new Event('change'));
+            }
             formData.weeklyLesson = {
                 startDate,
                 interval,
@@ -4265,6 +4606,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const occurrenceDisplay = $('#weeklyLessonOccurrenceDisplayManage');
         if (occurrenceDisplay) occurrenceDisplay.textContent = '13 occurrences';
+
+        // Reset change-teacher UI so previous selections do not bleed into new events
+        const changeTeacherCheckbox = document.getElementById('changeTeacherCheckbox');
+        if (changeTeacherCheckbox) {
+            changeTeacherCheckbox.checked = false;
+            changeTeacherCheckbox.dispatchEvent(new Event('change'));
+        }
+
+        // Reset new teacher dropdown
+        const newTeacherDropdownSection = document.getElementById('newTeacherDropdownSection');
+        if (newTeacherDropdownSection) {
+            newTeacherDropdownSection.style.display = 'none';
+        }
+
+        const newTeacherCurrentLabel = document.getElementById('newTeacherCurrentLabel');
+        if (newTeacherCurrentLabel) {
+            newTeacherCurrentLabel.textContent = 'Select new teacher';
+        }
+
+        const newTeacherCurrentImg = document.getElementById('newTeacherCurrentImg');
+        if (newTeacherCurrentImg) {
+            newTeacherCurrentImg.src =
+                'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop';
+        }
+
+        const newTeacherTrigger = document.getElementById('newTeacherDropdownTrigger');
+        if (newTeacherTrigger) {
+            delete newTeacherTrigger.dataset.userid;
+            delete newTeacherTrigger.dataset.name;
+            delete newTeacherTrigger.dataset.img;
+        }
+
+        // Clear selection from new teacher list items
+        const newTeacherItems = document.querySelectorAll('.new-teacher-item[aria-selected="true"]');
+        newTeacherItems.forEach(item => item.removeAttribute('aria-selected'));
 
         // Clear global variables
         window.selectedCmidManage = null;

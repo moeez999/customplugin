@@ -629,29 +629,31 @@ if (!empty($userids)) {
         $isactive = false;
         $methodlabel = 'Subscription';
 
-        if ($checkFn) {
-            $status = $checkFn($u->id);
-            if (!empty($status) && isset($status['state']) && $status['state'] === 'active') {
-                $isactive = true;
-                if (isset($status['method']) && $status['method']) {
-                    // Optional: show method like PayPal/Braintree/Patreon/Manual
-                    $methodlabel = 'Subscription';
-                }
-            }
-        } else {
-            // If checker not available, skip (or set your own fallback)
-            continue;
-        }
+       // if ($checkFn) {
+            // $status = $checkFn($u->id);
+            // if (!empty($status) && isset($status['state']) && $status['state'] === 'active') {
+            //     $isactive = true;
+            //     if (isset($status['method']) && $status['method']) {
+            //         // Optional: show method like PayPal/Braintree/Patreon/Manual
+            //         $methodlabel = 'Subscription';
+            //     }
+            // }
+        // } else {
+        //     // If checker not available, skip (or set your own fallback)
+        //     continue;
+        // }
 
-        if (!$isactive) {
-            continue;
-        }
+        // if (!$isactive) {
+        //     continue;
+        // }
 
         // 5) Build avatar URL just like teachers
         $pic = new user_picture($u);
         $pic->size = 50;
         $imgurl = $pic->get_url($PAGE)->out(false);
         $name   = fullname($u, true);
+
+        $methodlabel  = 'subscriptionloading';
 
         // 6) Build item (keep structure/classes the same)
         $students_items_html .=

@@ -543,15 +543,25 @@ $(function () {
     .attr("type", "checkbox")
     .prop("checked", false);
 
-  // Open/position widget
+  // Open/position widget with toggle functionality
   $trigger.on("click", function (e) {
     e.stopPropagation();
-    const off = $trigger.offset();
-    const h = $trigger.outerHeight();
-    closeAllDropdowns();
-    $(".cohort-search-widget-container").not($widget).hide();
-    $widget.css({ display: "flex", top: off.top + h + 4, left: off.left });
-    setTimeout(() => $input.trigger("focus"), 0);
+
+    // Check if widget is currently visible
+    const isVisible = $widget.css("display") === "flex";
+
+    if (isVisible) {
+      // Close the widget
+      closeWidget();
+    } else {
+      // Open the widget
+      const off = $trigger.offset();
+      const h = $trigger.outerHeight();
+      closeAllDropdowns();
+      $(".cohort-search-widget-container").not($widget).hide();
+      $widget.css({ display: "flex", top: off.top + h + 4, left: off.left });
+      setTimeout(() => $input.trigger("focus"), 0);
+    }
   });
 
   // Close on outside / Esc

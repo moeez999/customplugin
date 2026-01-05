@@ -783,16 +783,35 @@ $(function() {
 $(function() {
     let filterPopoverVisible = false; // Track popover visibility state
 
+    // Helper function to close filter popover
+    window.closeFilterPopover = function() {
+        if (filterPopoverVisible) {
+            const $popover = $('.events-filter-popover');
+            $popover.hide();
+            $popover.appendTo('#search-extra');
+            filterPopoverVisible = false;
+        }
+    };
+
     $('#extra-search-trigger').on('click', function(e) {
         e.stopPropagation();
 
         const $btn = $(this);
-        const $popover = $('#search-extra .events-filter-popover');
+        // Find popover wherever it is (in #search-extra or body)
+        let $popover = $('.events-filter-popover');
 
         // Toggle visibility
         filterPopoverVisible = !filterPopoverVisible;
 
         if (filterPopoverVisible) {
+            // Close other dropdowns when opening filter
+            const teacherWidget = document.getElementById('search-teacher');
+            const cohortWidget = document.getElementById('cohort-search-widget');
+            const studentWidget = document.getElementById('search-student');
+            if (teacherWidget) teacherWidget.style.display = 'none';
+            if (cohortWidget) cohortWidget.style.display = 'none';
+            if (studentWidget) studentWidget.style.display = 'none';
+            
             // Append to body and position absolutely under the button
             const off = $btn.offset();
             const top = off.top + $btn.outerHeight() + 8;
@@ -847,15 +866,24 @@ $(function() {
     $(document).on('change', '#ef_select_all', function() {
         const checked = $(this).is(':checked');
         $('.events-filter-popover').find('input.ef-input').not(this).prop('checked', checked);
-        $('.events-filter-popover input.ef-input').trigger('change');
+        // Don't trigger change event to prevent infinite loop
+        applyEventTypeFilter();
     });
 
     // If any individual checkbox is unchecked, update Select All and label
     $(document).on('change', '.events-filter-popover input.ef-input', function() {
+        // Prevent recursion when this is triggered by Select All
+        if ($(this).attr('id') === 'ef_select_all') return;
+        
         const all = $('.events-filter-popover input.ef-input').not('#ef_select_all');
         const checkedCount = all.filter(':checked').length;
         const total = all.length;
-        $('#ef_select_all').prop('checked', checkedCount === total);
+        
+        // Don't trigger change event when setting Select All state
+        const selectAll = $('#ef_select_all')[0];
+        if (selectAll) {
+            selectAll.checked = (checkedCount === total);
+        }
 
         // Update display text to show how many selected (if any)
         if (checkedCount === 0) {

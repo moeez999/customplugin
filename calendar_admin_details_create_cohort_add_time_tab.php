@@ -919,7 +919,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function resetAddTimeForm(parent, initialState) {
+function resetAddTimeForm(parent, initialState, slotInfo) {
+    // If called without parameters but with slot info, populate from slot
+    if (!parent && !initialState && slotInfo) {
+        parent = document.getElementById('addTimeTabContent');
+        if (!parent) return;
+        
+        // Create initialState from the clicked slot
+        const slotDate = new Date(slotInfo.date);
+        const dateStr = slotDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        const dayName = dayNames[slotDate.getDay()];
+        const monthName = monthNames[slotDate.getMonth()];
+        const dayNum = slotDate.getDate();
+        const label = `${dayName}, ${monthName} ${dayNum}`;
+        
+        initialState = {
+            teacher: {
+                id: '',
+                name: 'Select Teacher',
+                img: ''
+            },
+            title: 'Busy',
+            from: {
+                iso: dateStr,
+                label: label,
+                time: '9:30 am'
+            },
+            until: {
+                iso: dateStr,
+                label: label,
+                time: '10:00 am'
+            },
+            allDay: false
+        };
+    }
+    
     if (!parent || !initialState) return;
 
     const teacherTrigger = parent.querySelector('#addtimeTeacherTrigger');
@@ -928,12 +965,12 @@ function resetAddTimeForm(parent, initialState) {
     const teacherMenu = parent.querySelector('#addtimeTeacherMenu');
 
     // teacher
-    if (teacherAvatar) teacherAvatar.src = initialState.teacher.img;
+    if (teacherAvatar && initialState.teacher.img) teacherAvatar.src = initialState.teacher.img;
     if (teacherNameEl) teacherNameEl.textContent = initialState.teacher.name;
     if (teacherTrigger) {
-        teacherTrigger.dataset.userid = initialState.teacher.id;
+        teacherTrigger.dataset.userid = initialState.teacher.id || '';
         teacherTrigger.dataset.name = initialState.teacher.name;
-        teacherTrigger.dataset.img = initialState.teacher.img;
+        teacherTrigger.dataset.img = initialState.teacher.img || '';
     }
 
     // title
