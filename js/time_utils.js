@@ -44,6 +44,12 @@ function fmt12(min) {
  * @returns {number} - Minutes from midnight (e.g., 570 for "09:30" or "9:30 AM")
  */
 function minutes(hhmm) {
+    // If input is already a number (minutes from midnight), return it as-is
+    if (typeof hhmm === 'number' && !isNaN(hhmm)) {
+        return hhmm;
+    }
+    
+    // If input is not a string, log warning and return 0
     if (!hhmm || typeof hhmm !== 'string') {
         console.warn('minutes: Invalid input', hhmm);
         return 0;

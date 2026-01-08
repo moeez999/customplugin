@@ -2730,18 +2730,47 @@ $(function () {
     clearDateFilter(); // Clear filter when changing weeks
     clearTimeSlotFilter(); // Clear time slot filter when changing weeks
     currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    // Make currentWeekStart available globally for fetchCalendarEvents
+    window.currentWeekStart = currentWeekStart;
+    
+    // First render the week layout to establish week dates
     renderWeek(true);
+    // Then fetch fresh events for this week
+    if (
+      window.fetchCalendarEvents &&
+      typeof window.fetchCalendarEvents === "function"
+    ) {
+      window.fetchCalendarEvents();
+    }
   });
   $("#next-week").on("click", () => {
     clearDateFilter(); // Clear filter when changing weeks
     clearTimeSlotFilter(); // Clear time slot filter when changing weeks
     currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    // Make currentWeekStart available globally for fetchCalendarEvents
+    window.currentWeekStart = currentWeekStart;
+    
+    // First render the week layout to establish week dates
     renderWeek(true);
+    // Then fetch fresh events for this week
+    if (
+      window.fetchCalendarEvents &&
+      typeof window.fetchCalendarEvents === "function"
+    ) {
+      window.fetchCalendarEvents();
+    }
   });
 
   // Today button: jump to current week (Monday)
   $("#btnToday").on("click", () => {
     currentWeekStart = window.mondayOf(new Date());
+    // Make currentWeekStart available globally for fetchCalendarEvents
+    window.currentWeekStart = currentWeekStart;
+    
+    // Clear date filters when navigating to a new week to avoid hiding events
+    // Time slot filters can remain as they're not week-specific
+    clearDateFilter();
+    
     // First render the week layout to establish week dates
     renderWeek(true);
     // Then fetch fresh events for this week
@@ -2968,19 +2997,30 @@ $(function () {
 
       // If reschedule_instant with both previous and current, create two events
       if (hasRescheduleInstant && previousEvent && currentEvent) {
+        // Convert times to minutes for comparison
+        const prevStart = typeof previousEvent.start === "string"
+          ? minutes(previousEvent.start)
+          : previousEvent.start;
+        const prevEnd = typeof previousEvent.end === "string"
+          ? minutes(previousEvent.end)
+          : previousEvent.end;
+        const currStart = typeof currentEvent.start === "string"
+          ? minutes(currentEvent.start)
+          : currentEvent.start;
+        const currEnd = typeof currentEvent.end === "string"
+          ? minutes(currentEvent.end)
+          : currentEvent.end;
+        
+        // Check if time has changed (same start and end times)
+        const timeUnchanged = prevStart === currStart && prevEnd === currEnd && previousEvent.date === currentEvent.date;
+        
         // Create faded previous event
         const prevIdx = weekDates.indexOf(previousEvent.date);
         if (prevIdx !== -1) {
           const ePrev = { ...raw };
           ePrev.date = previousEvent.date;
-          ePrev.start =
-            typeof previousEvent.start === "string"
-              ? minutes(previousEvent.start)
-              : previousEvent.start;
-          ePrev.end =
-            typeof previousEvent.end === "string"
-              ? minutes(previousEvent.end)
-              : previousEvent.end;
+          ePrev.start = prevStart;
+          ePrev.end = prevEnd;
           ePrev.teacherId = previousEvent.teacher || raw.teacherId;
           ePrev.isFadedReschedule = true; // Mark as faded
           ePrev.isReschedulePrevious = true;
@@ -3006,47 +3046,43 @@ $(function () {
           }
         }
 
-        // Create current event
-        const currIdx = weekDates.indexOf(currentEvent.date);
-        if (currIdx !== -1) {
-          const eCurr = { ...raw };
-          eCurr.date = currentEvent.date;
-          eCurr.start =
-            typeof currentEvent.start === "string"
-              ? minutes(currentEvent.start)
-              : currentEvent.start;
-          eCurr.end =
-            typeof currentEvent.end === "string"
-              ? minutes(currentEvent.end)
-              : currentEvent.end;
-          eCurr.teacherId = currentEvent.teacher || raw.teacherId;
-          eCurr.isRescheduleCurrent = true;
+        // Only create current event if time has changed
+        if (!timeUnchanged) {
+          const currIdx = weekDates.indexOf(currentEvent.date);
+          if (currIdx !== -1) {
+            const eCurr = { ...raw };
+            eCurr.date = currentEvent.date;
+            eCurr.start = currStart;
+            eCurr.end = currEnd;
+            eCurr.teacherId = currentEvent.teacher || raw.teacherId;
+            eCurr.isRescheduleCurrent = true;
 
-          // Check if teacher changed
-          const oldTeacherId = previousEvent.teacher;
-          const newTeacherId = currentEvent.teacher;
-          if (oldTeacherId !== newTeacherId) {
-            eCurr.isTeacherChanged = true;
-          }
+            // Check if teacher changed
+            const oldTeacherId = previousEvent.teacher;
+            const newTeacherId = currentEvent.teacher;
+            if (oldTeacherId !== newTeacherId) {
+              eCurr.isTeacherChanged = true;
+            }
 
-          // Handle midnight-crossing for current event
-          if (eCurr.end < eCurr.start) {
-            const pairedId = `paired-curr-${Date.now()}-${Math.random()}`;
-            const eCurr1 = { ...eCurr };
-            eCurr1.end = 24 * 60;
-            eCurr1.isMidnightCrossing = true;
-            eCurr1.pairedId = pairedId;
-            eCurr1.part = "start";
-            perDay[currIdx].push(eCurr1);
+            // Handle midnight-crossing for current event
+            if (eCurr.end < eCurr.start) {
+              const pairedId = `paired-curr-${Date.now()}-${Math.random()}`;
+              const eCurr1 = { ...eCurr };
+              eCurr1.end = 24 * 60;
+              eCurr1.isMidnightCrossing = true;
+              eCurr1.pairedId = pairedId;
+              eCurr1.part = "start";
+              perDay[currIdx].push(eCurr1);
 
-            const eCurr2 = { ...eCurr };
-            eCurr2.start = 0;
-            eCurr2.isMidnightCrossing = true;
-            eCurr2.pairedId = pairedId;
-            eCurr2.part = "end";
-            if (currIdx < 6) perDay[currIdx + 1].push(eCurr2);
-          } else {
-            perDay[currIdx].push(eCurr);
+              const eCurr2 = { ...eCurr };
+              eCurr2.start = 0;
+              eCurr2.isMidnightCrossing = true;
+              eCurr2.pairedId = pairedId;
+              eCurr2.part = "end";
+              if (currIdx < 6) perDay[currIdx + 1].push(eCurr2);
+            } else {
+              perDay[currIdx].push(eCurr);
+            }
           }
         }
 
@@ -6412,9 +6448,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohortids = getSelectedCohortIds();
     const studentids = getSelectedStudentIds();
 
+    // Use currentWeekStart if available, otherwise fall back to currentStart
+    const weekStart = window.currentWeekStart || currentStart || getWeekStart(new Date());
+    const weekEnd = getWeekEnd(weekStart);
+
     const params = new URLSearchParams();
-    params.set("start", window.formatYMD(currentStart));
-    params.set("end", window.formatYMD(currentEnd));
+    params.set("start", window.formatYMD(weekStart));
+    params.set("end", window.formatYMD(weekEnd));
 
     if (teacherids && teacherids.length > 0)
       params.set("teacherids", teacherids.join(","));
@@ -6710,8 +6750,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (prevTid && currTid && prevTid !== currTid) {
           eventObj.isTeacherChanged = true;
         }
-        window.events.push(eventObj);
-        // If event is reschedule_instant, add previous event as faded
+        // If event is reschedule_instant, check if time has changed
+        let shouldAddMainEvent = true;
         if (
           Array.isArray(ev.statuses) &&
           ev.statuses.some((s) => s.code === "reschedule_instant" && s.previous)
@@ -6720,11 +6760,31 @@ document.addEventListener("DOMContentLoaded", () => {
             (s) => s.code === "reschedule_instant" && (s.previous || null)
           );
           if (statusObj && statusObj.previous) {
+            // Convert times to minutes for comparison
+            const prevStart = typeof statusObj.previous.start === "string"
+              ? minutes(statusObj.previous.start)
+              : statusObj.previous.start;
+            const prevEnd = typeof statusObj.previous.end === "string"
+              ? minutes(statusObj.previous.end)
+              : statusObj.previous.end;
+            const currStart = typeof eventObj.start === "string"
+              ? minutes(eventObj.start)
+              : eventObj.start;
+            const currEnd = typeof eventObj.end === "string"
+              ? minutes(eventObj.end)
+              : eventObj.end;
+            
+            // Check if time has changed (same start, end, and date)
+            const timeUnchanged = prevStart === currStart && 
+                                 prevEnd === currEnd && 
+                                 statusObj.previous.date === eventObj.date;
+            
+            // Add faded previous event
             window.events.push({
               ...eventObj,
               date: statusObj.previous.date,
-              start: statusObj.previous.start,
-              end: statusObj.previous.end,
+              start: prevStart,
+              end: prevEnd,
               faded: true,
               title: eventObj.title
                 ? eventObj.title + " (Previous)"
@@ -6733,7 +6793,17 @@ document.addEventListener("DOMContentLoaded", () => {
               avatar: ev.previous_teacher_picture || eventObj.avatar,
               teachernames: [ev.previous_teachername || ""],
             });
+            
+            // Only add main event if time has changed
+            if (timeUnchanged) {
+              shouldAddMainEvent = false;
+            }
           }
+        }
+        
+        // Only add main event if time has changed (or if not a reschedule_instant)
+        if (shouldAddMainEvent) {
+          window.events.push(eventObj);
         }
       }
 
@@ -6741,6 +6811,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof renderWeek === "function") {
         renderWeek(false);
       }
+      
+      // Apply filters after rendering to ensure events are properly shown/hidden
+      if (typeof applyFilters === "function") {
+        applyFilters();
+      }
+      
       // ✅ NEW: Refresh agenda view after events are populated
       if (typeof window.refreshAgendaView === "function") {
         window.refreshAgendaView();
@@ -6988,6 +7064,10 @@ document.addEventListener("DOMContentLoaded", () => {
     d.setDate(d.getDate() + deltaWeeks * 7);
     currentStart = getWeekStart(d);
     currentEnd = getWeekEnd(currentStart);
+    // Also update window.currentWeekStart for consistency
+    if (window.currentWeekStart) {
+      window.currentWeekStart = new Date(currentStart);
+    }
     fetchCalendarEvents();
   }
 
